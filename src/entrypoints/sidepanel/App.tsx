@@ -418,7 +418,7 @@ export function App() {
   }, [setThemeMode]);
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--md-sys-color-surface)' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--md-sys-color-surface)' }}>
       {/* Header */}
       <Header
         onThemeToggle={() => {
@@ -651,6 +651,13 @@ function ContentIndicators({ content }: { content: ExtractedContent }) {
       {commentCount > 0 && (
         <IndicatorChip icon={String.fromCodePoint(0x1F4AC)} label={`${commentCount} comments \u00B7 ${commentWords.toLocaleString()} words`} variant="success" />
       )}
+      {(content.richImages?.length ?? 0) > 0 && (
+        <IndicatorChip
+          icon={String.fromCodePoint(0x1F5BC)}
+          label={`${content.richImages!.length} image${content.richImages!.length > 1 ? 's' : ''}`}
+          variant="neutral"
+        />
+      )}
     </div>
   );
 }
@@ -693,6 +700,9 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh }: {
       borderBottom: '1px solid var(--md-sys-color-outline-variant)',
       flexShrink: 0,
       backgroundColor: 'var(--md-sys-color-surface)',
+      zIndex: 10,
+      position: 'relative',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
     }}>
       <span style={{ font: 'var(--md-sys-typescale-title-large)', color: 'var(--md-sys-color-on-surface)' }}>
         TL;DR

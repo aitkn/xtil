@@ -46,6 +46,9 @@ export function ChatInputBar({ value, onChange, onSubmit, isFirstSubmit, loading
         backgroundColor: 'var(--md-sys-color-surface-container-low)',
         borderTop: '1px solid var(--md-sys-color-outline-variant)',
         flexShrink: 0,
+        zIndex: 10,
+        position: 'relative',
+        boxShadow: '0 -1px 3px rgba(0,0,0,0.08)',
       }}
     >
       <div
