@@ -56,7 +56,7 @@ Summarize web page and YouTube video content using AI.
 ## Permissions Justification (required for each permission)
 
 ### activeTab
-Used to read the text content of the page the user is currently viewing when they click "Summarize". The extension only accesses the active tab's content upon explicit user action.
+Used to read the text content of the page the user is currently viewing. The extension reads page metadata (title, word count) when the side panel opens to display content indicators. The extracted content is only sent to an external AI provider when the user explicitly clicks "Summarize".
 
 ### sidePanel
 The extension's user interface is displayed in Chrome's side panel. This permission is required to register and open the side panel.
