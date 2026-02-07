@@ -1,7 +1,7 @@
 {
   "name": "tldr",
   "version": "1.0.0",
-  "description": "TLDR - Summarize web pages and YouTube videos",
+  "description": "Summarize any page or YouTube video with AI, refine via chat, and save to Notion",
   "private": true,
   "type": "module",
   "scripts": {
