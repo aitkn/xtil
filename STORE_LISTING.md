@@ -14,26 +14,29 @@ Summarize any page or YouTube video with AI, refine via chat, and save to Notion
 
 TL;DR gives you AI-powered summaries of any web page or YouTube video — right in Chrome's side panel.
 
-**Three steps to knowledge capture:**
-1. **Summarize** — Get a structured summary of any web page or YouTube video with key takeaways, notable quotes, and tags
-2. **Refine** — Chat with the AI to adjust the summary, ask follow-up questions, or dig deeper into specific topics
-3. **Save** — Export to Notion with all metadata, tags, and source links preserved
+Three steps to knowledge capture:
 
-**Works everywhere:**
-- Articles and blog posts (extracted with Mozilla Readability)
-- YouTube videos (transcripts + top comments)
-- Google Docs
-- Any web page
+1. Summarize — Get a structured summary of any web page or YouTube video with key takeaways, notable quotes, and tags
+2. Refine — Chat with the AI to adjust the summary, ask follow-up questions, or dig deeper into specific topics
+3. Save — Export to Notion with all metadata, tags, and source links preserved
 
-**Bring your own API key — no subscription, no account.**
+Works everywhere:
+
+  - Articles and blog posts
+  - YouTube videos (transcripts + top comments)
+  - Google Docs
+  - Any web page
+
+Bring your own API key — no subscription, no account.
 Works with OpenAI (GPT-4o), Anthropic (Claude), Google Gemini, xAI (Grok), DeepSeek, or any self-hosted OpenAI-compatible endpoint (Ollama, vLLM, etc.)
 
-**More features:**
-- Light, dark, and system themes
-- Configurable summary language and detail level
-- Auto-translation of summaries into your preferred language
+More features:
 
-**Privacy-first:** No data collection, no analytics, no backend server. Your API keys stay on your device. Content is sent directly to the AI provider you choose.
+  - Light, dark, and system themes
+  - Configurable summary language and detail level
+  - Auto-translation of summaries into your preferred language
+
+Privacy-first: No data collection, no analytics, no backend server. Your API keys stay on your device. Content is sent directly to the AI provider you choose.
 
 ---
 
