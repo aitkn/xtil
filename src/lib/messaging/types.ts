@@ -1,6 +1,6 @@
 import type { ExtractedContent } from '../extractors/types';
 import type { SummaryDocument } from '../summarizer/types';
-import type { ChatMessage } from '../llm/types';
+import type { ChatMessage, ModelInfo } from '../llm/types';
 import type { Settings } from '../storage/types';
 
 export type MessageType =
@@ -22,7 +22,9 @@ export type MessageType =
   | 'SAVE_SETTINGS'
   | 'SAVE_SETTINGS_RESULT'
   | 'FETCH_NOTION_DATABASES'
-  | 'NOTION_DATABASES_RESULT';
+  | 'NOTION_DATABASES_RESULT'
+  | 'FETCH_MODELS'
+  | 'FETCH_MODELS_RESULT';
 
 export interface ExtractContentMessage {
   type: 'EXTRACT_CONTENT';
@@ -131,6 +133,20 @@ export interface NotionDatabasesResultMessage {
   error?: string;
 }
 
+export interface FetchModelsMessage {
+  type: 'FETCH_MODELS';
+  providerId: string;
+  apiKey: string;
+  endpoint?: string;
+}
+
+export interface FetchModelsResultMessage {
+  type: 'FETCH_MODELS_RESULT';
+  success: boolean;
+  models?: ModelInfo[];
+  error?: string;
+}
+
 export type Message =
   | ExtractContentMessage
   | ExtractResultMessage
@@ -150,4 +166,6 @@ export type Message =
   | SaveSettingsMessage
   | SaveSettingsResultMessage
   | FetchNotionDatabasesMessage
-  | NotionDatabasesResultMessage;
+  | NotionDatabasesResultMessage
+  | FetchModelsMessage
+  | FetchModelsResultMessage;

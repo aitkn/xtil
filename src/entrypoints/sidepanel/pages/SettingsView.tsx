@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import type { Settings, ThemeMode, ProviderConfig } from '@/lib/storage/types';
+import type { ModelInfo } from '@/lib/llm/types';
 import { PROVIDER_DEFINITIONS } from '@/lib/llm/registry';
 import { Button } from '@/components/Button';
 
@@ -18,24 +19,35 @@ const LANGUAGES = [
 interface SettingsViewProps {
   settings: Settings;
   onSave: (settings: Settings) => Promise<void>;
-  onTestLLM: () => Promise<boolean>;
+  onTestLLM: () => Promise<{ success: boolean; error?: string }>;
   onTestNotion: () => Promise<boolean>;
   onFetchNotionDatabases: () => Promise<Array<{ id: string; title: string }>>;
+  onFetchModels: (providerId: string, apiKey: string, endpoint?: string) => Promise<ModelInfo[]>;
   onThemeChange: (mode: ThemeMode) => void;
   currentTheme: ThemeMode;
 }
 
-export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetchNotionDatabases, onThemeChange, currentTheme }: SettingsViewProps) {
+export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetchNotionDatabases, onFetchModels, onThemeChange, currentTheme }: SettingsViewProps) {
   const [local, setLocal] = useState<Settings>(settings);
   const [testingLLM, setTestingLLM] = useState(false);
   const [testingNotion, setTestingNotion] = useState(false);
   const [llmStatus, setLlmStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [llmError, setLlmError] = useState<string | null>(null);
   const [notionStatus, setNotionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [notionDatabases, setNotionDatabases] = useState<Array<{ id: string; title: string }>>([]);
   const [loadingDbs, setLoadingDbs] = useState(false);
 
+  // Dynamic model state
+  const [fetchedModels, setFetchedModels] = useState<Record<string, ModelInfo[]>>({});
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+
   useEffect(() => {
     setLocal(settings);
+    // Load cached models from settings
+    if (settings.cachedModels) {
+      setFetchedModels(settings.cachedModels);
+    }
   }, [settings]);
 
   const currentProviderId = local.activeProviderId;
@@ -46,6 +58,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     contextWindow: 100000,
   };
   const currentProviderDef = PROVIDER_DEFINITIONS.find((p) => p.id === currentProviderId);
+  const currentModels = fetchedModels[currentProviderId] || [];
 
   const updateProviderConfig = (patch: Partial<ProviderConfig>) => {
     setLocal({
@@ -57,6 +70,23 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     });
   };
 
+  const doFetchModels = useCallback(async (providerId?: string) => {
+    const pid = providerId || currentProviderId;
+    const config = local.providerConfigs[pid] || currentConfig;
+    if (!config.apiKey && pid !== 'self-hosted') return;
+
+    setLoadingModels(true);
+    setModelsError(null);
+    try {
+      const models = await onFetchModels(pid, config.apiKey, config.endpoint);
+      setFetchedModels((prev) => ({ ...prev, [pid]: models }));
+    } catch (err) {
+      setModelsError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingModels(false);
+    }
+  }, [currentProviderId, local.providerConfigs, currentConfig, onFetchModels]);
+
   const handleProviderChange = (newProviderId: string) => {
     // Save current config before switching
     const updatedConfigs = {
@@ -67,13 +97,12 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     // Load or create config for new provider
     if (!updatedConfigs[newProviderId]) {
       const def = PROVIDER_DEFINITIONS.find((p) => p.id === newProviderId);
-      const model = def?.defaultModels[0];
       updatedConfigs[newProviderId] = {
         providerId: newProviderId,
         apiKey: '',
-        model: model?.id || '',
+        model: '',
         endpoint: def?.defaultEndpoint || '',
-        contextWindow: model?.contextWindow || 100000,
+        contextWindow: def?.defaultContextWindow || 100000,
       };
     }
 
@@ -85,13 +114,14 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   };
 
   const handleSave = async () => {
-    // Ensure current config is saved before persisting
+    // Ensure current config and cached models are preserved
     const finalSettings = {
       ...local,
       providerConfigs: {
         ...local.providerConfigs,
         [currentProviderId]: currentConfig,
       },
+      cachedModels: { ...local.cachedModels, ...fetchedModels },
     };
     await onSave(finalSettings);
   };
@@ -99,12 +129,15 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   const handleTestLLM = async () => {
     setTestingLLM(true);
     setLlmStatus('idle');
+    setLlmError(null);
     try {
       await handleSave();
-      const success = await onTestLLM();
-      setLlmStatus(success ? 'success' : 'error');
-    } catch {
+      const result = await onTestLLM();
+      setLlmStatus(result.success ? 'success' : 'error');
+      if (!result.success && result.error) setLlmError(result.error);
+    } catch (err) {
       setLlmStatus('error');
+      setLlmError(err instanceof Error ? err.message : String(err));
     } finally {
       setTestingLLM(false);
     }
@@ -153,23 +186,42 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         ))}
       </select>
 
-      <Label>API Key</Label>
+      <Label>
+        API Key
+        {currentProviderDef?.apiKeyUrl && (
+          <a
+            href={currentProviderDef.apiKeyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              marginLeft: '6px',
+              font: 'var(--md-sys-typescale-label-small)',
+              color: 'var(--md-sys-color-primary)',
+              textDecoration: 'none',
+            }}
+            title={`Get ${currentProviderDef.name} API key`}
+          >
+            Get key &rarr;
+          </a>
+        )}
+      </Label>
       <input
         type="password"
         value={currentConfig.apiKey}
         onInput={(e) => updateProviderConfig({ apiKey: (e.target as HTMLInputElement).value })}
+        onBlur={() => doFetchModels()}
         placeholder="Enter API key..."
         style={inputStyle}
       />
 
       <Label>Model</Label>
-      <div style={{ display: 'flex', gap: '4px' }}>
+      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
         <select
-          value={currentProviderDef?.defaultModels.some((m) => m.id === currentConfig.model) ? currentConfig.model : '__custom__'}
+          value={currentModels.some((m) => m.id === currentConfig.model) ? currentConfig.model : '__custom__'}
           onChange={(e) => {
             const val = (e.target as HTMLSelectElement).value;
             if (val !== '__custom__') {
-              const model = currentProviderDef?.defaultModels.find((m) => m.id === val);
+              const model = currentModels.find((m) => m.id === val);
               updateProviderConfig({
                 model: val,
                 contextWindow: model?.contextWindow || currentConfig.contextWindow,
@@ -178,14 +230,25 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           }}
           style={{ ...selectStyle, flex: 1 }}
         >
-          {currentProviderDef?.defaultModels.map((m) => (
+          {currentModels.length === 0 && !currentConfig.model && (
+            <option value="__custom__">Enter API key to load models...</option>
+          )}
+          {currentModels.map((m) => (
             <option key={m.id} value={m.id}>{m.name}</option>
           ))}
           <option value="__custom__">Custom...</option>
         </select>
+        <Button onClick={() => doFetchModels()} loading={loadingModels} size="sm" variant="ghost" title="Refresh model list">
+          Refresh
+        </Button>
       </div>
+      {modelsError && (
+        <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-error)', marginTop: '4px' }}>
+          {modelsError}
+        </div>
+      )}
 
-      {!currentProviderDef?.defaultModels.some((m) => m.id === currentConfig.model) && (
+      {(!currentModels.some((m) => m.id === currentConfig.model) && currentConfig.model) && (
         <>
           <Label>Custom Model ID</Label>
           <input
@@ -222,6 +285,11 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         {llmStatus === 'success' && <StatusBadge type="success">Connected!</StatusBadge>}
         {llmStatus === 'error' && <StatusBadge type="error">Failed</StatusBadge>}
       </div>
+      {llmError && (
+        <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-error)', marginTop: '4px' }}>
+          {llmError}
+        </div>
+      )}
 
       {/* Notion Configuration */}
       <SectionHeader>Notion Export</SectionHeader>

@@ -14,7 +14,9 @@ import type {
   SaveSettingsResultMessage,
   NotionDatabasesResultMessage,
   ExportResultMessage,
+  FetchModelsResultMessage,
 } from '@/lib/messaging/types';
+import type { ModelInfo } from '@/lib/llm/types';
 import { SummaryContent, MetadataHeader } from './pages/SummaryView';
 import { SettingsView } from './pages/SettingsView';
 import { Toast } from '@/components/Toast';
@@ -314,9 +316,9 @@ export function App() {
     }
   }, []);
 
-  const handleTestLLM = useCallback(async (): Promise<boolean> => {
+  const handleTestLLM = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     const response = await sendMessage({ type: 'TEST_LLM_CONNECTION' }) as ConnectionTestResultMessage;
-    return response.success;
+    return { success: response.success, error: response.error };
   }, []);
 
   const handleTestNotion = useCallback(async (): Promise<boolean> => {
@@ -327,6 +329,12 @@ export function App() {
   const handleFetchNotionDatabases = useCallback(async (): Promise<Array<{ id: string; title: string }>> => {
     const response = await sendMessage({ type: 'FETCH_NOTION_DATABASES' }) as NotionDatabasesResultMessage;
     return response.databases || [];
+  }, []);
+
+  const handleFetchModels = useCallback(async (providerId: string, apiKey: string, endpoint?: string): Promise<ModelInfo[]> => {
+    const response = await sendMessage({ type: 'FETCH_MODELS', providerId, apiKey, endpoint }) as FetchModelsResultMessage;
+    if (!response.success) throw new Error(response.error || 'Failed to fetch models');
+    return response.models || [];
   }, []);
 
   const handleThemeChange = useCallback((mode: Settings['theme']) => {
@@ -445,6 +453,7 @@ export function App() {
           onTestLLM={handleTestLLM}
           onTestNotion={handleTestNotion}
           onFetchNotionDatabases={handleFetchNotionDatabases}
+          onFetchModels={handleFetchModels}
           onThemeChange={handleThemeChange}
           currentTheme={themeMode}
         />
@@ -563,6 +572,9 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh }: {
         TL;DR
       </span>
       <div style={{ display: 'flex', gap: '4px' }}>
+        <IconButton onClick={() => window.open('https://buymeacoffee.com/aitkn', '_blank', 'noopener')} label="Support">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
+        </IconButton>
         <IconButton onClick={onRefresh} label="Refresh — re-link to current tab">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" /></svg>
         </IconButton>

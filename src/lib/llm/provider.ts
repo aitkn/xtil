@@ -9,12 +9,21 @@ export class OpenAICompatibleProvider implements LLMProvider {
   readonly name: string;
   private config: ProviderConfig;
   private endpoint: string;
+  private isOpenAI: boolean;
 
   constructor(config: ProviderConfig, name: string, defaultEndpoint: string) {
     this.id = config.providerId;
     this.name = name;
     this.config = config;
     this.endpoint = config.endpoint || defaultEndpoint;
+    this.isOpenAI = config.providerId === 'openai';
+  }
+
+  private tokenLimitParam(maxTokens: number): Record<string, number> {
+    // OpenAI's newer models (o-series, gpt-4.1, etc.) require max_completion_tokens
+    return this.isOpenAI
+      ? { max_completion_tokens: maxTokens }
+      : { max_tokens: maxTokens };
   }
 
   async sendChat(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
@@ -23,7 +32,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       model: this.config.model,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
       temperature: options?.temperature ?? 0.3,
-      max_tokens: options?.maxTokens ?? 4096,
+      ...this.tokenLimitParam(options?.maxTokens ?? 4096),
       stream: false,
     };
 
@@ -51,7 +60,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       model: this.config.model,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
       temperature: options?.temperature ?? 0.3,
-      max_tokens: options?.maxTokens ?? 4096,
+      ...this.tokenLimitParam(options?.maxTokens ?? 4096),
       stream: true,
     };
 

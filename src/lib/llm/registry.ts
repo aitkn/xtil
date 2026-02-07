@@ -8,53 +8,42 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
     id: 'openai',
     name: 'OpenAI',
     defaultEndpoint: 'https://api.openai.com',
-    defaultModels: [
-      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 },
-      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', contextWindow: 128000 },
-    ],
+    defaultContextWindow: 128000,
+    apiKeyUrl: 'https://platform.openai.com/api-keys',
   },
   {
     id: 'anthropic',
     name: 'Anthropic',
     defaultEndpoint: 'https://api.anthropic.com',
-    defaultModels: [
-      { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', contextWindow: 200000 },
-      { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', contextWindow: 200000 },
-    ],
+    defaultContextWindow: 200000,
+    apiKeyUrl: 'https://console.anthropic.com/settings/keys',
   },
   {
     id: 'google',
     name: 'Google Gemini',
     defaultEndpoint: 'https://generativelanguage.googleapis.com',
-    defaultModels: [
-      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', contextWindow: 1000000 },
-      { id: 'gemini-2.0-pro', name: 'Gemini 2.0 Pro', contextWindow: 1000000 },
-    ],
+    defaultContextWindow: 1000000,
+    apiKeyUrl: 'https://aistudio.google.com/apikey',
   },
   {
     id: 'xai',
     name: 'xAI (Grok)',
     defaultEndpoint: 'https://api.x.ai',
-    defaultModels: [
-      { id: 'grok-2', name: 'Grok-2', contextWindow: 128000 },
-    ],
+    defaultContextWindow: 128000,
+    apiKeyUrl: 'https://console.x.ai/',
   },
   {
     id: 'deepseek',
     name: 'DeepSeek',
     defaultEndpoint: 'https://api.deepseek.com',
-    defaultModels: [
-      { id: 'deepseek-chat', name: 'DeepSeek Chat', contextWindow: 64000 },
-      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', contextWindow: 64000 },
-    ],
+    defaultContextWindow: 64000,
+    apiKeyUrl: 'https://platform.deepseek.com/api_keys',
   },
   {
     id: 'self-hosted',
     name: 'Self-hosted',
     defaultEndpoint: 'http://localhost:11434',
-    defaultModels: [
-      { id: 'custom', name: 'Custom Model', contextWindow: 100000 },
-    ],
+    defaultContextWindow: 100000,
   },
 ];
 

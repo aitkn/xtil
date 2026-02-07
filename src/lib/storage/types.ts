@@ -1,3 +1,5 @@
+import type { ModelInfo } from '../llm/types';
+
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface ProviderConfig {
@@ -22,6 +24,7 @@ export interface Settings {
   summaryLanguageExcept: string[]; // don't translate if source is one of these, e.g. ['en', 'ru']
   summaryDetailLevel: 'brief' | 'standard' | 'detailed';
   theme: ThemeMode;
+  cachedModels?: Record<string, ModelInfo[]>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

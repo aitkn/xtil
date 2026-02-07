@@ -1,8 +1,9 @@
 import { getSettings, saveSettings } from '@/lib/storage/settings';
 import { getActiveProviderConfig } from '@/lib/storage/types';
 import { createProvider } from '@/lib/llm/registry';
+import { fetchModels } from '@/lib/llm/models';
 import { summarize } from '@/lib/summarizer/summarizer';
-import type { Message, ExtractResultMessage, SummaryResultMessage, ChatResponseMessage, ConnectionTestResultMessage, SettingsResultMessage, SaveSettingsResultMessage, NotionDatabasesResultMessage, ExportResultMessage } from '@/lib/messaging/types';
+import type { Message, ExtractResultMessage, SummaryResultMessage, ChatResponseMessage, ConnectionTestResultMessage, SettingsResultMessage, SaveSettingsResultMessage, NotionDatabasesResultMessage, ExportResultMessage, FetchModelsResultMessage } from '@/lib/messaging/types';
 import type { ChatMessage } from '@/lib/llm/types';
 import type { SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent } from '@/lib/extractors/types';
@@ -49,6 +50,8 @@ async function handleMessage(message: Message): Promise<Message> {
       return handleSaveSettings(message.settings);
     case 'FETCH_NOTION_DATABASES':
       return handleFetchNotionDatabases();
+    case 'FETCH_MODELS':
+      return handleFetchModels(message.providerId, message.apiKey, message.endpoint);
     default:
       return { type: (message as Message).type, success: false, error: 'Unknown message type' } as Message;
   }
@@ -247,15 +250,37 @@ async function handleTestLLMConnection(): Promise<ConnectionTestResultMessage> {
   try {
     const settings = await getSettings();
     const provider = createProvider(getActiveProviderConfig(settings));
-    const success = await provider.testConnection();
-    return { type: 'CONNECTION_TEST_RESULT', success };
+    // Call sendChat directly instead of testConnection() so errors propagate.
+    // If sendChat doesn't throw, the connection works (even if response is empty
+    // due to e.g. Gemini safety filters on trivial prompts).
+    await provider.sendChat(
+      [{ role: 'user', content: 'Reply with "ok"' }],
+      { maxTokens: 10 },
+    );
+    return { type: 'CONNECTION_TEST_RESULT', success: true };
   } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
+    // Try to extract a readable message from JSON error responses
+    const readable = extractApiError(raw);
     return {
       type: 'CONNECTION_TEST_RESULT',
       success: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: readable,
     };
   }
+}
+
+function extractApiError(raw: string): string {
+  try {
+    // Match JSON embedded in error strings like "API error (400): {...}"
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const msg = parsed.error?.message || parsed.message;
+      if (msg) return msg;
+    }
+  } catch { /* not JSON */ }
+  return raw;
 }
 
 async function handleTestNotionConnection(): Promise<ConnectionTestResultMessage> {
@@ -324,6 +349,28 @@ async function handleFetchNotionDatabases(): Promise<NotionDatabasesResultMessag
   } catch (err) {
     return {
       type: 'NOTION_DATABASES_RESULT',
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+async function handleFetchModels(
+  providerId: string,
+  apiKey: string,
+  endpoint?: string,
+): Promise<FetchModelsResultMessage> {
+  try {
+    const models = await fetchModels(providerId, apiKey, endpoint);
+    // Cache results in storage
+    const settings = await getSettings();
+    await saveSettings({
+      cachedModels: { ...settings.cachedModels, [providerId]: models },
+    });
+    return { type: 'FETCH_MODELS_RESULT', success: true, models };
+  } catch (err) {
+    return {
+      type: 'FETCH_MODELS_RESULT',
       success: false,
       error: err instanceof Error ? err.message : String(err),
     };

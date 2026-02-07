@@ -24,9 +24,16 @@ export interface ProviderConfig {
   contextWindow: number;
 }
 
+export interface ModelInfo {
+  id: string;
+  name: string;
+  contextWindow: number;
+}
+
 export interface ProviderDefinition {
   id: string;
   name: string;
   defaultEndpoint: string;
-  defaultModels: Array<{ id: string; name: string; contextWindow: number }>;
+  defaultContextWindow: number;
+  apiKeyUrl?: string;
 }
