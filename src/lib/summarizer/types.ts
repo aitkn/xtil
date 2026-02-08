@@ -14,4 +14,6 @@ export interface SummaryDocument {
   translatedTitle?: string; // title translated to summary language (only when translated)
   inferredAuthor?: string; // author inferred from content when not in metadata
   inferredPublishDate?: string; // publish date inferred from content when not in metadata
+  llmProvider?: string; // display name of the LLM provider used, e.g. 'OpenAI'
+  llmModel?: string; // model ID used for summarization, e.g. 'gpt-4o'
 }

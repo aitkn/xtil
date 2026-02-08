@@ -99,7 +99,7 @@ export function ChatInputBar({ value, onChange, onSubmit, isFirstSubmit, loading
           <button
             onClick={onSubmit}
             disabled={!canSubmit}
-            title="Summarize page content"
+            title={summarizeVariant === 'disabled' ? 'Configure your LLM provider in Settings first' : 'Summarize page content'}
             style={{
               padding: '8px 20px',
               borderRadius: '20px',

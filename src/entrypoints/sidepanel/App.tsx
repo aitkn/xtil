@@ -22,6 +22,7 @@ import type {
 import type { ModelInfo } from '@/lib/llm/types';
 import { SummaryContent, MetadataHeader } from './pages/SummaryView';
 import { SettingsView } from './pages/SettingsView';
+import { getProviderDefinition } from '@/lib/llm/registry';
 import { Toast } from '@/components/Toast';
 import { Spinner } from '@/components/Spinner';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
@@ -238,8 +239,15 @@ export function App() {
 
   const isFirstSubmit = !summary && chatMessages.length === 0;
 
-  // Compute summarize button state for YouTube pages
+  // Check whether the active LLM provider is configured
+  const isLLMConfigured = (() => {
+    const cfg = getActiveProviderConfig(settings);
+    return !!(cfg.apiKey || cfg.providerId === 'self-hosted');
+  })();
+
+  // Compute summarize button state
   const summarizeVariant: SummarizeVariant = (() => {
+    if (!isLLMConfigured) return 'disabled';
     if (!content) return 'primary';
     if (content.type !== 'youtube') return 'primary';
 
@@ -482,8 +490,58 @@ export function App() {
         {/* Page metadata — always visible when content is extracted */}
         {content && (
           <div style={{ padding: '16px' }}>
-            <MetadataHeader content={content} summary={summary || undefined} />
+            <MetadataHeader
+              content={content}
+              summary={summary || undefined}
+              providerName={(() => {
+                const cfg = getActiveProviderConfig(settings);
+                if (!cfg.apiKey && cfg.providerId !== 'self-hosted') return undefined;
+                return getProviderDefinition(settings.activeProviderId)?.name || settings.activeProviderId;
+              })()}
+              modelName={getActiveProviderConfig(settings).model || undefined}
+              onProviderClick={() => setSettingsOpen(true)}
+            />
             <ContentIndicators content={content} settings={settings} />
+          </div>
+        )}
+
+        {/* Onboarding prompt when LLM is not configured */}
+        {!isLLMConfigured && !loading && !summary && chatMessages.length === 0 && (
+          <div style={{
+            margin: '0 16px 16px',
+            padding: '20px',
+            borderRadius: 'var(--md-sys-shape-corner-large)',
+            backgroundColor: 'var(--md-sys-color-surface-container)',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              font: 'var(--md-sys-typescale-title-medium)',
+              color: 'var(--md-sys-color-on-surface)',
+              marginBottom: '8px',
+            }}>
+              Welcome to TL;DR!
+            </div>
+            <p style={{
+              font: 'var(--md-sys-typescale-body-medium)',
+              color: 'var(--md-sys-color-on-surface-variant)',
+              margin: '0 0 12px',
+            }}>
+              Configure your LLM provider to start summarizing pages and videos.
+            </p>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              style={{
+                padding: '8px 20px',
+                borderRadius: '20px',
+                border: 'none',
+                backgroundColor: 'var(--md-sys-color-primary)',
+                color: 'var(--md-sys-color-on-primary)',
+                font: 'var(--md-sys-typescale-label-large)',
+                cursor: 'pointer',
+              }}
+            >
+              Open Settings
+            </button>
           </div>
         )}
 

@@ -254,6 +254,9 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
 
     const MAX_TOTAL_IMAGES = 5;
 
+    const providerDef = getProviderDefinition(llmConfig.providerId);
+    const providerName = providerDef?.name || llmConfig.providerId;
+
     try {
       const result = await summarize(provider, content, {
         detailLevel: settings.summaryDetailLevel,
@@ -264,6 +267,8 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         fetchedImages: allFetchedImages.length > 0 ? allFetchedImages : undefined,
         imageUrlList: imageUrlList.length > 0 ? imageUrlList : undefined,
       });
+      result.llmProvider = providerName;
+      result.llmModel = llmConfig.model;
       return { type: 'SUMMARY_RESULT', success: true, data: result };
     } catch (err) {
       // Round-trip: LLM requested additional images
@@ -292,6 +297,8 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
           fetchedImages: allFetchedImages.length > 0 ? allFetchedImages : undefined,
           imageUrlList: imageUrlList.length > 0 ? imageUrlList : undefined,
         });
+        result.llmProvider = providerName;
+        result.llmModel = llmConfig.model;
         return { type: 'SUMMARY_RESULT', success: true, data: result };
       }
       throw err;

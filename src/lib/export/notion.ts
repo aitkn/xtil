@@ -6,6 +6,8 @@ import { markdownToNotionBlocks } from './markdown-to-notion';
 
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
+// TODO: Update once the Chrome Web Store listing is approved
+const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/tl-dr/TODO';
 
 export class NotionAdapter implements ExportAdapter {
   readonly id = 'notion';
@@ -31,6 +33,12 @@ export class NotionAdapter implements ExportAdapter {
     if (!databaseId) {
       databaseId = await this.createDatabase();
     }
+
+    // Ensure new columns exist on older databases
+    await this.ensureProperties(databaseId, {
+      'LLM Provider': { rich_text: {} },
+      'LLM Model': { rich_text: {} },
+    });
 
     // Build page properties
     const properties = this.buildProperties(summary, content);
@@ -118,6 +126,8 @@ export class NotionAdapter implements ExportAdapter {
           },
           Tags: { multi_select: {} },
           'Reading Time': { number: {} },
+          'LLM Provider': { rich_text: {} },
+          'LLM Model': { rich_text: {} },
           Status: {
             select: {
               options: [
@@ -138,6 +148,25 @@ export class NotionAdapter implements ExportAdapter {
 
     const db = await response.json();
     return db.id;
+  }
+
+  /** Add missing properties to an existing database (no-op for properties that already exist). */
+  private async ensureProperties(databaseId: string, required: Record<string, unknown>): Promise<void> {
+    const resp = await this.notionFetch(`/databases/${databaseId}`);
+    if (!resp.ok) return; // best-effort — don't block export
+
+    const db = await resp.json();
+    const existing = db.properties as Record<string, unknown> | undefined;
+    const missing: Record<string, unknown> = {};
+    for (const key of Object.keys(required)) {
+      if (!existing?.[key]) missing[key] = required[key];
+    }
+    if (Object.keys(missing).length === 0) return;
+
+    await this.notionFetch(`/databases/${databaseId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ properties: missing }),
+    });
   }
 
   private buildProperties(summary: SummaryDocument, content: ExtractedContent): Record<string, unknown> {
@@ -190,6 +219,18 @@ export class NotionAdapter implements ExportAdapter {
     if (summary.tags.length > 0) {
       properties.Tags = {
         multi_select: summary.tags.map((tag) => ({ name: tag })),
+      };
+    }
+
+    if (summary.llmProvider) {
+      properties['LLM Provider'] = {
+        rich_text: [{ text: { content: summary.llmProvider } }],
+      };
+    }
+
+    if (summary.llmModel) {
+      properties['LLM Model'] = {
+        rich_text: [{ text: { content: summary.llmModel } }],
       };
     }
 
@@ -289,6 +330,26 @@ export class NotionAdapter implements ExportAdapter {
         blocks.push(bulletItem(topic));
       }
     }
+
+    // "Created with" attribution
+    blocks.push(
+      divider(),
+      {
+        object: 'block',
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [
+            { type: 'text', text: { content: 'Created with ' } },
+            {
+              type: 'text',
+              text: { content: 'TL;DR', link: { url: CHROME_STORE_URL } },
+              annotations: { bold: true },
+            },
+            { type: 'text', text: { content: ' — AI-powered summaries for Chrome' } },
+          ],
+        },
+      },
+    );
 
     // Notion API limits children to 100 blocks per request
     return blocks.slice(0, 100);

@@ -22,6 +22,9 @@ export default defineConfig({
     },
     permissions: ['sidePanel', 'activeTab', 'storage', 'scripting', 'tabs'],
     host_permissions: ['<all_urls>'],
+    web_accessible_resources: [
+      { resources: ['sidepanel.html'], matches: ['<all_urls>'] },
+    ],
   },
   vite: () => ({
     plugins: [preact()],

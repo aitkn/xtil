@@ -221,7 +221,13 @@ export function SummaryContent({ summary, content, onExport, notionUrl }: Summar
   );
 }
 
-export function MetadataHeader({ content, summary }: { content: ExtractedContent; summary?: SummaryDocument }) {
+export function MetadataHeader({ content, summary, providerName, modelName, onProviderClick }: {
+  content: ExtractedContent;
+  summary?: SummaryDocument;
+  providerName?: string;
+  modelName?: string;
+  onProviderClick?: () => void;
+}) {
   const badgeColors: Record<string, { bg: string; text: string }> = {
     article: { bg: 'var(--md-sys-color-success-container)', text: 'var(--md-sys-color-on-success-container)' },
     youtube: { bg: 'var(--md-sys-color-error-container)', text: 'var(--md-sys-color-on-error-container)' },
@@ -260,6 +266,28 @@ export function MetadataHeader({ content, summary }: { content: ExtractedContent
             {(LANG_LABELS[summary.sourceLanguage] || summary.sourceLanguage.toUpperCase())} → {(LANG_LABELS[summary.summaryLanguage] || summary.summaryLanguage.toUpperCase())}
           </span>
         )}
+        {(() => {
+          const label = summary?.llmProvider || providerName;
+          const tooltip = summary?.llmModel || modelName || '';
+          const configured = !!label;
+          return (
+            <span
+              title={configured ? tooltip : 'Click to configure LLM provider'}
+              onClick={onProviderClick}
+              style={{
+                backgroundColor: configured ? 'var(--md-sys-color-secondary-container)' : '#fef3c7',
+                color: configured ? 'var(--md-sys-color-on-secondary-container)' : '#92400e',
+                padding: '2px 10px',
+                borderRadius: 'var(--md-sys-shape-corner-small)',
+                font: 'var(--md-sys-typescale-label-small)',
+                fontWeight: 600,
+                cursor: onProviderClick ? 'pointer' : 'default',
+              }}
+            >
+              {configured ? label : 'Configure LLM'}
+            </span>
+          );
+        })()}
       </div>
 
       {content.type === 'youtube' && content.thumbnailUrl && (
