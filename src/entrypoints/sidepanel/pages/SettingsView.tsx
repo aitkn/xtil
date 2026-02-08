@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import type { Settings, ThemeMode, ProviderConfig } from '@/lib/storage/types';
 import type { ModelInfo, VisionSupport } from '@/lib/llm/types';
 import { PROVIDER_DEFINITIONS } from '@/lib/llm/registry';
@@ -44,13 +44,33 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [probingVision, setProbingVision] = useState(false);
 
+  const lastSavedJson = useRef(JSON.stringify(settings));
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
   useEffect(() => {
     setLocal(settings);
-    // Load cached models from settings
     if (settings.cachedModels) {
       setFetchedModels(settings.cachedModels);
     }
+    lastSavedJson.current = JSON.stringify(settings);
   }, [settings]);
+
+  // Auto-save on changes (debounced)
+  useEffect(() => {
+    const finalSettings = {
+      ...local,
+      cachedModels: { ...local.cachedModels, ...fetchedModels },
+    };
+    const json = JSON.stringify(finalSettings);
+    if (json === lastSavedJson.current) return;
+
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      lastSavedJson.current = json;
+      onSave(finalSettings);
+    }, 500);
+    return () => clearTimeout(saveTimerRef.current);
+  }, [local, fetchedModels, onSave]);
 
   const currentProviderId = local.activeProviderId;
   const currentConfig = local.providerConfigs[currentProviderId] || {
@@ -139,15 +159,12 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   };
 
   const handleSave = async () => {
-    // Ensure current config and cached models are preserved
+    clearTimeout(saveTimerRef.current);
     const finalSettings = {
       ...local,
-      providerConfigs: {
-        ...local.providerConfigs,
-        [currentProviderId]: currentConfig,
-      },
       cachedModels: { ...local.cachedModels, ...fetchedModels },
     };
+    lastSavedJson.current = JSON.stringify(finalSettings);
     await onSave(finalSettings);
   };
 
@@ -508,10 +525,6 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         <option value="standard">Standard</option>
         <option value="detailed">Detailed</option>
       </select>
-
-      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--md-sys-color-outline-variant)' }}>
-        <Button onClick={handleSave} title="Save all settings">Save Settings</Button>
-      </div>
 
       <div style={{
         marginTop: '24px',
