@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'preact/hooks';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import mermaid from 'mermaid';
 
 const MERMAID_THEME_VARS = {
@@ -168,7 +169,7 @@ function useResolvedTheme(): 'light' | 'dark' {
 }
 
 export function InlineMarkdown({ text }: { text: string }) {
-  const html = marked.parseInline(text, { async: false }) as string;
+  const html = DOMPurify.sanitize(marked.parseInline(text, { async: false }) as string);
   return <span class="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
@@ -179,7 +180,7 @@ interface MarkdownRendererProps {
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const ref = useRef<HTMLDivElement>(null);
   const theme = useResolvedTheme();
-  const html = marked.parse(content, { async: false }) as string;
+  const html = DOMPurify.sanitize(marked.parse(content, { async: false }) as string);
 
   useEffect(() => {
     if (!ref.current) return;

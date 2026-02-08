@@ -1,4 +1,5 @@
 import { Readability, isProbablyReaderable } from '@mozilla/readability';
+import DOMPurify from 'dompurify';
 import type { ContentExtractor, ExtractedContent } from './types';
 import { extractRichImages } from './image-utils';
 import { refineTitleIfGeneric } from './title-utils';
@@ -38,7 +39,7 @@ export const articleExtractor: ContentExtractor = {
 
     // Extract image URLs
     const tempDiv = doc.createElement('div');
-    tempDiv.innerHTML = article.content;
+    tempDiv.innerHTML = DOMPurify.sanitize(article.content);
     const images = Array.from(tempDiv.querySelectorAll('img'))
       .map((img) => img.src)
       .filter(Boolean);
@@ -62,7 +63,7 @@ export const articleExtractor: ContentExtractor = {
 
 function htmlToMarkdown(html: string): string {
   const div = document.createElement('div');
-  div.innerHTML = html;
+  div.innerHTML = DOMPurify.sanitize(html);
 
   let md = '';
 
