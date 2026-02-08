@@ -4,14 +4,14 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface ProviderConfig {
   providerId: string; // 'openai' | 'anthropic' | 'google' | 'xai' | 'deepseek' | 'self-hosted'
-  apiKey: string;
+  apiKey: string; // stored in chrome.storage.local (plaintext) — must persist across sessions
   model: string;
   endpoint?: string; // custom endpoint for self-hosted
   contextWindow: number; // in tokens
 }
 
 export interface NotionConfig {
-  apiKey: string;
+  apiKey: string; // stored in chrome.storage.local (plaintext) — must persist across sessions
   databaseId?: string;
   databaseName?: string;
 }
