@@ -18,7 +18,7 @@ Three steps to knowledge capture:
 
 1. Summarize — Get a structured summary of any web page or YouTube video with key takeaways, notable quotes, and tags
 2. Refine — Chat with the AI to adjust the summary, ask follow-up questions, or request diagrams and custom sections
-3. Save — Export to Notion or Markdown with all metadata, tags, and source links preserved
+3. Save & Share — Export to Notion or Markdown with all metadata, tags, and source links preserved. Share any summary via a Notion public link.
 
 Works everywhere:
 

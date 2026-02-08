@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 440px;
+  height: 280px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  color: white;
+  display: flex;
+  position: relative;
+}
+
+.left {
+  flex: 0 0 218px;
+  padding: 28px 20px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  z-index: 2;
+}
+
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.icon img {
+  width: 100%;
+  height: 100%;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #fff;
+}
+
+.tagline {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.tagline strong {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 14px;
+}
+
+.features + .features {
+  margin-top: 5px;
+}
+
+.feature {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 10px;
+  color: #93c5fd;
+  font-weight: 500;
+}
+
+/* Right half — two panels side by side, second one clipped */
+.right {
+  position: absolute;
+  left: 218px;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  overflow: hidden;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  padding: 8px 0 8px 0;
+  gap: 6px;
+}
+
+.panel {
+  flex-shrink: 0;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.panel img {
+  height: 100%;
+  width: auto;
+  display: block;
+}
+
+/* Subtle glow accent */
+.glow {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%);
+  top: -40px;
+  left: -40px;
+  z-index: 0;
+}
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="left">
+    <div class="logo-row">
+      <div class="icon">
+        <img src="../public/icon.svg" alt="icon">
+      </div>
+      <div class="title">TL;DR</div>
+    </div>
+    <div class="tagline">
+      Summarize any page or YouTube video with <strong>AI</strong>. Chat to refine. Export to Notion.
+    </div>
+    <div class="features">
+      <span class="feature">YouTube</span>
+      <span class="feature">Articles</span>
+      <span class="feature">AI Chat</span>
+    </div>
+    <div class="features">
+      <span class="feature">Diagrams</span>
+      <span class="feature">Notion</span>
+    </div>
+  </div>
+  <div class="right">
+    <div class="panel">
+      <img src="panel-crop.png" alt="TL;DR panel">
+    </div>
+    <div class="panel">
+      <img src="panel-crop-2.png" alt="TL;DR panel continued">
+    </div>
+  </div>
+</body>
+</html>

@@ -13,9 +13,10 @@ interface SummaryContentProps {
   content: ExtractedContent | null;
   onExport?: () => void;
   notionUrl?: string | null;
+  exporting?: boolean;
 }
 
-export function SummaryContent({ summary, content, onExport, notionUrl }: SummaryContentProps) {
+export function SummaryContent({ summary, content, onExport, notionUrl, exporting }: SummaryContentProps) {
   const [mdSaved, setMdSaved] = useState(false);
   useEffect(() => setMdSaved(false), [summary]);
   return (
@@ -181,6 +182,7 @@ export function SummaryContent({ summary, content, onExport, notionUrl }: Summar
           ) : (
             <button
               onClick={onExport}
+              disabled={exporting}
               title="Export summary to Notion"
               style={{
                 padding: '8px 20px',
@@ -189,10 +191,11 @@ export function SummaryContent({ summary, content, onExport, notionUrl }: Summar
                 backgroundColor: 'var(--md-sys-color-primary)',
                 color: 'var(--md-sys-color-on-primary)',
                 font: 'var(--md-sys-typescale-label-large)',
-                cursor: 'pointer',
+                cursor: exporting ? 'default' : 'pointer',
+                opacity: exporting ? 0.6 : 1,
               }}
             >
-              Export to Notion
+              {exporting ? 'Exporting…' : 'Export to Notion'}
             </button>
           )
         )}

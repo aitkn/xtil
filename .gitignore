@@ -4,3 +4,5 @@ node_modules/
 .claude/
 *.log
 .playwright-user-data/
+demo-output/
+tldr-extension.zip

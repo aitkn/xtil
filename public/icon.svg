@@ -1,4 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <rect width="128" height="128" rx="20" ry="20" fill="#2563eb"/>
-  <text x="64" y="78" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="64" fill="white">TL</text>
+  <!-- T: uniform 16-unit stroke -->
+  <path d="M12,24 H60 V40 H44 V104 H28 V40 H12 Z" fill="white"/>
+  <!-- L: uniform 16-unit stroke -->
+  <path d="M68,24 H84 V88 H116 V104 H68 Z" fill="white"/>
 </svg>

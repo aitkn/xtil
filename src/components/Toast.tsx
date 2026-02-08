@@ -34,7 +34,7 @@ export function Toast({ message, type = 'info', onClose, duration = 3000 }: Toas
     <div
       style={{
         position: 'fixed',
-        bottom: '72px',
+        top: '8px',
         left: '16px',
         right: '16px',
         padding: '12px 16px',
@@ -44,7 +44,7 @@ export function Toast({ message, type = 'info', onClose, duration = 3000 }: Toas
         font: 'var(--md-sys-typescale-body-medium)',
         boxShadow: 'var(--md-sys-elevation-2)',
         zIndex: 1000,
-        animation: 'slideUp 0.2s ease-out',
+        animation: 'slideDown 0.2s ease-out',
       }}
     >
       {message}

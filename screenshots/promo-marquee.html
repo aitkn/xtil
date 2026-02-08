@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1400px;
+  height: 560px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #0f172a 100%);
+  color: white;
+  display: flex;
+  position: relative;
+}
+
+/* Subtle background pattern */
+body::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 50%, rgba(59,130,246,0.08) 0%, transparent 50%),
+    radial-gradient(circle at 85% 30%, rgba(59,130,246,0.05) 0%, transparent 40%);
+  z-index: 0;
+}
+
+.left {
+  flex: 0 0 420px;
+  padding: 60px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  z-index: 2;
+}
+
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.icon img {
+  width: 100%;
+  height: 100%;
+}
+
+.title {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: #fff;
+}
+
+.tagline {
+  font-size: 17px;
+  line-height: 1.5;
+  color: #94a3b8;
+  max-width: 320px;
+  margin-bottom: 24px;
+}
+
+.tagline strong {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feature {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #93c5fd;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+.providers {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.provider {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.provider-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #475569;
+}
+
+.right {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 30px 30px 30px 0;
+}
+
+.screenshot-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+
+.screenshot-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-main {
+  width: 560px;
+  height: 380px;
+}
+
+.card-side {
+  width: 360px;
+  height: 380px;
+}
+
+.card-main img {
+  object-position: right center;
+}
+
+.card-side img {
+  object-position: left center;
+}
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="logo-row">
+      <div class="icon">
+        <img src="../public/icon.svg" alt="icon">
+      </div>
+      <div class="title">TL;DR</div>
+    </div>
+    <div class="tagline">
+      Summarize any page or YouTube video with <strong>AI</strong>. Refine via chat. Export to Notion.
+    </div>
+    <div class="features">
+      <span class="feature">YouTube Videos</span>
+      <span class="feature">Articles</span>
+      <span class="feature">AI Chat</span>
+      <span class="feature">Mermaid Diagrams</span>
+      <span class="feature">Notion Export</span>
+      <span class="feature">Image Analysis</span>
+    </div>
+    <div class="providers">
+      <span class="provider">OpenAI</span>
+      <span class="provider-sep"></span>
+      <span class="provider">Claude</span>
+      <span class="provider-sep"></span>
+      <span class="provider">Gemini</span>
+      <span class="provider-sep"></span>
+      <span class="provider">DeepSeek</span>
+      <span class="provider-sep"></span>
+      <span class="provider">Self-hosted</span>
+    </div>
+  </div>
+  <div class="right">
+    <div class="screenshot-card card-main">
+      <img src="../demo-output/yt-dark-wide.png" alt="YouTube summary">
+    </div>
+    <div class="screenshot-card card-side">
+      <img src="../demo-output/tech-dark-continue.png" alt="Diagrams and chat">
+    </div>
+  </div>
+</body>
+</html>
