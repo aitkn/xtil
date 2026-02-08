@@ -92,8 +92,13 @@ async function fetchYouTubeTranscript(videoId: string, hintLang?: string): Promi
   // - ANDROID client bypasses age-restriction checks
   // - Page context provides YouTube cookies (avoids 403 from service worker)
   // - Returns fresh caption URLs (unlike ytInitialPlayerResponse which has expired tokens)
+  //
+  // This is YouTube's public Innertube API key, embedded in YouTube's own frontend JS.
+  // It is not a private credential — it is shipped to every YouTube visitor.
+  // nosemgrep: generic-api-key
+  const YOUTUBE_INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'; // gitleaks:allow
   const playerResponse = await fetch(
-    'https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false',
+    `https://www.youtube.com/youtubei/v1/player?key=${YOUTUBE_INNERTUBE_KEY}&prettyPrint=false`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
