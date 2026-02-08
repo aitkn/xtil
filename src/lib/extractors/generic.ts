@@ -1,5 +1,6 @@
 import type { ContentExtractor, ExtractedContent } from './types';
 import { extractRichImages } from './image-utils';
+import { extractTitle } from './title-utils';
 
 export const genericExtractor: ContentExtractor = {
   canExtract(): boolean {
@@ -7,10 +8,7 @@ export const genericExtractor: ContentExtractor = {
   },
 
   extract(url: string, doc: Document): ExtractedContent {
-    const title =
-      doc.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
-      doc.title ||
-      'Untitled Page';
+    const title = extractTitle(doc, url);
 
     const author =
       doc.querySelector('meta[name="author"]')?.getAttribute('content') ||

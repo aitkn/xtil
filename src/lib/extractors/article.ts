@@ -1,6 +1,7 @@
 import { Readability, isProbablyReaderable } from '@mozilla/readability';
 import type { ContentExtractor, ExtractedContent } from './types';
 import { extractRichImages } from './image-utils';
+import { refineTitleIfGeneric } from './title-utils';
 
 export const articleExtractor: ContentExtractor = {
   canExtract(_url: string, doc: Document): boolean {
@@ -46,7 +47,7 @@ export const articleExtractor: ContentExtractor = {
     return {
       type: 'article',
       url,
-      title: article.title,
+      title: refineTitleIfGeneric(article.title, doc, url),
       author,
       publishDate,
       language,
