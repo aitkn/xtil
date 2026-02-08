@@ -19,8 +19,8 @@ export function ChatInputBar({ value, onChange, onSubmit, isFirstSubmit, loading
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = 'auto';
-    const maxHeight = 4 * 20 + 16; // 4 rows * lineHeight + padding
+    el.style.height = '0';
+    const maxHeight = 3 * 20 + 16; // 3 rows * lineHeight + padding
     el.style.height = Math.min(el.scrollHeight, maxHeight) + 'px';
   }, [value]);
 
@@ -42,7 +42,7 @@ export function ChatInputBar({ value, onChange, onSubmit, isFirstSubmit, loading
   return (
     <div
       style={{
-        padding: '12px 16px',
+        padding: '8px 16px',
         backgroundColor: 'var(--md-sys-color-surface-container-low)',
         borderTop: '1px solid var(--md-sys-color-outline-variant)',
         flexShrink: 0,
@@ -78,6 +78,7 @@ export function ChatInputBar({ value, onChange, onSubmit, isFirstSubmit, loading
             color: 'var(--md-sys-color-on-surface)',
             resize: 'none',
             outline: 'none',
+            overflow: 'hidden',
             lineHeight: '20px',
           }}
         />
