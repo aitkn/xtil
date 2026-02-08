@@ -14,13 +14,16 @@ import type { ExtractedContent } from '@/lib/extractors/types';
 // Persist images across service worker restarts via chrome.storage.session
 const chromeStorage = () => (globalThis as unknown as { chrome: { storage: typeof chrome.storage } }).chrome.storage;
 
-async function cacheImages(images: ImageContent[]): Promise<void> {
-  await chromeStorage().session.set({ _cachedImages: images });
+async function cacheImages(images: ImageContent[], urls: { url: string; alt: string }[]): Promise<void> {
+  await chromeStorage().session.set({ _cachedImages: images, _cachedImageUrls: urls });
 }
 
-async function getCachedImages(): Promise<ImageContent[]> {
-  const result = await chromeStorage().session.get('_cachedImages');
-  return (result._cachedImages as ImageContent[]) || [];
+async function getCachedImages(): Promise<{ images: ImageContent[]; urls: { url: string; alt: string }[] }> {
+  const result = await chromeStorage().session.get(['_cachedImages', '_cachedImageUrls']);
+  return {
+    images: (result._cachedImages as ImageContent[]) || [],
+    urls: (result._cachedImageUrls as { url: string; alt: string }[]) || [],
+  };
 }
 
 export default defineBackground(() => {
@@ -227,7 +230,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
     }
 
     let allFetchedImages: FetchedImage[] = [];
-    let imageContents: ImageContent[] | undefined;
+    let imageUrlList: { url: string; alt: string }[] = [];
 
     if (imageAnalysisEnabled) {
       // Send all images as actual image data (inline first, then contextual)
@@ -237,18 +240,17 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         ...richImages.filter((i) => i.tier === 'contextual'),
       ];
 
-      if (modelVision === 'url') {
-        // Send URLs directly — no fetch/encode needed
-        imageContents = sorted.slice(0, 5).map((i) => ({ url: i.url }));
-      } else {
-        // Fetch and encode as base64
-        allFetchedImages = await fetchImages(sorted, 5);
-        imageContents = allFetchedImages.map((fi) => ({ base64: fi.base64, mimeType: fi.mimeType }));
-      }
+      // Always fetch and encode as base64 — sending URLs directly is unreliable
+      // because the remote LLM API can't access images behind auth/cookies (e.g. x.com)
+      // or served with unsupported content-types. The service worker has the user's
+      // session and fetchImages() converts unsupported formats to JPEG.
+      allFetchedImages = await fetchImages(sorted, 5);
+      imageUrlList = allFetchedImages.map((fi) => ({ url: fi.url, alt: fi.alt }));
     }
 
-    // Cache images for chat to reuse (survives service worker restarts)
-    await cacheImages(imageContents || []);
+    // Cache images + URLs for chat to reuse (survives service worker restarts)
+    const cachedImageContents: ImageContent[] = allFetchedImages.map((fi) => ({ base64: fi.base64, mimeType: fi.mimeType }));
+    await cacheImages(cachedImageContents, imageUrlList);
 
     const MAX_TOTAL_IMAGES = 5;
 
@@ -260,28 +262,24 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         contextWindow: llmConfig.contextWindow,
         userInstructions,
         fetchedImages: allFetchedImages.length > 0 ? allFetchedImages : undefined,
-        imageContents: imageContents?.length ? imageContents : undefined,
+        imageUrlList: imageUrlList.length > 0 ? imageUrlList : undefined,
       });
       return { type: 'SUMMARY_RESULT', success: true, data: result };
     } catch (err) {
       // Round-trip: LLM requested additional images
       if (err instanceof ImageRequestError && imageAnalysisEnabled) {
         const requestedUrls = err.requestedImages.slice(0, 3);
-        const remaining = MAX_TOTAL_IMAGES - (imageContents?.length ?? 0);
+        const remaining = MAX_TOTAL_IMAGES - allFetchedImages.length;
         if (remaining > 0 && requestedUrls.length > 0) {
-          if (modelVision === 'url') {
-            const additionalUrls = requestedUrls.slice(0, remaining).map((url) => ({ url }));
-            imageContents = [...(imageContents || []), ...additionalUrls];
-          } else {
-            const requestedExtracted = requestedUrls.slice(0, remaining).map((url) => ({
-              url,
-              alt: '',
-              tier: 'contextual' as const,
-            }));
-            const additionalImages = await fetchImages(requestedExtracted, remaining);
-            allFetchedImages = [...allFetchedImages, ...additionalImages];
-            imageContents = allFetchedImages.map((fi) => ({ base64: fi.base64, mimeType: fi.mimeType }));
-          }
+          const additionalUrlList = requestedUrls.slice(0, remaining).map((url) => ({ url, alt: '' }));
+          imageUrlList = [...imageUrlList, ...additionalUrlList];
+          const requestedExtracted = requestedUrls.slice(0, remaining).map((url) => ({
+            url,
+            alt: '',
+            tier: 'contextual' as const,
+          }));
+          const additionalImages = await fetchImages(requestedExtracted, remaining);
+          allFetchedImages = [...allFetchedImages, ...additionalImages];
         }
 
         // Retry summarization with all images — no further round-trips
@@ -292,7 +290,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
           contextWindow: llmConfig.contextWindow,
           userInstructions,
           fetchedImages: allFetchedImages.length > 0 ? allFetchedImages : undefined,
-          imageContents: imageContents?.length ? imageContents : undefined,
+          imageUrlList: imageUrlList.length > 0 ? imageUrlList : undefined,
         });
         return { type: 'SUMMARY_RESULT', success: true, data: result };
       }
@@ -319,7 +317,9 @@ async function handleChatMessage(
     const key = `${llmConfig.providerId}:${llmConfig.model}`;
     const visionCached = settings.modelCapabilities?.[key]?.vision;
     const hasVisionCapability = visionCached === 'base64' || visionCached === 'url';
-    const cachedImages = (settings.enableImageAnalysis && hasVisionCapability) ? await getCachedImages() : [];
+    const cached = (settings.enableImageAnalysis && hasVisionCapability) ? await getCachedImages() : { images: [], urls: [] };
+    const cachedImages = cached.images;
+    const cachedImageUrls = cached.urls;
     const hasImages = cachedImages.length > 0;
 
     const metaLines = [`Title: ${content.title}`, `URL: ${content.url}`];
@@ -346,6 +346,12 @@ Response format rules:
 
     if (hasImages) {
       systemPrompt += `\n\nYou have multimodal capabilities — images from the page are attached to this conversation. You can analyze and reference them when answering questions or updating the summary.`;
+      if (cachedImageUrls.length > 0) {
+        const urlLines = cachedImageUrls.map((img, i) =>
+          `${i + 1}. ${img.url}${img.alt ? ` — "${img.alt}"` : ''}`,
+        );
+        systemPrompt += `\n\nOriginal image URLs (use for ![alt](url) embeds in summary/responses):\n${urlLines.join('\n')}`;
+      }
     }
 
     const chatMessages: ChatMessage[] = [

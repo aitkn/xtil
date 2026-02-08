@@ -43,7 +43,7 @@ export interface SummarizeOptions {
   maxRetries?: number;
   userInstructions?: string;
   fetchedImages?: FetchedImage[];
-  imageContents?: ImageContent[]; // URL mode — takes precedence over fetchedImages
+  imageUrlList?: { url: string; alt: string }[];
 }
 
 export async function summarize(
@@ -51,9 +51,8 @@ export async function summarize(
   content: ExtractedContent,
   options: SummarizeOptions,
 ): Promise<SummaryDocument> {
-  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, userInstructions, fetchedImages, imageContents: directImageContents } = options;
-  // Prefer pre-built imageContents (URL mode) over fetchedImages
-  const imageContents: ImageContent[] | undefined = directImageContents || fetchedImages?.map((fi) => ({
+  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, userInstructions, fetchedImages, imageUrlList } = options;
+  const imageContents: ImageContent[] | undefined = fetchedImages?.map((fi) => ({
     base64: fi.base64,
     mimeType: fi.mimeType,
   }));
@@ -71,9 +70,9 @@ export async function summarize(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (chunks.length === 1) {
-        return await oneShotSummarize(provider, content, systemPrompt, imageContents);
+        return await oneShotSummarize(provider, content, systemPrompt, imageContents, imageUrlList);
       } else {
-        return await rollingContextSummarize(provider, content, chunks, systemPrompt, imageContents);
+        return await rollingContextSummarize(provider, content, chunks, systemPrompt, imageContents, imageUrlList);
       }
     } catch (err) {
       // Don't retry if the LLM gave a text response, detected no content, or requested images — it won't change
@@ -93,8 +92,12 @@ async function oneShotSummarize(
   content: ExtractedContent,
   systemPrompt: string,
   images?: ImageContent[],
+  imageUrlList?: { url: string; alt: string }[],
 ): Promise<SummaryDocument> {
-  const userPrompt = getSummarizationPrompt(content);
+  let userPrompt = getSummarizationPrompt(content);
+  if (images?.length && imageUrlList?.length) {
+    userPrompt += formatImageUrlListing(imageUrlList);
+  }
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -111,6 +114,7 @@ async function rollingContextSummarize(
   chunks: string[],
   systemPrompt: string,
   images?: ImageContent[],
+  imageUrlList?: { url: string; alt: string }[],
 ): Promise<SummaryDocument> {
   let rollingSummary = '';
 
@@ -129,6 +133,9 @@ async function rollingContextSummarize(
 
     if (i === 0) {
       userPrompt = getSummarizationPrompt(chunkContent);
+      if (images?.length && imageUrlList?.length) {
+        userPrompt += formatImageUrlListing(imageUrlList);
+      }
     } else {
       userPrompt = getRollingContextPrompt(rollingSummary) + '\n\n';
       if (isLast) {
@@ -205,4 +212,11 @@ function parseSummaryResponse(response: string, imageAnalysisEnabled = false): S
     inferredAuthor: (parsed.inferredAuthor as string) || undefined,
     inferredPublishDate: (parsed.inferredPublishDate as string) || undefined,
   };
+}
+
+function formatImageUrlListing(imageUrlList: { url: string; alt: string }[]): string {
+  const lines = imageUrlList.map((img, i) =>
+    `${i + 1}. ${img.url}${img.alt ? ` — "${img.alt}"` : ''}`,
+  );
+  return `\n\n**Attached image URLs (use these for ![alt](url) embeds):**\n${lines.join('\n')}`;
 }
