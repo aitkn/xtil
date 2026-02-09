@@ -148,6 +148,8 @@ export class NotionAdapter implements ExportAdapter {
                 { name: 'YouTube Video', color: 'red' },
                 { name: 'Article', color: 'green' },
                 { name: 'Facebook Post', color: 'blue' },
+                { name: 'Reddit Discussion', color: 'orange' },
+                { name: 'X/Twitter Thread', color: 'default' },
                 { name: 'Web Page', color: 'gray' },
               ],
             },
@@ -217,7 +219,11 @@ export class NotionAdapter implements ExportAdapter {
         ? 'Article'
         : content.type === 'facebook'
           ? 'Facebook Post'
-          : 'Web Page';
+          : content.type === 'reddit'
+            ? 'Reddit Discussion'
+            : content.type === 'twitter'
+              ? 'X/Twitter Thread'
+              : 'Web Page';
 
     const properties: Record<string, unknown> = {
       Title: {

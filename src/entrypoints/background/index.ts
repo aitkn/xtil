@@ -10,6 +10,7 @@ import type { Message, ExtractResultMessage, SummaryResultMessage, ChatResponseM
 import type { ChatMessage, ImageContent, VisionSupport, LLMProvider } from '@/lib/llm/types';
 import type { SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent } from '@/lib/extractors/types';
+import { parseRedditJson, buildRedditMarkdown } from '@/lib/extractors/reddit';
 
 // Persist images across service worker restarts via chrome.storage.session
 const chromeStorage = () => (globalThis as unknown as { chrome: { storage: typeof chrome.storage } }).chrome.storage;
@@ -186,6 +187,36 @@ async function handleExtractContent(): Promise<ExtractResultMessage> {
       }
     }
 
+    // Resolve Reddit JSON from background (no CORS restrictions here)
+    if (result.success && result.data) {
+      const redditMarker = '[REDDIT_JSON:';
+      const ridx = result.data.content.indexOf(redditMarker);
+      if (ridx !== -1) {
+        const rend = result.data.content.indexOf(']', ridx + redditMarker.length);
+        if (rend !== -1) {
+          const redditUrl = result.data.content.slice(ridx + redditMarker.length, rend);
+          try {
+            const redditData = await fetchRedditJson(redditUrl);
+            const parsed = parseRedditJson(redditData);
+            const built = buildRedditMarkdown(parsed.post, parsed.comments);
+            result.data.content = built.markdown;
+            result.data.wordCount = built.wordCount;
+            result.data.estimatedReadingTime = Math.ceil(built.wordCount / 200);
+            result.data.title = built.title || result.data.title;
+            result.data.commentCount = built.commentCount;
+            result.data.postScore = built.postScore;
+            result.data.subreddit = built.subreddit;
+            result.data.author = built.author;
+            if (built.thumbnailUrl) result.data.thumbnailUrl = built.thumbnailUrl;
+            if (built.richImages) result.data.richImages = built.richImages;
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            result.data.content = `*Could not fetch Reddit discussion: ${errMsg}*`;
+          }
+        }
+      }
+    }
+
     return result;
   } catch (err) {
     return {
@@ -341,8 +372,13 @@ async function handleChatMessage(
     if (content.channelName) metaLines.push(`Channel: ${content.channelName}`);
     if (content.description) metaLines.push(`Description: ${content.description}`);
 
+    const contentLabel = content.type === 'youtube' ? 'YouTube video'
+      : content.type === 'reddit' ? 'Reddit discussion'
+      : content.type === 'twitter' ? 'X/Twitter thread'
+      : 'web page';
+
     let systemPrompt = `You are a helpful assistant that helps refine and discuss content summaries.
-The user has a summary of a ${content.type === 'youtube' ? 'YouTube video' : 'web page'}.
+The user has a summary of a ${contentLabel}.
 
 Source metadata:
 ${metaLines.join('\n')}
@@ -667,6 +703,36 @@ async function handleFetchModels(
       success: false,
       error: err instanceof Error ? err.message : String(err),
     };
+  }
+}
+
+async function fetchRedditJson(redditUrl: string): Promise<unknown[]> {
+  const jsonUrl = `${redditUrl.replace(/\/$/, '')}.json?limit=200&depth=5&sort=top`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const response = await fetch(jsonUrl, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'web:tldr-extension:v1.0' },
+    });
+    if (response.status === 403) {
+      throw new Error('Reddit returned 403 — the subreddit may be private or quarantined.');
+    }
+    if (response.status === 429) {
+      throw new Error('Reddit rate limit hit. Please try again in a minute.');
+    }
+    if (!response.ok) {
+      throw new Error(`Reddit JSON fetch failed (${response.status}).`);
+    }
+    return await response.json() as unknown[];
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Reddit JSON fetch timed out after 30s');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

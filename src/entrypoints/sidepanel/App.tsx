@@ -214,7 +214,7 @@ export function App() {
 
   // YouTube/Facebook lazy-load comments as the user scrolls — poll periodically to pick up new ones
   useEffect(() => {
-    if (!content || (content.type !== 'youtube' && content.type !== 'facebook')) return;
+    if (!content || (content.type !== 'youtube' && content.type !== 'facebook' && content.type !== 'twitter')) return;
 
     let lastCount = content.comments?.length ?? 0;
     let stableRounds = 0;

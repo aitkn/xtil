@@ -1,4 +1,4 @@
-export type ContentType = 'article' | 'youtube' | 'facebook' | 'generic';
+export type ContentType = 'article' | 'youtube' | 'facebook' | 'reddit' | 'twitter' | 'generic';
 
 export interface ExtractedContent {
   type: ContentType;
@@ -17,6 +17,11 @@ export interface ExtractedContent {
   viewCount?: string;
   thumbnailUrl?: string;
   description?: string;
+
+  // Reddit-specific
+  subreddit?: string;
+  postScore?: number;
+  commentCount?: number;
 
   // Comments
   comments?: ExtractedComment[];

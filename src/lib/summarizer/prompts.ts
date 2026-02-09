@@ -78,7 +78,13 @@ Image Analysis Instructions:
 }
 
 export function getSummarizationPrompt(content: ExtractedContent): string {
-  let prompt = `Summarize the following ${content.type === 'youtube' ? 'YouTube video' : 'article/page'}.\n\n`;
+  const isDiscussion = content.type === 'reddit' || content.type === 'twitter';
+  const contentLabel = content.type === 'youtube' ? 'YouTube video'
+    : content.type === 'reddit' ? 'Reddit discussion'
+    : content.type === 'twitter' ? 'X/Twitter thread'
+    : 'article/page';
+
+  let prompt = `Summarize the following ${contentLabel}.\n\n`;
 
   prompt += `**Title:** ${content.title || 'MISSING — infer a concise, descriptive title from the content'}\n`;
   prompt += `**URL:** ${content.url}\n`;
@@ -87,12 +93,26 @@ export function getSummarizationPrompt(content: ExtractedContent): string {
   if (content.channelName) prompt += `**Channel:** ${content.channelName}\n`;
   if (content.duration) prompt += `**Duration:** ${content.duration}\n`;
   if (content.viewCount) prompt += `**Views:** ${content.viewCount}\n`;
+  if (content.subreddit) prompt += `**Subreddit:** r/${content.subreddit}\n`;
+  if (content.postScore !== undefined) prompt += `**Post Score:** ${content.postScore}\n`;
+  if (content.commentCount !== undefined) prompt += `**Comments:** ${content.commentCount}\n`;
   prompt += `**Word count:** ${content.wordCount}\n\n`;
   if (content.description) prompt += `**Description:**\n${content.description}\n\n`;
 
+  if (isDiscussion) {
+    prompt += `**IMPORTANT — Discussion Mode:** This is a community discussion. The comments/replies ARE the primary content — not supplementary. Your summary should:
+- Synthesize the key themes and arguments from the discussion into a coherent narrative.
+- Identify points of consensus and disagreement among participants.
+- Highlight the most insightful, upvoted, or impactful contributions.
+- Note the overall community sentiment (supportive, critical, mixed, etc.).
+- Use "commentsHighlights" for the most notable individual comments or exchanges.
+- "notableQuotes" should be actual quotes from commenters, not just the original poster.\n\n`;
+  }
+
   prompt += `---\n\n**Content:**\n\n${content.content}\n`;
 
-  if (content.comments && content.comments.length > 0) {
+  // For discussion types, comments are already embedded in the content
+  if (!isDiscussion && content.comments && content.comments.length > 0) {
     prompt += `\n---\n\n**User Comments:**\n\n`;
     for (const comment of content.comments.slice(0, 20)) {
       const author = comment.author ? `**${comment.author}**` : 'Anonymous';

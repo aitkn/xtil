@@ -235,6 +235,8 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
     article: { bg: 'var(--md-sys-color-success-container)', text: 'var(--md-sys-color-on-success-container)' },
     youtube: { bg: 'var(--md-sys-color-error-container)', text: 'var(--md-sys-color-on-error-container)' },
     facebook: { bg: 'var(--md-sys-color-primary-container)', text: 'var(--md-sys-color-on-primary-container)' },
+    reddit: { bg: '#FFE0B2', text: '#E65100' },
+    twitter: { bg: '#E3F2FD', text: '#1565C0' },
     generic: { bg: 'var(--md-sys-color-surface-container-highest)', text: 'var(--md-sys-color-on-surface-variant)' },
   };
   const badge = badgeColors[content.type] || badgeColors.generic;
@@ -251,7 +253,7 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
           fontWeight: 600,
           textTransform: 'uppercase',
         }}>
-          {content.type === 'youtube' ? 'YouTube' : content.type === 'facebook' ? 'Facebook' : content.type}
+          {content.type === 'youtube' ? 'YouTube' : content.type === 'facebook' ? 'Facebook' : content.type === 'reddit' ? 'Reddit' : content.type === 'twitter' ? 'X/Twitter' : content.type}
         </span>
         {content.estimatedReadingTime > 0 && (
           <span style={{ color: 'var(--md-sys-color-on-surface-variant)', font: 'var(--md-sys-typescale-label-small)' }}>
