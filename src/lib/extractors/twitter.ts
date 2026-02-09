@@ -99,9 +99,12 @@ export const twitterExtractor: ContentExtractor = {
 
     // Extract images from tweets
     const richImages = extractTweetImages(doc);
+    // X/Twitter og:image is always a generic logo — use actual tweet images instead
+    const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
+    const hasRealOgImage = ogImage && !ogImage.includes('abs.twimg.com/rweb/');
     const thumbnailUrl =
-      doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
-      (richImages.length > 0 ? richImages[0].url : undefined);
+      (richImages.length > 0 ? richImages[0].url : undefined) ||
+      (hasRealOgImage ? ogImage : undefined);
 
     return {
       type: 'twitter',
@@ -232,6 +235,8 @@ function extractTweetText(article: Element): string {
       const text = node.textContent?.trim();
       if (!text) return NodeFilter.FILTER_REJECT;
       if (text === 'Verified account' || text === 'reposted') return NodeFilter.FILTER_REJECT;
+      // Skip "Click to Follow/Subscribe" accessibility text
+      if (/^Click to (Follow|Subscribe)/i.test(text)) return NodeFilter.FILTER_REJECT;
 
       // Skip very short generic UI text
       if (text.length < 2 && !/[A-Za-z]/.test(text)) return NodeFilter.FILTER_REJECT;
