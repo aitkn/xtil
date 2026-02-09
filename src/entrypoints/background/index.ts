@@ -420,7 +420,7 @@ async function handleExport(
 
     if (result.databaseId && !settings.notion.databaseId) {
       await saveSettings({
-        notion: { ...settings.notion, databaseId: result.databaseId },
+        notion: { ...settings.notion, databaseId: result.databaseId, databaseName: result.databaseName },
       });
     }
 
@@ -530,14 +530,65 @@ async function handleTestNotionConnection(): Promise<ConnectionTestResultMessage
     const settings = await getSettings();
     if (!settings.notion.apiKey) throw new Error('Notion API key not configured');
 
-    const response = await fetch('https://api.notion.com/v1/users/me', {
-      headers: {
-        Authorization: `Bearer ${settings.notion.apiKey}`,
-        'Notion-Version': '2022-06-28',
-      },
-    });
+    const headers = {
+      Authorization: `Bearer ${settings.notion.apiKey}`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    };
 
-    return { type: 'CONNECTION_TEST_RESULT', success: response.ok };
+    const response = await fetch('https://api.notion.com/v1/users/me', { headers });
+    if (!response.ok) {
+      return { type: 'CONNECTION_TEST_RESULT', success: false };
+    }
+
+    // If no database is selected (auto-create mode), try to set one up
+    if (!settings.notion.databaseId) {
+      // Check if pages are shared with the integration
+      const searchResp = await fetch('https://api.notion.com/v1/search', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          filter: { value: 'page', property: 'object' },
+          page_size: 1,
+        }),
+      });
+      if (searchResp.ok) {
+        const data = await searchResp.json();
+        if (!data.results?.length) {
+          return {
+            type: 'CONNECTION_TEST_RESULT',
+            success: true,
+            warning: 'No pages shared with integration. Open Notion, go to a page (or create one, e.g. "TL;DR"), click "..." → "Connections" → add your integration.',
+          };
+        }
+      }
+
+      // Pages are shared — create the database now
+      try {
+        const { NotionAdapter } = await import('@/lib/export/notion');
+        const adapter = new NotionAdapter(settings.notion);
+        const databaseId = await adapter.createDatabase();
+        const databaseName = 'TL;DR Summaries';
+        await saveSettings({
+          notion: { ...settings.notion, databaseId, databaseName },
+        });
+        return {
+          type: 'CONNECTION_TEST_RESULT',
+          success: true,
+          databaseId,
+          databaseName,
+        };
+      } catch (err) {
+        // Database creation failed — still connected, just warn
+        return {
+          type: 'CONNECTION_TEST_RESULT',
+          success: true,
+          warning: err instanceof Error ? err.message : 'Could not auto-create database',
+        };
+      }
+    }
+
+    return { type: 'CONNECTION_TEST_RESULT', success: true };
   } catch (err) {
     return {
       type: 'CONNECTION_TEST_RESULT',

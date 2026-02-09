@@ -108,7 +108,10 @@ export interface ConnectionTestResultMessage {
   type: 'CONNECTION_TEST_RESULT';
   success: boolean;
   error?: string;
+  warning?: string;
   visionSupport?: VisionSupport;
+  databaseId?: string;
+  databaseName?: string;
 }
 
 export interface GetSettingsMessage {

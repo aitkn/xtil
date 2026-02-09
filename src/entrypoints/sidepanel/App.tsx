@@ -475,9 +475,9 @@ export function App() {
     return undefined;
   }, []);
 
-  const handleTestNotion = useCallback(async (): Promise<boolean> => {
+  const handleTestNotion = useCallback(async (): Promise<{ success: boolean; warning?: string; databaseId?: string; databaseName?: string }> => {
     const response = await sendMessage({ type: 'TEST_NOTION_CONNECTION' }) as ConnectionTestResultMessage;
-    return response.success;
+    return { success: response.success, warning: response.warning, databaseId: response.databaseId, databaseName: response.databaseName };
   }, []);
 
   const handleFetchNotionDatabases = useCallback(async (): Promise<Array<{ id: string; title: string }>> => {

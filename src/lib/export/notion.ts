@@ -59,8 +59,10 @@ export class NotionAdapter implements ExportAdapter {
   async export(summary: SummaryDocument, content: ExtractedContent): Promise<ExportResult> {
     // Ensure database exists
     let databaseId = this.config.databaseId;
+    let databaseName = this.config.databaseName;
     if (!databaseId) {
       databaseId = await this.createDatabase();
+      databaseName = 'TL;DR Summaries';
     }
 
     // Ensure new columns exist on older databases
@@ -110,10 +112,10 @@ export class NotionAdapter implements ExportAdapter {
     }
 
     const page = await response.json();
-    return { url: page.url, databaseId };
+    return { url: page.url, databaseId, databaseName };
   }
 
-  private async createDatabase(): Promise<string> {
+  async createDatabase(): Promise<string> {
     // First, find a page to use as parent (search for pages the integration has access to)
     const searchResponse = await this.notionFetch('/search', {
       method: 'POST',
@@ -128,7 +130,7 @@ export class NotionAdapter implements ExportAdapter {
     const searchData = await searchResponse.json();
     const parentPage = searchData.results?.[0];
     if (!parentPage) {
-      throw new Error('No pages found. Please share at least one page with your Notion integration.');
+      throw new Error('No pages shared with your Notion integration. Open Notion, go to a page (or create one, e.g. "TL;DR"), click "..." (top-right) → "Connections" → add your integration. Then retry.');
     }
 
     const response = await this.notionFetch('/databases', {

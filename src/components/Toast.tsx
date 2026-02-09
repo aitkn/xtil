@@ -7,11 +7,13 @@ interface ToastProps {
   duration?: number;
 }
 
-export function Toast({ message, type = 'info', onClose, duration = 3000 }: ToastProps) {
+export function Toast({ message, type = 'info', onClose, duration }: ToastProps) {
+  const effectiveDuration = duration ?? (type === 'error' ? 10000 : 3000);
+
   useEffect(() => {
-    const timer = setTimeout(onClose, duration);
+    const timer = setTimeout(onClose, effectiveDuration);
     return () => clearTimeout(timer);
-  }, [duration, onClose]);
+  }, [effectiveDuration, onClose]);
 
   const colorMap = {
     success: {
@@ -45,9 +47,30 @@ export function Toast({ message, type = 'info', onClose, duration = 3000 }: Toas
         boxShadow: 'var(--md-sys-elevation-2)',
         zIndex: 1000,
         animation: 'slideDown 0.2s ease-out',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '8px',
+        userSelect: 'text',
       }}
     >
-      {message}
+      <span style={{ flex: 1 }}>{message}</span>
+      <button
+        onClick={onClose}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: 'inherit',
+          cursor: 'pointer',
+          padding: '0 2px',
+          font: 'var(--md-sys-typescale-body-medium)',
+          lineHeight: 1,
+          opacity: 0.7,
+          flexShrink: 0,
+        }}
+        title="Dismiss"
+      >
+        &times;
+      </button>
     </div>
   );
 }

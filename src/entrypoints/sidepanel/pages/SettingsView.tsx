@@ -20,7 +20,7 @@ interface SettingsViewProps {
   settings: Settings;
   onSave: (settings: Settings) => Promise<void>;
   onTestLLM: () => Promise<{ success: boolean; error?: string; visionSupport?: VisionSupport }>;
-  onTestNotion: () => Promise<boolean>;
+  onTestNotion: () => Promise<{ success: boolean; warning?: string; databaseId?: string; databaseName?: string }>;
   onFetchNotionDatabases: () => Promise<Array<{ id: string; title: string }>>;
   onFetchModels: (providerId: string, apiKey: string, endpoint?: string) => Promise<ModelInfo[]>;
   onProbeVision: (providerId?: string, apiKey?: string, model?: string, endpoint?: string) => Promise<VisionSupport | undefined>;
@@ -34,7 +34,8 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   const [testingNotion, setTestingNotion] = useState(false);
   const [llmStatus, setLlmStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [llmError, setLlmError] = useState<string | null>(null);
-  const [notionStatus, setNotionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [notionStatus, setNotionStatus] = useState<'idle' | 'success' | 'warning' | 'error'>('idle');
+  const [notionWarning, setNotionWarning] = useState<string | null>(null);
   const [notionDatabases, setNotionDatabases] = useState<Array<{ id: string; title: string }>>([]);
   const [loadingDbs, setLoadingDbs] = useState(false);
 
@@ -198,10 +199,22 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   const handleTestNotion = async () => {
     setTestingNotion(true);
     setNotionStatus('idle');
+    setNotionWarning(null);
     try {
       await handleSave();
-      const success = await onTestNotion();
-      setNotionStatus(success ? 'success' : 'error');
+      const result = await onTestNotion();
+      if (result.databaseId) {
+        setLocal((prev) => ({
+          ...prev,
+          notion: { ...prev.notion, databaseId: result.databaseId!, databaseName: result.databaseName },
+        }));
+      }
+      if (result.warning) {
+        setNotionStatus('warning');
+        setNotionWarning(result.warning);
+      } else {
+        setNotionStatus(result.success ? 'success' : 'error');
+      }
     } catch {
       setNotionStatus('error');
     } finally {
@@ -376,7 +389,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       )}
 
       {/* Notion Configuration */}
-      <SectionHeader>Notion Export</SectionHeader>
+      <SectionHeader>Notion Integration (Optional, but recommended)</SectionHeader>
 
       <Label>
         Notion API Key
@@ -432,8 +445,14 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           Test Connection
         </Button>
         {notionStatus === 'success' && <StatusBadge type="success">Connected!</StatusBadge>}
+        {notionStatus === 'warning' && <StatusBadge type="warning">Connected</StatusBadge>}
         {notionStatus === 'error' && <StatusBadge type="error">Failed</StatusBadge>}
       </div>
+      {notionWarning && (
+        <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-warning, #b45309)', marginTop: '4px' }}>
+          {notionWarning}
+        </div>
+      )}
 
       {/* General Settings */}
       <SectionHeader>General</SectionHeader>
@@ -570,11 +589,16 @@ function Label({ children }: { children: preact.ComponentChildren }) {
   );
 }
 
-function StatusBadge({ type, children }: { type: 'success' | 'error'; children: preact.ComponentChildren }) {
+function StatusBadge({ type, children }: { type: 'success' | 'warning' | 'error'; children: preact.ComponentChildren }) {
+  const color = type === 'success'
+    ? 'var(--md-sys-color-success)'
+    : type === 'warning'
+      ? 'var(--md-sys-color-warning, #b45309)'
+      : 'var(--md-sys-color-error)';
   return (
     <span style={{
       font: 'var(--md-sys-typescale-label-small)',
-      color: type === 'success' ? 'var(--md-sys-color-success)' : 'var(--md-sys-color-error)',
+      color,
     }}>
       {children}
     </span>

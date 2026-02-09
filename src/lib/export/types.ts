@@ -4,6 +4,7 @@ import type { ExtractedContent } from '../extractors/types';
 export interface ExportResult {
   url: string;
   databaseId?: string;
+  databaseName?: string;
 }
 
 export interface ExportAdapter {
