@@ -69,11 +69,23 @@ export class NotionAdapter implements ExportAdapter {
       'LLM Model': { rich_text: {} },
     });
 
+    // Upload thumbnail to Notion if available
+    let thumbnailRef: { type: 'file_upload'; file_upload: { id: string } } | { type: 'external'; external: { url: string } } | null = null;
+    if (content.thumbnailUrl) {
+      const uploadId = await this.uploadImageToNotion(content.thumbnailUrl);
+      if (uploadId) {
+        thumbnailRef = { type: 'file_upload', file_upload: { id: uploadId } };
+      } else if (content.type !== 'facebook') {
+        // Fallback to external URL for non-Facebook (public URLs)
+        thumbnailRef = { type: 'external', external: { url: content.thumbnailUrl } };
+      }
+    }
+
     // Build page properties
     const properties = this.buildProperties(summary, content);
 
     // Build page content blocks
-    const children = this.buildContentBlocks(summary, content);
+    const children = this.buildContentBlocks(summary, content, thumbnailRef);
 
     // Create page
     const body: Record<string, unknown> = {
@@ -82,12 +94,9 @@ export class NotionAdapter implements ExportAdapter {
       children,
     };
 
-    // Set YouTube thumbnail as cover image
-    if (content.type === 'youtube' && content.thumbnailUrl) {
-      body.cover = {
-        type: 'external',
-        external: { url: content.thumbnailUrl },
-      };
+    // Set thumbnail as cover image
+    if (thumbnailRef) {
+      body.cover = thumbnailRef;
     }
 
     const response = await this.notionFetch('/pages', {
@@ -136,6 +145,7 @@ export class NotionAdapter implements ExportAdapter {
               options: [
                 { name: 'YouTube Video', color: 'red' },
                 { name: 'Article', color: 'green' },
+                { name: 'Facebook Post', color: 'blue' },
                 { name: 'Web Page', color: 'gray' },
               ],
             },
@@ -203,11 +213,13 @@ export class NotionAdapter implements ExportAdapter {
       ? 'YouTube Video'
       : content.type === 'article'
         ? 'Article'
-        : 'Web Page';
+        : content.type === 'facebook'
+          ? 'Facebook Post'
+          : 'Web Page';
 
     const properties: Record<string, unknown> = {
       Title: {
-        title: [{ text: { content: summary.translatedTitle || content.title } }],
+        title: [{ text: { content: summary.translatedTitle || content.title || summary.inferredTitle || 'Untitled' } }],
       },
       URL: { url: content.url },
       'Source Type': { select: { name: sourceType } },
@@ -266,15 +278,51 @@ export class NotionAdapter implements ExportAdapter {
     return properties;
   }
 
-  private buildContentBlocks(summary: SummaryDocument, content: ExtractedContent): unknown[] {
+  /** Upload an image to Notion's file storage. Returns the upload ID, or null on failure. */
+  private async uploadImageToNotion(imageUrl: string): Promise<string | null> {
+    try {
+      // Fetch the image (background service worker has host_permissions for all URLs)
+      const imgResponse = await fetch(imageUrl);
+      if (!imgResponse.ok) return null;
+      const blob = await imgResponse.blob();
+      if (blob.size === 0 || blob.size > 20 * 1024 * 1024) return null;
+
+      // Step 1: Create file upload object
+      const createResp = await this.notionFetch('/file_uploads', { method: 'POST', body: '{}' });
+      if (!createResp.ok) return null;
+      const { id: uploadId } = await createResp.json() as { id: string };
+
+      // Step 2: Send file contents as multipart/form-data
+      const form = new FormData();
+      const ext = blob.type.split('/')[1] || 'jpg';
+      form.append('file', blob, `thumbnail.${ext}`);
+
+      const sendResp = await fetch(`${NOTION_API}/file_uploads/${uploadId}/send`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+          'Notion-Version': NOTION_VERSION,
+          // Note: do NOT set Content-Type — browser sets it with boundary for FormData
+        },
+        body: form,
+      });
+      if (!sendResp.ok) return null;
+
+      return uploadId;
+    } catch {
+      return null; // Non-fatal — export continues without thumbnail
+    }
+  }
+
+  private buildContentBlocks(summary: SummaryDocument, content: ExtractedContent, thumbnailRef?: { type: string; [key: string]: unknown } | null): unknown[] {
     const blocks: unknown[] = [];
 
-    // YouTube thumbnail
-    if (content.type === 'youtube' && content.thumbnailUrl) {
+    // Thumbnail image block
+    if (thumbnailRef) {
       blocks.push({
         object: 'block',
         type: 'image',
-        image: { type: 'external', external: { url: content.thumbnailUrl } },
+        image: thumbnailRef,
       });
     }
 

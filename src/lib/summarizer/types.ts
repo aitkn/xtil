@@ -12,6 +12,7 @@ export interface SummaryDocument {
   sourceLanguage?: string; // detected source language code, e.g. 'ru'
   summaryLanguage?: string; // language the summary is written in, e.g. 'en'
   translatedTitle?: string; // title translated to summary language (only when translated)
+  inferredTitle?: string; // title inferred from content when not in metadata (e.g. Facebook posts)
   inferredAuthor?: string; // author inferred from content when not in metadata
   inferredPublishDate?: string; // publish date inferred from content when not in metadata
   llmProvider?: string; // display name of the LLM provider used, e.g. 'OpenAI'

@@ -1,6 +1,9 @@
 import type { ExtractedComment } from './types';
 
 export function extractComments(doc: Document, url: string): ExtractedComment[] {
+  // Facebook comments are handled by the async loader in content/index.ts
+  if (/facebook\.com/.test(url)) return [];
+
   if (/youtube\.com|youtu\.be/.test(url)) {
     return extractYouTubeComments(doc);
   }

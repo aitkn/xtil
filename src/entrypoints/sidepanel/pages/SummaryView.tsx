@@ -234,6 +234,7 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
   const badgeColors: Record<string, { bg: string; text: string }> = {
     article: { bg: 'var(--md-sys-color-success-container)', text: 'var(--md-sys-color-on-success-container)' },
     youtube: { bg: 'var(--md-sys-color-error-container)', text: 'var(--md-sys-color-on-error-container)' },
+    facebook: { bg: 'var(--md-sys-color-primary-container)', text: 'var(--md-sys-color-on-primary-container)' },
     generic: { bg: 'var(--md-sys-color-surface-container-highest)', text: 'var(--md-sys-color-on-surface-variant)' },
   };
   const badge = badgeColors[content.type] || badgeColors.generic;
@@ -250,7 +251,7 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
           fontWeight: 600,
           textTransform: 'uppercase',
         }}>
-          {content.type === 'youtube' ? 'YouTube' : content.type}
+          {content.type === 'youtube' ? 'YouTube' : content.type === 'facebook' ? 'Facebook' : content.type}
         </span>
         {content.estimatedReadingTime > 0 && (
           <span style={{ color: 'var(--md-sys-color-on-surface-variant)', font: 'var(--md-sys-typescale-label-small)' }}>
@@ -293,25 +294,27 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
         })()}
       </div>
 
-      {content.type === 'youtube' && content.thumbnailUrl && (
+      {content.thumbnailUrl && (
         <img
           src={content.thumbnailUrl}
           alt={content.title}
           style={{ width: '100%', borderRadius: 'var(--md-sys-shape-corner-medium)', marginBottom: '8px' }}
           onError={(e) => {
             const img = e.currentTarget as HTMLImageElement;
-            const hqFallback = content.thumbnailUrl!.replace(/\/[^/]+\.jpg$/, '/hqdefault.jpg');
-            if (img.src !== hqFallback) {
-              img.src = hqFallback;
-            } else {
-              img.style.display = 'none';
+            if (content.type === 'youtube') {
+              const hqFallback = content.thumbnailUrl!.replace(/\/[^/]+\.jpg$/, '/hqdefault.jpg');
+              if (img.src !== hqFallback) {
+                img.src = hqFallback;
+                return;
+              }
             }
+            img.style.display = 'none';
           }}
         />
       )}
 
       <h2 style={{ font: 'var(--md-sys-typescale-title-medium)', lineHeight: 1.3, margin: '4px 0', color: 'var(--md-sys-color-on-surface)' }}>
-        {content.title}
+        {content.title || summary?.translatedTitle || summary?.inferredTitle || ''}
       </h2>
 
       <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
@@ -367,7 +370,8 @@ function summaryToMarkdown(summary: SummaryDocument, content: ExtractedContent |
   const lines: string[] = [];
 
   if (content) {
-    lines.push(`# ${content.title}`, '');
+    const displayTitle = content.title || summary.translatedTitle || summary.inferredTitle || 'Untitled';
+    lines.push(`# ${displayTitle}`, '');
     const meta: string[] = [];
     if (content.author || summary.inferredAuthor) meta.push(`**Author:** ${content.author || summary.inferredAuthor}`);
     if (content.publishDate || summary.inferredPublishDate) meta.push(`**Date:** ${content.publishDate || summary.inferredPublishDate}`);
@@ -429,7 +433,7 @@ function downloadMarkdown(summary: SummaryDocument, content: ExtractedContent | 
   const md = summaryToMarkdown(summary, content);
   const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const slug = (content?.title || 'summary').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 80);
+  const slug = (content?.title || summary.translatedTitle || summary.inferredTitle || 'summary').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 80);
   const a = document.createElement('a');
   a.href = url;
   a.download = `${slug}.md`;

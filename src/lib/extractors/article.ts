@@ -45,6 +45,13 @@ export const articleExtractor: ContentExtractor = {
       .filter(Boolean);
     const richImages = extractRichImages(tempDiv);
 
+    // Hero image: og:image, twitter:image, or first article image
+    const thumbnailUrl =
+      doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+      doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
+      images[0] ||
+      undefined;
+
     return {
       type: 'article',
       url,
@@ -55,6 +62,7 @@ export const articleExtractor: ContentExtractor = {
       content,
       wordCount,
       estimatedReadingTime: Math.ceil(wordCount / 200),
+      thumbnailUrl,
       images,
       richImages,
     };

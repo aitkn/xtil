@@ -45,6 +45,7 @@ You MUST respond with valid JSON matching this exact structure (no markdown code
   "sourceLanguage": "xx",
   "summaryLanguage": "xx",
   "translatedTitle": "Title in summary language or null",
+  "inferredTitle": "Descriptive title or null",
   "inferredAuthor": "Author name or null",
   "inferredPublishDate": "YYYY-MM-DD or null"
 }
@@ -58,6 +59,7 @@ Guidelines:
 - "sourceLanguage" must be the ISO 639-1 code of the original content language (e.g. "en", "ru", "fr").
 - "summaryLanguage" must be the ISO 639-1 code of the language you wrote the summary in (e.g. "en", "ru").
 - "translatedTitle" — if sourceLanguage differs from summaryLanguage, provide the title translated to the summary language. Set to null if no translation was needed.
+- "inferredTitle" — if the title metadata is marked as MISSING, create a concise, descriptive title (5-10 words) that captures the main topic. Set to null if a real title was already provided.
 - "inferredAuthor" — if the author metadata is marked as MISSING, try to infer the author from the content text (byline, signature, mentions, etc.). Set to null if you cannot determine it.
 - "inferredPublishDate" — if the publish date metadata is marked as MISSING, try to infer the date from the content text (date references, timestamps, etc.) in YYYY-MM-DD format. Set to null if you cannot determine it.
 - "extraSections" is optional — use it to add supplementary sections that don't fit the standard fields (cheat sheets, reference tables, etc.). Set to null if not applicable.
@@ -77,7 +79,7 @@ Image Analysis Instructions:
 export function getSummarizationPrompt(content: ExtractedContent): string {
   let prompt = `Summarize the following ${content.type === 'youtube' ? 'YouTube video' : 'article/page'}.\n\n`;
 
-  prompt += `**Title:** ${content.title}\n`;
+  prompt += `**Title:** ${content.title || 'MISSING — infer a concise, descriptive title from the content'}\n`;
   prompt += `**URL:** ${content.url}\n`;
   prompt += `**Author:** ${content.author || 'MISSING — try to infer from content'}\n`;
   prompt += `**Published:** ${content.publishDate || 'MISSING — try to infer from content'}\n`;

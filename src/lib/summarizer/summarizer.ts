@@ -209,6 +209,7 @@ function parseSummaryResponse(response: string, imageAnalysisEnabled = false): S
     sourceLanguage: (parsed.sourceLanguage as string) || undefined,
     summaryLanguage: (parsed.summaryLanguage as string) || undefined,
     translatedTitle: (parsed.translatedTitle as string) || undefined,
+    inferredTitle: (parsed.inferredTitle as string) || undefined,
     inferredAuthor: (parsed.inferredAuthor as string) || undefined,
     inferredPublishDate: (parsed.inferredPublishDate as string) || undefined,
   };

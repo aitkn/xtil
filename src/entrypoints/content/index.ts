@@ -1,5 +1,6 @@
 import { detectExtractor } from '@/lib/extractors/detector';
 import { extractComments } from '@/lib/extractors/comments';
+import { isFacebookPostContext, extractVisibleComments } from '@/lib/extractors/facebook';
 import type { ExtractedContent } from '@/lib/extractors/types';
 import type { ExtractResultMessage, Message } from '@/lib/messaging/types';
 
@@ -8,6 +9,36 @@ export default defineContentScript({
 
   main() {
     const chromeRuntime = (globalThis as unknown as { chrome: { runtime: typeof chrome.runtime } }).chrome.runtime;
+
+    // Watch for Facebook post modals appearing/changing → notify sidepanel
+    if (/(^|\.)facebook\.com$/.test(window.location.hostname)) {
+      let lastModalHeading = '';
+      let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const observer = new MutationObserver(() => {
+        if (debounceTimer) return; // debounce — skip if a check is already scheduled
+        debounceTimer = setTimeout(() => {
+          debounceTimer = null;
+          const headings = document.querySelectorAll('h2');
+          let currentHeading = '';
+          for (const h of headings) {
+            const text = h.textContent?.trim() || '';
+            if (/'.?s Post$/.test(text)) {
+              currentHeading = text;
+              break;
+            }
+          }
+          if (currentHeading && currentHeading !== lastModalHeading) {
+            lastModalHeading = currentHeading;
+            chromeRuntime.sendMessage({ type: 'CONTENT_CHANGED' }).catch(() => {});
+          } else if (!currentHeading && lastModalHeading) {
+            lastModalHeading = '';
+          }
+        }, 500);
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+
     chromeRuntime.onMessage.addListener(
       (message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void) => {
         if (sender.id !== chromeRuntime.id) {
@@ -31,7 +62,10 @@ export default defineContentScript({
         }
 
         if (msg.type === 'EXTRACT_COMMENTS') {
-          const comments = extractComments(document, window.location.href);
+          const url = window.location.href;
+          const comments = isFacebookPostContext(url, document)
+            ? extractVisibleComments(document)
+            : extractComments(document, url);
           sendResponse({ success: true, comments });
           return true;
         }
@@ -54,6 +88,20 @@ async function extractAndResolve(): Promise<ExtractedContent> {
   const comments = extractComments(document, window.location.href);
   if (comments.length > 0) {
     content.comments = comments;
+  }
+
+  // Extract visible Facebook comments (synchronous — no loading delay)
+  if (isFacebookPostContext(window.location.href, document)) {
+    const fbComments = extractVisibleComments(document);
+    if (fbComments.length > 0) {
+      content.comments = fbComments;
+      content.content += `\n\n## Comments (${fbComments.length})\n\n`;
+      for (const c of fbComments) {
+        const reactionStr = c.likes ? ` (${c.likes} reactions)` : '';
+        content.content += `**${c.author || 'Unknown'}**${reactionStr}\n${c.text}\n\n`;
+      }
+      content.wordCount = content.content.split(/\s+/).filter(Boolean).length;
+    }
   }
 
   // Resolve YouTube transcript inline so the sidepanel knows immediately

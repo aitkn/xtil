@@ -182,6 +182,15 @@ export function App() {
       }
     };
 
+    // Content script detected an in-page content change (e.g. Facebook post modal)
+    const onMessage = (message: unknown) => {
+      const msg = message as { type?: string };
+      if (msg?.type === 'CONTENT_CHANGED') {
+        if (spaTimer) clearTimeout(spaTimer);
+        spaTimer = setTimeout(() => extractContent(), 800);
+      }
+    };
+
     // Re-link to the current active tab when the locked tab is closed
     const onRemoved = (tabId: number) => {
       if (tabId !== lockedTabId) return;
@@ -194,16 +203,18 @@ export function App() {
 
     chromeObj.tabs.onUpdated.addListener(onUpdated);
     chromeObj.tabs.onRemoved.addListener(onRemoved);
+    chromeObj.runtime.onMessage.addListener(onMessage);
     return () => {
       chromeObj.tabs.onUpdated.removeListener(onUpdated);
       chromeObj.tabs.onRemoved.removeListener(onRemoved);
+      chromeObj.runtime.onMessage.removeListener(onMessage);
       if (spaTimer) clearTimeout(spaTimer);
     };
   }, [lockedTabId, extractContent]);
 
-  // YouTube lazy-loads comments as the user scrolls — poll periodically to pick up new ones
+  // YouTube/Facebook lazy-load comments as the user scrolls — poll periodically to pick up new ones
   useEffect(() => {
-    if (!content || content.type !== 'youtube') return;
+    if (!content || (content.type !== 'youtube' && content.type !== 'facebook')) return;
 
     let lastCount = content.comments?.length ?? 0;
     let stableRounds = 0;
