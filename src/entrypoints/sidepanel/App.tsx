@@ -164,6 +164,28 @@ export function App() {
     extractContent();
   }, [extractContent]);
 
+  // When no tab is locked (e.g. opened on chrome://), listen for any tab navigation to pick it up
+  useEffect(() => {
+    if (lockedTabId) return;
+    const chromeObj = (globalThis as unknown as { chrome: typeof chrome }).chrome;
+
+    const onUpdated = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+      if (changeInfo.status === 'complete') {
+        extractContent();
+      }
+    };
+    const onActivated = () => {
+      extractContent();
+    };
+
+    chromeObj.tabs.onUpdated.addListener(onUpdated);
+    chromeObj.tabs.onActivated.addListener(onActivated);
+    return () => {
+      chromeObj.tabs.onUpdated.removeListener(onUpdated);
+      chromeObj.tabs.onActivated.removeListener(onActivated);
+    };
+  }, [lockedTabId, extractContent]);
+
   // Re-extract only when the locked tab navigates or reloads
   useEffect(() => {
     if (!lockedTabId) return;
