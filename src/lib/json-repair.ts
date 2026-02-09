@@ -70,6 +70,23 @@ export function repairJson(raw: string): string {
   return chars.join('');
 }
 
+/** Find the index of the closing `}` that matches the opening `{` at `start`. */
+export function findMatchingBrace(raw: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    if (ch === '}') { depth--; if (depth === 0) return i; }
+  }
+  return -1;
+}
+
 /** Try JSON.parse, falling back to repairJson if it fails. */
 export function parseJsonSafe(raw: string): unknown | null {
   try {

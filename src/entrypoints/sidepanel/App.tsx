@@ -5,7 +5,7 @@ import type { ChatMessage, VisionSupport } from '@/lib/llm/types';
 import type { Settings } from '@/lib/storage/types';
 import { getActiveProviderConfig } from '@/lib/storage/types';
 import { DEFAULT_SETTINGS } from '@/lib/storage/types';
-import { parseJsonSafe } from '@/lib/json-repair';
+import { parseJsonSafe, findMatchingBrace } from '@/lib/json-repair';
 import { sendMessage } from '@/lib/messaging/bridge';
 import type {
   ExtractResultMessage,
@@ -705,24 +705,6 @@ function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
     inferredAuthor: (parsed.inferredAuthor as string) || undefined,
     inferredPublishDate: (parsed.inferredPublishDate as string) || undefined,
   };
-}
-
-/** Find the matching `}` for the `{` at position `start` using balanced-brace matching,
- *  correctly skipping over JSON string contents (handles backticks, escapes, etc.). */
-function findMatchingBrace(raw: string, start: number): number {
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < raw.length; i++) {
-    const ch = raw[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === '{') depth++;
-    if (ch === '}') { depth--; if (depth === 0) return i; }
-  }
-  return -1;
 }
 
 function extractJsonAndText(raw: string): { json: SummaryDocument | null; text: string } {

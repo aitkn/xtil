@@ -3,7 +3,7 @@ import type { ExtractedContent } from '../extractors/types';
 import type { SummaryDocument } from './types';
 import type { FetchedImage } from '../images/fetcher';
 import { chunkContent, type ChunkOptions } from './chunker';
-import { parseJsonSafe } from '../json-repair';
+import { parseJsonSafe, findMatchingBrace } from '../json-repair';
 import {
   getSystemPrompt,
   getSummarizationPrompt,
@@ -179,10 +179,27 @@ function parseSummaryResponse(response: string, imageAnalysisEnabled = false): S
   }
 
   // Try standard JSON.parse first, then fall back to repair for broken LLM output
-  const parsed = parseJsonSafe(cleaned) as Record<string, unknown> | null;
+  let parsed = parseJsonSafe(cleaned) as Record<string, unknown> | null;
+
+  // If full-text parse failed, try to extract JSON embedded in surrounding text
+  if (!parsed || typeof parsed !== 'object') {
+    const braceIdx = cleaned.indexOf('{');
+    if (braceIdx > 0) {
+      const braceEnd = findMatchingBrace(cleaned, braceIdx);
+      if (braceEnd !== -1) {
+        parsed = parseJsonSafe(cleaned.slice(braceIdx, braceEnd + 1)) as Record<string, unknown> | null;
+      }
+    }
+  }
+
   if (!parsed || typeof parsed !== 'object') {
     // LLM returned text instead of JSON — surface it as a chat message, not a broken summary
     throw new LLMTextResponse(cleaned);
+  }
+
+  // LLM respected "don't summarize" request — surface the message as a chat response
+  if (parsed.noSummary) {
+    throw new LLMTextResponse((parsed.message as string) || 'OK, feel free to ask questions about the content.');
   }
 
   if (parsed.noContent) {
