@@ -933,43 +933,39 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       }}>
         <div>TL;DR v1.0.0</div>
         <div>&copy; 2026 AI Tech Knowledge LLC</div>
-        <a
-          href="https://github.com/aitkn/tldr/issues"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: 'inline-block',
-            marginTop: '4px',
-            font: 'var(--md-sys-typescale-label-small)',
-            color: 'var(--md-sys-color-on-surface-variant)',
-            textDecoration: 'none',
-            opacity: 0.7,
-          }}
-        >
-          Help &amp; Feedback
-        </a>
-        {!isOnboarding && (
-          <button
-            onClick={() => {
-              setOnboardingStep('provider');
-              setProviderPicked(false);
-              setLocal((prev) => ({ ...prev, onboardingCompleted: false }));
-            }}
-            style={{
-              marginTop: '8px',
-              background: 'none',
-              border: 'none',
-              font: 'var(--md-sys-typescale-label-small)',
-              color: 'var(--md-sys-color-on-surface-variant)',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-              padding: '4px',
-              opacity: 0.7,
-            }}
+        <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', font: 'var(--md-sys-typescale-label-small)', opacity: 0.7 }}>
+          <a
+            href="https://github.com/aitkn/tldr/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--md-sys-color-on-surface-variant)', textDecoration: 'none' }}
           >
-            Restart setup wizard
-          </button>
-        )}
+            Help &amp; Feedback
+          </a>
+          {!isOnboarding && (
+            <>
+              <span style={{ color: 'var(--md-sys-color-outline-variant)' }}>&middot;</span>
+              <button
+                onClick={() => {
+                  setOnboardingStep('provider');
+                  setProviderPicked(false);
+                  setLocal((prev) => ({ ...prev, onboardingCompleted: false }));
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  font: 'inherit',
+                  color: 'var(--md-sys-color-on-surface-variant)',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                Restart setup
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1083,7 +1079,7 @@ const inputStyle: Record<string, string> = {
   border: '1px solid var(--md-sys-color-outline)',
   borderRadius: 'var(--md-sys-shape-corner-small)',
   fontSize: '13px',
-  fontFamily: 'Inter, sans-serif',
+  fontFamily: 'var(--font-stack)',
   outline: 'none',
   boxSizing: 'border-box',
   backgroundColor: 'var(--md-sys-color-surface-container-highest)',
