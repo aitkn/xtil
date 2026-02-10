@@ -10,9 +10,10 @@ interface ChatInputBarProps {
   isFirstSubmit: boolean;
   loading: boolean;
   summarizeVariant?: SummarizeVariant;
+  summarizeLabel?: string;
 }
 
-export function ChatInputBar({ value, onChange, onSubmit, isFirstSubmit, loading, summarizeVariant = 'primary' }: ChatInputBarProps) {
+export function ChatInputBar({ value, onChange, onSubmit, isFirstSubmit, loading, summarizeVariant = 'primary', summarizeLabel = 'Summarize' }: ChatInputBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const maxHeight = 3 * 20 + 16; // 3 rows * lineHeight + padding
   const [height, setHeight] = useState('auto');
@@ -124,7 +125,7 @@ export function ChatInputBar({ value, onChange, onSubmit, isFirstSubmit, loading
             }}
           >
             {loading ? <SmallSpinner /> : null}
-            Summarize
+            {summarizeLabel}
           </button>
         ) : (
           <button

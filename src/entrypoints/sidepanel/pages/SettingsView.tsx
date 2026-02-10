@@ -16,9 +16,9 @@ const LANGUAGES = [
   { code: 'ko', name: 'Korean' },
 ];
 
-type OnboardingStep = 'provider' | 'apiKey' | 'model' | 'test' | 'notion' | 'theme' | 'language' | 'detail' | null;
+type OnboardingStep = 'provider' | 'apiKey' | 'endpoint' | 'model' | 'contextWindow' | 'test' | 'notionKey' | 'notionDb' | 'theme' | 'language' | 'detail' | null;
 
-const ONBOARDING_STEPS: Exclude<OnboardingStep, null>[] = ['provider', 'apiKey', 'model', 'test', 'notion', 'theme', 'language', 'detail'];
+const ONBOARDING_STEPS: Exclude<OnboardingStep, null>[] = ['provider', 'apiKey', 'endpoint', 'model', 'contextWindow', 'test', 'notionKey', 'notionDb', 'theme', 'language', 'detail'];
 
 const STEP_HELPERS: Record<Exclude<OnboardingStep, null>, { title: string; subtitle: string }> = {
   provider: {
@@ -29,28 +29,40 @@ const STEP_HELPERS: Record<Exclude<OnboardingStep, null>, { title: string; subti
     title: 'Step 2: Connect with your API key',
     subtitle: "Paste your API key below so TL;DR can talk to the provider. Don't have one yet? Click \"Get key\" to create an account and generate a key — it only takes a minute.",
   },
+  endpoint: {
+    title: 'Step 3a: Set the endpoint URL',
+    subtitle: 'Enter the URL of your self-hosted LLM server (e.g. Ollama, LM Studio, vLLM). TL;DR will send requests to this address using the OpenAI-compatible API format.',
+  },
   model: {
     title: 'Step 3: Pick a model',
     subtitle: 'Different models vary in cost and quality. Models near the top of the list are usually newer and perform better for the same price. Some models support vision (image analysis) — look for the vision badge after selecting.',
   },
+  contextWindow: {
+    title: 'Step 3c: Context window size',
+    subtitle: 'How many tokens can the model process at once? This determines how much page content TL;DR sends in a single request. Check your model\'s documentation for the exact value.',
+  },
   test: {
     title: 'Step 4: Image analysis & connection test',
-    subtitle: 'Image analysis lets TL;DR read images on the page and include them in summaries. Uncheck it to save tokens. Press "Test Connection" to verify everything works before continuing.',
+    subtitle: 'Image analysis lets TL;DR read images on the page and include them in summaries. Uncheck it to save tokens. If your model doesn\'t support vision, this setting is ignored. Press "Test Connection" to verify everything works.',
   },
-  notion: {
+  notionKey: {
     title: 'Step 5: Save summaries to Notion (optional)',
     subtitle: "Connect a Notion integration to automatically save every summary as a Notion page. Great for building a personal knowledge base. You can skip this and set it up anytime later.",
   },
+  notionDb: {
+    title: 'Step 6: Select a Notion database',
+    subtitle: 'Pick an existing compatible database or create a new one. Compatible databases have all the columns TL;DR needs (Title, URL, Tags, etc.).',
+  },
   theme: {
-    title: 'Step 6: Pick your look',
-    subtitle: 'Choose light, dark, or let TL;DR follow your system setting. Click one to continue.',
+    title: 'Step 7: Pick your look',
+    subtitle: 'Choose light, dark, or let TL;DR follow your system setting. You can also keep the default and click Next.',
   },
   language: {
-    title: 'Step 7: Translation preferences',
+    title: 'Step 8: Translation preferences',
     subtitle: 'Want summaries in a specific language? Pick one below. You can also mark exception languages — pages already in those languages won\'t be translated, keeping the original voice.',
   },
   detail: {
-    title: 'Step 8: How detailed should summaries be?',
+    title: 'Step 9: How detailed should summaries be?',
     subtitle: 'Brief gives you a quick overview in a few sentences. Standard balances detail and length. Detailed captures more nuance. You can tweak this per-summary later too.',
   },
 };
@@ -64,10 +76,13 @@ interface SettingsViewProps {
   onFetchModels: (providerId: string, apiKey: string, endpoint?: string) => Promise<ModelInfo[]>;
   onProbeVision: (providerId?: string, apiKey?: string, model?: string, endpoint?: string) => Promise<VisionSupport | undefined>;
   onThemeChange: (mode: ThemeMode) => void;
+  onOpenTab: (url: string) => Promise<void>;
+  onCloseOnboardingTabs: () => Promise<void>;
+  onClose: () => void;
   currentTheme: ThemeMode;
 }
 
-export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetchNotionDatabases, onFetchModels, onProbeVision, onThemeChange, currentTheme }: SettingsViewProps) {
+export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetchNotionDatabases, onFetchModels, onProbeVision, onThemeChange, onOpenTab, onCloseOnboardingTabs, onClose, currentTheme }: SettingsViewProps) {
   const [local, setLocal] = useState<Settings>(settings);
   const [testingLLM, setTestingLLM] = useState(false);
   const [testingNotion, setTestingNotion] = useState(false);
@@ -93,10 +108,10 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     return 'provider';
   });
   const [providerPicked, setProviderPicked] = useState(false);
+  const [showDoneScreen, setShowDoneScreen] = useState(false);
 
   const lastSavedJson = useRef(JSON.stringify(settings));
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const initialSyncDone = useRef(false);
 
   useEffect(() => {
     setLocal(settings);
@@ -108,9 +123,9 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     // Always respect persisted onboardingCompleted flag
     if (settings.onboardingCompleted) {
       setOnboardingStep(null);
-    } else if (!initialSyncDone.current) {
-      initialSyncDone.current = true;
-      // Existing user: has an API key → skip onboarding
+    } else if (settings.onboardingCompleted === undefined) {
+      // Old user who never saw onboarding: if they have an API key, skip it
+      // (onboardingCompleted === false means explicit restart — keep wizard)
       if (settings.providerConfigs[settings.activeProviderId]?.apiKey) {
         setOnboardingStep(null);
       }
@@ -145,23 +160,27 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   const currentModels = fetchedModels[currentProviderId] || [];
   const visionKey = `${currentProviderId}:${currentConfig.model}`;
   const visionCapability: VisionSupport = local.modelCapabilities?.[visionKey]?.vision || 'unknown';
+  const isSelfHosted = currentProviderId === 'self-hosted';
 
   const isOnboarding = onboardingStep !== null;
   const currentStepIndex = isOnboarding ? ONBOARDING_STEPS.indexOf(onboardingStep) : -1;
 
   // Determine which sections are visible during onboarding
   const sectionVisible = useMemo(() => {
-    if (!isOnboarding) return { provider: true, apiKey: true, model: true, test: true, notion: true, theme: true, language: true, detail: true };
-    const idx = currentStepIndex;
+    if (!isOnboarding) return { provider: true, apiKey: true, endpoint: true, model: true, contextWindow: true, test: true, notionKey: true, notionDb: true, theme: true, language: true, detail: true };
+    const stepIdx = (s: Exclude<OnboardingStep, null>) => ONBOARDING_STEPS.indexOf(s);
     return {
-      provider: idx >= 0,
-      apiKey: idx >= 1,
-      model: idx >= 2,
-      test: idx >= 3,
-      notion: idx >= 4,
-      theme: idx >= 5,
-      language: idx >= 6,
-      detail: idx >= 7,
+      provider: currentStepIndex >= stepIdx('provider'),
+      apiKey: currentStepIndex >= stepIdx('apiKey'),
+      endpoint: currentStepIndex >= stepIdx('endpoint'),
+      model: currentStepIndex >= stepIdx('model'),
+      contextWindow: currentStepIndex >= stepIdx('contextWindow'),
+      test: currentStepIndex >= stepIdx('test'),
+      notionKey: currentStepIndex >= stepIdx('notionKey'),
+      notionDb: currentStepIndex >= stepIdx('notionDb'),
+      theme: currentStepIndex >= stepIdx('theme'),
+      language: currentStepIndex >= stepIdx('language'),
+      detail: currentStepIndex >= stepIdx('detail'),
     };
   }, [isOnboarding, currentStepIndex]);
 
@@ -178,16 +197,54 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     });
   }, [fetchedModels, onSave]);
 
-  const advanceStep = useCallback((from: Exclude<OnboardingStep, null>) => {
+  /** Check whether a provider-related step is already complete for the given config. */
+  const isStepComplete = useCallback((step: Exclude<OnboardingStep, null>, config: ProviderConfig, providerId: string): boolean => {
+    const selfHosted = providerId === 'self-hosted';
+    switch (step) {
+      case 'apiKey': return !!(config.apiKey || selfHosted);
+      case 'endpoint': return !!(selfHosted && config.endpoint);
+      case 'model': return !!config.model;
+      case 'contextWindow': return selfHosted; // always has a default value
+      // test and all subsequent steps are not provider-specific — never skip
+      default: return false;
+    }
+  }, []);
+
+  /** Find the first incomplete onboarding step after `from`, skipping inapplicable and already-complete steps. */
+  const findNextStep = useCallback((from: Exclude<OnboardingStep, null>, config: ProviderConfig, providerId: string): OnboardingStep => {
+    const selfHosted = providerId === 'self-hosted';
     const idx = ONBOARDING_STEPS.indexOf(from);
-    if (idx < 0) return;
-    const next = idx + 1 < ONBOARDING_STEPS.length ? ONBOARDING_STEPS[idx + 1] : null;
+    if (idx < 0) return null;
+    for (let i = idx + 1; i < ONBOARDING_STEPS.length; i++) {
+      const candidate = ONBOARDING_STEPS[i];
+      // Skip self-hosted-only steps for standard providers
+      if ((candidate === 'endpoint' || candidate === 'contextWindow') && !selfHosted) continue;
+      // Skip steps already completed for this provider
+      if (isStepComplete(candidate, config, providerId)) continue;
+      return candidate;
+    }
+    return null; // all done
+  }, [isStepComplete]);
+
+  const advanceStep = useCallback((from: Exclude<OnboardingStep, null>) => {
+    const next = findNextStep(from, currentConfig, currentProviderId);
     if (next === null) {
-      completeOnboarding();
+      setShowDoneScreen(true);
     } else {
       setOnboardingStep(next);
     }
-  }, [completeOnboarding]);
+  }, [currentConfig, currentProviderId, findNextStep]);
+
+  // Skip entire Notion section (both notionKey and notionDb steps)
+  const skipNotion = useCallback(() => {
+    setOnboardingStep('theme');
+  }, []);
+
+  // Open a tab and track it for closing on wizard completion
+  // Background tracks tab IDs automatically — just fire and forget
+  const openTrackedTab = useCallback(async (url: string) => {
+    await onOpenTab(url);
+  }, [onOpenTab]);
 
   // Auto-probe vision when model changes and capability is unknown
   useEffect(() => {
@@ -262,14 +319,15 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       activeProviderId: newProviderId,
     });
 
-    // Advance onboarding
+    // Advance onboarding — skip steps already completed for the new provider
     setProviderPicked(true);
     if (onboardingStep === 'provider') {
-      if (newProviderId === 'self-hosted') {
-        // Skip apiKey for self-hosted
-        setOnboardingStep('model');
+      const newConfig = updatedConfigs[newProviderId];
+      const next = findNextStep('provider', newConfig, newProviderId);
+      if (next === null) {
+        setShowDoneScreen(true);
       } else {
-        advanceStep('provider');
+        setOnboardingStep(next);
       }
     }
   };
@@ -334,9 +392,9 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       } else {
         setNotionStatus(result.success ? 'success' : 'error');
       }
-      // Advance onboarding on Notion test
-      if (onboardingStep === 'notion') {
-        advanceStep('notion');
+      // Advance onboarding on successful Notion database creation
+      if (onboardingStep === 'notionDb' && result.success) {
+        advanceStep('notionDb');
       }
     } catch {
       setNotionStatus('error');
@@ -347,15 +405,34 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
 
   const handleFetchDatabases = async () => {
     setLoadingDbs(true);
+    setNotionStatus('idle');
+    setNotionWarning(null);
     try {
       await handleSave();
       const dbs = await onFetchNotionDatabases();
       setNotionDatabases(dbs);
-    } catch {
-      // ignore
+      setNotionStatus('success');
+    } catch (err) {
+      setNotionStatus('error');
+      setNotionWarning(String(err));
     } finally {
       setLoadingDbs(false);
     }
+  };
+
+  // Auto-fetch databases when entering notionDb step
+  useEffect(() => {
+    if (onboardingStep === 'notionDb' && local.notion.apiKey) {
+      handleFetchDatabases();
+    }
+  }, [onboardingStep]);
+
+  const handleFinishOnboarding = async () => {
+    // Close tabs we opened during setup (API key pages, Notion integration)
+    try { await onCloseOnboardingTabs(); } catch { /* ignore */ }
+    setShowDoneScreen(false);
+    completeOnboarding();
+    onClose();
   };
 
   // Card-level visibility: show when any step inside it has been reached
@@ -422,6 +499,43 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     };
   };
 
+  // Done screen with firework celebration
+  if (showDoneScreen) {
+    return (
+      <div style={{ padding: '16px', font: 'var(--md-sys-typescale-body-medium)', textAlign: 'center' }}>
+        <FireworkCanvas />
+        <div style={{
+          animation: 'fadeIn 0.6s ease',
+          marginTop: '24px',
+        }}>
+          <div style={{
+            font: 'var(--md-sys-typescale-headline-small)',
+            color: 'var(--md-sys-color-primary)',
+            marginBottom: '12px',
+          }}>
+            You're all set!
+          </div>
+          <div style={{
+            font: 'var(--md-sys-typescale-body-medium)',
+            color: 'var(--md-sys-color-on-surface-variant)',
+            lineHeight: '1.6',
+            maxWidth: '280px',
+            margin: '0 auto 24px',
+          }}>
+            Close settings and navigate to any page — then click the TL;DR icon to get your first summary.
+          </div>
+          <Button
+            onClick={handleFinishOnboarding}
+            size="sm"
+            variant="primary"
+          >
+            Start using TL;DR
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: '16px', font: 'var(--md-sys-typescale-body-medium)' }}>
       {/* Onboarding header — dots + skip only, no helper here */}
@@ -429,7 +543,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <StepDots current={currentStepIndex} total={ONBOARDING_STEPS.length} />
           <button
-            onClick={completeOnboarding}
+            onClick={async () => { try { await onCloseOnboardingTabs(); } catch {} setShowDoneScreen(false); completeOnboarding(); }}
             style={{
               background: 'none',
               border: 'none',
@@ -515,14 +629,18 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           API Key
           {currentProviderDef?.apiKeyUrl && (
             <a
-              href={currentProviderDef.apiKeyUrl}
+              href={isOnboarding ? undefined : currentProviderDef.apiKeyUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={isOnboarding ? () => {
+                openTrackedTab(currentProviderDef.apiKeyUrl!);
+              } : undefined}
               style={{
                 marginLeft: '6px',
                 font: 'var(--md-sys-typescale-label-small)',
                 color: 'var(--md-sys-color-primary)',
                 textDecoration: 'none',
+                cursor: 'pointer',
                 ...(isOnboarding && onboardingStep === 'apiKey' ? { animation: 'bounceRight 1.5s ease-in-out infinite' as string, display: 'inline-block' } : {}),
               }}
               title={`Get ${currentProviderDef.name} API key`}
@@ -545,10 +663,13 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           placeholder="Enter API key..."
           style={inputStyle}
         />
-        <StepHint step="apiKey" currentStep={onboardingStep} />
+        <StepHint step="apiKey" currentStep={onboardingStep}
+          title={isSelfHosted ? 'Step 2: API key (optional)' : undefined}
+          subtitle={isSelfHosted ? 'Some self-hosted setups require an API key for authentication. If yours doesn\'t, just click Continue to skip this step.' : undefined}
+        />
 
-        {/* Continue button during onboarding */}
-        {isOnboarding && onboardingStep === 'apiKey' && currentConfig.apiKey && (
+        {/* Continue button during onboarding (always shown for self-hosted since API key is optional) */}
+        {isOnboarding && onboardingStep === 'apiKey' && (currentConfig.apiKey || isSelfHosted) && (
           <Button
             onClick={() => { doFetchModels(); advanceStep('apiKey'); }}
             size="sm"
@@ -560,35 +681,57 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         )}
       </div>
 
+      {/* === Endpoint URL Section (self-hosted only) === */}
+      {isSelfHosted && (
+        <div style={getSectionStyle('endpoint')}>
+          <Label>Endpoint URL</Label>
+          <input
+            type="text"
+            value={currentConfig.endpoint || ''}
+            onInput={(e) => updateProviderConfig({ endpoint: (e.target as HTMLInputElement).value })}
+            placeholder={currentProviderDef?.defaultEndpoint || 'http://localhost:11434'}
+            style={inputStyle}
+          />
+          <StepHint step="endpoint" currentStep={onboardingStep} />
+          {isOnboarding && onboardingStep === 'endpoint' && (
+            <Button
+              onClick={() => { doFetchModels(); advanceStep('endpoint'); }}
+              size="sm"
+              variant="secondary"
+              style={{ marginTop: '8px' }}
+            >
+              Continue
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* === Model Section === */}
       <div style={getSectionStyle('model')}>
         <Label>Model</Label>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <select
-            value={currentModels.some((m) => m.id === currentConfig.model) ? currentConfig.model : '__custom__'}
+            value={currentConfig.model}
             onChange={(e) => {
               const val = (e.target as HTMLSelectElement).value;
-              if (val !== '__custom__') {
-                const model = currentModels.find((m) => m.id === val);
-                updateProviderConfig({
-                  model: val,
-                  contextWindow: model?.contextWindow || currentConfig.contextWindow,
-                });
-                // Advance onboarding on model select
-                if (onboardingStep === 'model') {
-                  advanceStep('model');
-                }
+              const model = currentModels.find((m) => m.id === val);
+              updateProviderConfig({
+                model: val,
+                contextWindow: model?.contextWindow || currentConfig.contextWindow,
+              });
+              // Advance onboarding on model select
+              if (onboardingStep === 'model') {
+                advanceStep('model');
               }
             }}
             style={{ ...selectStyle, flex: 1 }}
           >
             {currentModels.length === 0 && !currentConfig.model && (
-              <option value="__custom__">Enter API key to load models...</option>
+              <option value="">Enter API key to load models...</option>
             )}
             {currentModels.map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
-            <option value="__custom__">Custom...</option>
           </select>
           <Button onClick={() => doFetchModels()} loading={loadingModels} size="sm" variant="ghost" title="Refresh model list">
             Refresh
@@ -607,35 +750,6 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           </div>
         )}
 
-        {(!currentModels.some((m) => m.id === currentConfig.model) && currentConfig.model) && (
-          <>
-            <Label>Custom Model ID</Label>
-            <input
-              type="text"
-              value={currentConfig.model}
-              onInput={(e) => updateProviderConfig({ model: (e.target as HTMLInputElement).value })}
-              placeholder="e.g. my-model-name"
-              style={inputStyle}
-            />
-          </>
-        )}
-
-        <Label>Endpoint URL</Label>
-        <input
-          type="text"
-          value={currentConfig.endpoint || ''}
-          onInput={(e) => updateProviderConfig({ endpoint: (e.target as HTMLInputElement).value })}
-          placeholder={currentProviderDef?.defaultEndpoint || 'http://localhost:11434'}
-          style={inputStyle}
-        />
-
-        <Label>Context Window (tokens)</Label>
-        <input
-          type="number"
-          value={currentConfig.contextWindow}
-          onInput={(e) => updateProviderConfig({ contextWindow: parseInt((e.target as HTMLInputElement).value) || 100000 })}
-          style={inputStyle}
-        />
         <StepHint step="model" currentStep={onboardingStep} />
 
         {/* Continue button during onboarding */}
@@ -650,6 +764,30 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           </Button>
         )}
       </div>
+
+      {/* === Context Window Section (self-hosted only) === */}
+      {isSelfHosted && (
+        <div style={getSectionStyle('contextWindow')}>
+          <Label>Context Window (tokens)</Label>
+          <input
+            type="number"
+            value={currentConfig.contextWindow}
+            onInput={(e) => updateProviderConfig({ contextWindow: parseInt((e.target as HTMLInputElement).value) || 100000 })}
+            style={inputStyle}
+          />
+          <StepHint step="contextWindow" currentStep={onboardingStep} />
+          {isOnboarding && onboardingStep === 'contextWindow' && (
+            <Button
+              onClick={() => advanceStep('contextWindow')}
+              size="sm"
+              variant="secondary"
+              style={{ marginTop: '8px' }}
+            >
+              Continue
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* === Image Analysis + Test Connection Section === */}
       <div style={getSectionStyle('test')}>
@@ -694,17 +832,20 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       </SectionCard>
 
       {/* === Notion Card === */}
-      <SectionCard title="Notion Integration" style={getCardStyle('notion')}>
+      <SectionCard title="Notion Integration" style={getCardStyle('notionKey')}>
 
-      {/* === Notion Section === */}
-      <div style={getSectionStyle('notion')}>
+      {/* === Notion API Key Section === */}
+      <div style={getSectionStyle('notionKey')}>
 
         <Label>
           Notion API Key
           <a
-            href="https://www.notion.so/my-integrations"
+            href={isOnboarding ? undefined : 'https://www.notion.so/my-integrations'}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={isOnboarding ? () => {
+              openTrackedTab('https://www.notion.so/my-integrations');
+            } : undefined}
             style={{
               marginLeft: '6px',
               font: 'var(--md-sys-typescale-label-small)',
@@ -724,6 +865,33 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           style={inputStyle}
         />
 
+        <StepHint step="notionKey" currentStep={onboardingStep} />
+
+        {/* Continue / Skip buttons during onboarding */}
+        {isOnboarding && onboardingStep === 'notionKey' && (
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            {local.notion.apiKey && (
+              <Button
+                onClick={() => advanceStep('notionKey')}
+                size="sm"
+                variant="secondary"
+              >
+                Continue
+              </Button>
+            )}
+            <Button
+              onClick={skipNotion}
+              size="sm"
+              variant="ghost"
+            >
+              Skip Notion
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* === Notion Database Selection Section === */}
+      <div style={getSectionStyle('notionDb')}>
         <Label>Database</Label>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <select
@@ -735,22 +903,41 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             }}
             style={{ ...selectStyle, flex: 1 }}
           >
-            <option value="">Auto-create new database</option>
-            {local.notion.databaseId && !notionDatabases.some((d) => d.id === local.notion.databaseId) && (
-              <option value={local.notion.databaseId}>{local.notion.databaseName || local.notion.databaseId}</option>
-            )}
-            {notionDatabases.map((db) => (
-              <option key={db.id} value={db.id}>{db.title}</option>
-            ))}
+            <option value="">Create new database</option>
+            {notionDatabases.length > 0
+              ? notionDatabases.map((db) => (
+                  <option key={db.id} value={db.id}>{db.title}</option>
+                ))
+              : settings.notion.databaseId && (
+                  <option value={settings.notion.databaseId}>{settings.notion.databaseName || settings.notion.databaseId}</option>
+                )
+            }
           </select>
-          <Button onClick={handleFetchDatabases} loading={loadingDbs} size="sm" variant="ghost" title="Fetch Notion databases">
-            Fetch
+          <Button onClick={handleFetchDatabases} loading={loadingDbs} size="sm" variant="ghost" title="Refresh database list">
+            Refresh
           </Button>
         </div>
+        {loadingDbs && (
+          <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', marginTop: '4px' }}>
+            Searching for compatible databases...
+          </div>
+        )}
+        {!loadingDbs && notionDatabases.length === 0 && local.notion.apiKey && onboardingStep === 'notionDb' && (
+          <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', marginTop: '4px' }}>
+            No compatible databases found. Click "Create Notion Database" to create one.
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
-          <Button onClick={handleTestNotion} loading={testingNotion} size="sm" variant="secondary" title="Test Notion connection">
-            Test Connection
+          <Button
+            onClick={handleTestNotion}
+            loading={testingNotion}
+            size="sm"
+            variant="secondary"
+            title="Create a new Notion database for TL;DR"
+            disabled={!!local.notion.databaseId}
+          >
+            Create Notion Database
           </Button>
           {notionStatus === 'success' && <StatusBadge type="success">Connected!</StatusBadge>}
           {notionStatus === 'warning' && <StatusBadge type="warning">Connected</StatusBadge>}
@@ -762,18 +949,28 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           </div>
         )}
 
-        <StepHint step="notion" currentStep={onboardingStep} />
+        <StepHint step="notionDb" currentStep={onboardingStep} />
 
-        {/* Continue button during onboarding */}
-        {isOnboarding && onboardingStep === 'notion' && (
-          <Button
-            onClick={() => advanceStep('notion')}
-            size="sm"
-            variant="secondary"
-            style={{ marginTop: '8px' }}
-          >
-            Continue
-          </Button>
+        {/* Continue / Skip buttons during onboarding */}
+        {isOnboarding && onboardingStep === 'notionDb' && (
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            {(local.notion.databaseId || notionStatus === 'success') && (
+              <Button
+                onClick={() => advanceStep('notionDb')}
+                size="sm"
+                variant="secondary"
+              >
+                Continue
+              </Button>
+            )}
+            <Button
+              onClick={skipNotion}
+              size="sm"
+              variant="ghost"
+            >
+              Skip Notion
+            </Button>
+          </div>
         )}
       </div>
 
@@ -816,6 +1013,18 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           ))}
         </div>
         <StepHint step="theme" currentStep={onboardingStep} />
+
+        {/* Next button during onboarding to keep default theme */}
+        {isOnboarding && onboardingStep === 'theme' && (
+          <Button
+            onClick={() => advanceStep('theme')}
+            size="sm"
+            variant="secondary"
+            style={{ marginTop: '8px' }}
+          >
+            Continue
+          </Button>
+        )}
       </div>
 
       {/* === Language Section === */}
@@ -887,25 +1096,51 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       {/* === Detail Level Section === */}
       <div style={getSectionStyle('detail')}>
         <Label>Summary Detail Level</Label>
-        <select
-          value={local.summaryDetailLevel}
-          onChange={(e) => {
-            setLocal({ ...local, summaryDetailLevel: (e.target as HTMLSelectElement).value as Settings['summaryDetailLevel'] });
-            // Advance onboarding on detail level change
-            if (onboardingStep === 'detail') {
-              advanceStep('detail');
-            }
-          }}
-          style={selectStyle}
-        >
-          <option value="brief">Brief</option>
-          <option value="standard">Standard</option>
-          <option value="detailed">Detailed</option>
-        </select>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {([
+            { value: 'brief', label: 'Brief', desc: 'Quick overview' },
+            { value: 'standard', label: 'Standard', desc: 'Balanced detail' },
+            { value: 'detailed', label: 'Detailed', desc: 'Full depth' },
+          ] as const).map((opt) => {
+            const selected = local.summaryDetailLevel === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  setLocal({ ...local, summaryDetailLevel: opt.value });
+                  if (onboardingStep === 'detail') {
+                    advanceStep('detail');
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '8px 8px',
+                  borderRadius: 'var(--md-sys-shape-corner-small)',
+                  border: '1px solid',
+                  borderColor: selected ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-outline-variant)',
+                  backgroundColor: selected ? 'var(--md-sys-color-primary-container)' : 'var(--md-sys-color-surface-container)',
+                  color: selected ? 'var(--md-sys-color-on-primary-container)' : 'var(--md-sys-color-on-surface-variant)',
+                  font: 'var(--md-sys-typescale-label-medium)',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                <div>{opt.label}</div>
+                <div style={{
+                  font: 'var(--md-sys-typescale-body-small)',
+                  marginTop: '2px',
+                  opacity: 0.8,
+                }}>
+                  {opt.desc}
+                </div>
+              </button>
+            );
+          })}
+        </div>
 
         <StepHint step="detail" currentStep={onboardingStep} />
 
-        {/* Finish setup button during onboarding */}
+        {/* Finish setup button during onboarding — only when detail was already selected */}
         {isOnboarding && onboardingStep === 'detail' && (
           <Button
             onClick={() => advanceStep('detail')}
@@ -949,6 +1184,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
                 onClick={() => {
                   setOnboardingStep('provider');
                   setProviderPicked(false);
+                  setShowDoneScreen(false);
                   setLocal((prev) => ({ ...prev, onboardingCompleted: false }));
                 }}
                 style={{
@@ -971,6 +1207,97 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   );
 }
 
+function FireworkCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = 300;
+    canvas.height = 200;
+
+    interface Particle {
+      x: number; y: number;
+      vx: number; vy: number;
+      life: number; maxLife: number;
+      color: string; size: number;
+    }
+
+    const particles: Particle[] = [];
+    const colors = ['#6750A4', '#D0BCFF', '#EADDFF', '#625B71', '#CCC2DC', '#B4A7D6', '#7F67BE', '#E8DEF8'];
+
+    function burst(cx: number, cy: number) {
+      const count = 30 + Math.random() * 20;
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+        const speed = 1.5 + Math.random() * 3;
+        particles.push({
+          x: cx, y: cy,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0,
+          maxLife: 40 + Math.random() * 30,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: 1.5 + Math.random() * 2,
+        });
+      }
+    }
+
+    // Initial bursts
+    burst(80, 80);
+    setTimeout(() => burst(220, 60), 200);
+    setTimeout(() => burst(150, 100), 400);
+    setTimeout(() => burst(100, 50), 700);
+    setTimeout(() => burst(200, 90), 900);
+
+    let animFrame: number;
+    function animate() {
+      ctx!.clearRect(0, 0, 300, 200);
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.04; // gravity
+        p.vx *= 0.99; // friction
+        p.life++;
+
+        const alpha = Math.max(0, 1 - p.life / p.maxLife);
+        ctx!.globalAlpha = alpha;
+        ctx!.fillStyle = p.color;
+        ctx!.beginPath();
+        ctx!.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+        ctx!.fill();
+
+        if (p.life >= p.maxLife) particles.splice(i, 1);
+      }
+      ctx!.globalAlpha = 1;
+
+      if (particles.length > 0) {
+        animFrame = requestAnimationFrame(animate);
+      }
+    }
+    animFrame = requestAnimationFrame(animate);
+
+    return () => cancelAnimationFrame(animFrame);
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        width: '100%',
+        maxWidth: '300px',
+        height: '200px',
+        display: 'block',
+        margin: '0 auto',
+      }}
+    />
+  );
+}
+
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -990,7 +1317,7 @@ function StepDots({ current, total }: { current: number; total: number }) {
   );
 }
 
-function StepHint({ step, currentStep }: { step: Exclude<OnboardingStep, null>; currentStep: OnboardingStep }) {
+function StepHint({ step, currentStep, title, subtitle }: { step: Exclude<OnboardingStep, null>; currentStep: OnboardingStep; title?: string; subtitle?: string }) {
   if (currentStep !== step) return null;
   const helper = STEP_HELPERS[step];
   return (
@@ -1007,7 +1334,7 @@ function StepHint({ step, currentStep }: { step: Exclude<OnboardingStep, null>; 
         color: 'var(--md-sys-color-on-primary-container)',
         marginBottom: '3px',
       }}>
-        {helper.title}
+        {title || helper.title}
       </div>
       <div style={{
         font: 'var(--md-sys-typescale-body-small)',
@@ -1015,7 +1342,7 @@ function StepHint({ step, currentStep }: { step: Exclude<OnboardingStep, null>; 
         lineHeight: '1.5',
         opacity: 0.85,
       }}>
-        {helper.subtitle}
+        {subtitle || helper.subtitle}
       </div>
     </div>
   );

@@ -248,6 +248,7 @@ export function App() {
         setSummary(null);
         setNotionUrl(null);
         setChatMessages([]);
+        setPendingResummarize(false);
       }
     } catch {
       // Silently fail — user can still click Summarize which will retry
@@ -269,6 +270,7 @@ export function App() {
     setSummary(null);
     setChatMessages([]);
     setNotionUrl(null);
+    setPendingResummarize(false);
     extractContent();
   }, [extractContent]);
 
@@ -432,7 +434,10 @@ export function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, chatLoading]);
 
-  const isFirstSubmit = !summary && chatMessages.length === 0;
+  // Track whether user changed detail level after a summary was generated
+  const [pendingResummarize, setPendingResummarize] = useState(false);
+
+  const isFirstSubmit = pendingResummarize || (!summary && chatMessages.length === 0);
 
   // Check whether the active LLM provider is configured
   const isLLMConfigured = (() => {
@@ -662,6 +667,12 @@ export function App() {
       if (summarizeVariant === 'amber') {
         setToast({ message: 'No transcript available — summarizing from comments only', type: 'info' });
       }
+      if (pendingResummarize) {
+        setSummary(null);
+        setChatMessages([]);
+        setNotionUrl(null);
+      }
+      setPendingResummarize(false);
       handleSummarize();
       setInputValue('');
       return;
@@ -673,6 +684,12 @@ export function App() {
       if (summarizeVariant === 'amber') {
         setToast({ message: 'No transcript available — summarizing from comments only', type: 'info' });
       }
+      if (pendingResummarize) {
+        setSummary(null);
+        setChatMessages([]);
+        setNotionUrl(null);
+      }
+      setPendingResummarize(false);
       handleSummarize(text);
     } else {
       handleChatSend(text);
@@ -724,10 +741,31 @@ export function App() {
     return response.models || [];
   }, []);
 
+  const handleOpenTab = useCallback(async (url: string): Promise<void> => {
+    await sendMessage({ type: 'OPEN_TAB', url });
+  }, []);
+
+  const handleCloseOnboardingTabs = useCallback(async (): Promise<void> => {
+    await sendMessage({ type: 'CLOSE_ONBOARDING_TABS' });
+  }, []);
+
   const handleThemeChange = useCallback((mode: Settings['theme']) => {
     setThemeMode(mode);
     sendMessage({ type: 'SAVE_SETTINGS', settings: { theme: mode } });
   }, [setThemeMode]);
+
+  const handleDetailLevelCycle = useCallback(() => {
+    const levels: Settings['summaryDetailLevel'][] = ['brief', 'standard', 'detailed'];
+    const currentIdx = levels.indexOf(settings.summaryDetailLevel);
+    const next = levels[(currentIdx + 1) % levels.length];
+    const newSettings = { ...settings, summaryDetailLevel: next };
+    setSettings(newSettings);
+    sendMessage({ type: 'SAVE_SETTINGS', settings: { summaryDetailLevel: next } });
+    // If a summary already exists, signal that user should re-summarize
+    if (summary) {
+      setPendingResummarize(true);
+    }
+  }, [settings, summary]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--md-sys-color-surface)' }}>
@@ -744,6 +782,8 @@ export function App() {
         onSaveMd={summary && content ? () => downloadMarkdown(summary, content) : undefined}
         notionUrl={notionUrl}
         exporting={exporting}
+        detailLevel={settings.summaryDetailLevel}
+        onDetailLevelCycle={handleDetailLevelCycle}
       />
 
       {/* Scrollable content area */}
@@ -886,6 +926,7 @@ export function App() {
         isFirstSubmit={isFirstSubmit}
         loading={loading || chatLoading}
         summarizeVariant={isFirstSubmit ? summarizeVariant : 'primary'}
+        summarizeLabel={pendingResummarize ? 'Re-summarize' : 'Summarize'}
       />
 
       {/* Settings drawer */}
@@ -899,6 +940,9 @@ export function App() {
           onFetchModels={handleFetchModels}
           onProbeVision={handleProbeVision}
           onThemeChange={handleThemeChange}
+          onOpenTab={handleOpenTab}
+          onCloseOnboardingTabs={handleCloseOnboardingTabs}
+          onClose={() => setSettingsOpen(false)}
           currentTheme={themeMode}
         />
       </SettingsDrawer>
@@ -1081,7 +1125,7 @@ function IndicatorChip({ icon, label, variant }: { icon: string; label: string; 
   );
 }
 
-function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport, onSaveMd, notionUrl, exporting }: {
+function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport, onSaveMd, notionUrl, exporting, detailLevel, onDetailLevelCycle }: {
   onThemeToggle: () => void;
   themeMode: string;
   onOpenSettings: () => void;
@@ -1090,6 +1134,8 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport,
   onSaveMd?: () => void;
   notionUrl?: string | null;
   exporting?: boolean;
+  detailLevel: 'brief' | 'standard' | 'detailed';
+  onDetailLevelCycle: () => void;
 }) {
   const [mdSaved, setMdSaved] = useState(false);
   // Reset mdSaved when onSaveMd changes (new summary)
@@ -1136,6 +1182,7 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport,
         <IconButton onClick={onSaveMd && !mdSaved ? () => { onSaveMd(); setMdSaved(true); } : undefined} label={mdSaved ? 'Saved' : 'Save .md'} disabled={!onSaveMd || mdSaved}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" /></svg>
         </IconButton>
+        <DetailLevelButton level={detailLevel} onClick={onDetailLevelCycle} />
         <IconButton onClick={onRefresh} label="Refresh">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" /></svg>
         </IconButton>
@@ -1155,6 +1202,40 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport,
         </IconButton>
       </div>
     </div>
+  );
+}
+
+function DetailLevelButton({ level, onClick }: { level: 'brief' | 'standard' | 'detailed'; onClick: () => void }) {
+  const config = {
+    brief:    { label: 'Brief', bars: 1 },
+    standard: { label: 'Standard', bars: 2 },
+    detailed: { label: 'Detailed', bars: 3 },
+  }[level];
+
+  return (
+    <button
+      onClick={onClick}
+      aria-label={`Detail: ${config.label} (click to cycle)`}
+      title={`Detail: ${config.label}`}
+      style={{
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        padding: '8px',
+        borderRadius: 'var(--md-sys-shape-corner-small)',
+        color: 'var(--md-sys-color-on-surface-variant)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+        {/* Three horizontal bars — filled bars indicate level */}
+        <rect x="3" y="4" width="14" height="2.5" rx="1" opacity={config.bars >= 1 ? 1 : 0.2} />
+        <rect x="3" y="9" width="14" height="2.5" rx="1" opacity={config.bars >= 2 ? 1 : 0.2} />
+        <rect x="3" y="14" width="14" height="2.5" rx="1" opacity={config.bars >= 3 ? 1 : 0.2} />
+      </svg>
+    </button>
   );
 }
 
