@@ -18,7 +18,7 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
     name: 'Anthropic',
     defaultEndpoint: 'https://api.anthropic.com',
     defaultContextWindow: 200000,
-    apiKeyUrl: 'https://console.anthropic.com/settings/keys',
+    apiKeyUrl: 'https://platform.claude.com/settings/keys',
     supportsVision: true,
     description: 'Excellent for code and analysis',
   },

@@ -14,6 +14,8 @@ export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
   images?: ImageContent[];
+  /** Hint for providers with explicit cache control (Anthropic). */
+  cacheBreakpoint?: boolean;
 }
 
 export interface ChatOptions {

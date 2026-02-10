@@ -139,15 +139,15 @@ export class AnthropicProvider implements LLMProvider {
 }
 
 function splitMessages(messages: ChatMessage[]): {
-  system: string | undefined;
+  system: string | Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> | undefined;
   userMessages: Array<{ role: 'user' | 'assistant'; content: unknown }>;
 } {
-  let system: string | undefined;
+  const systemMsgs: ChatMessage[] = [];
   const userMessages: Array<{ role: 'user' | 'assistant'; content: unknown }> = [];
 
   for (const msg of messages) {
     if (msg.role === 'system') {
-      system = (system ? system + '\n' : '') + msg.content;
+      systemMsgs.push(msg);
     } else if (msg.images?.length) {
       const parts: Array<Record<string, unknown>> = [{ type: 'text', text: msg.content }];
       for (const img of msg.images) {
@@ -166,5 +166,23 @@ function splitMessages(messages: ChatMessage[]): {
     }
   }
 
+  if (systemMsgs.length === 0) return { system: undefined, userMessages };
+
+  // If any system message uses cacheBreakpoint, return content block array
+  const hasCacheBreakpoint = systemMsgs.some(m => m.cacheBreakpoint);
+  if (hasCacheBreakpoint) {
+    const blocks = systemMsgs.map(m => {
+      const block: { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } } = {
+        type: 'text' as const,
+        text: m.content,
+      };
+      if (m.cacheBreakpoint) block.cache_control = { type: 'ephemeral' };
+      return block;
+    });
+    return { system: blocks, userMessages };
+  }
+
+  // Plain string for backward compat (testConnection, summarization, etc.)
+  const system = systemMsgs.map(m => m.content).join('\n');
   return { system, userMessages };
 }
