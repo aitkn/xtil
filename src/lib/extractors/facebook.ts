@@ -1,4 +1,4 @@
-import type { ContentExtractor, ExtractedComment, ExtractedContent } from './types';
+import type { ContentExtractor, ExtractedComment, ExtractedContent, ExtractedImage } from './types';
 
 const FB_POST_URL_RE =
   /facebook\.com\/(photo[./]|permalink\.php|story\.php|watch\/?\?|reel\/|.+\/(posts|videos)\/)/;
@@ -54,6 +54,7 @@ export const facebookExtractor: ContentExtractor = {
     const postText = extractPostText(doc, scope);
     const images = extractImages(scope);
     const postMedia = extractPostMediaUrls(scope);
+    const richImages = buildRichImages(scope, postMedia);
     const { reactions, commentCount, shareCount } = extractMetadata(scope);
 
     let content = '';
@@ -83,6 +84,7 @@ export const facebookExtractor: ContentExtractor = {
       thumbnailUrl: postMedia[0] || undefined,
       thumbnailUrls: postMedia.length > 1 ? postMedia.slice(0, 4) : undefined,
       images: images.length > 0 ? images : undefined,
+      richImages: richImages.length > 0 ? richImages : undefined,
     };
   },
 };
@@ -282,6 +284,28 @@ function isInsideComment(el: Element): boolean {
   if (!article) return false;
   const label = article.getAttribute('aria-label') || '';
   return label.startsWith('Comment by') || label.startsWith('Reply by');
+}
+
+/** Convert post media URLs into ExtractedImage objects for the vision pipeline. */
+function buildRichImages(scope: Element | Document, mediaUrls: string[]): ExtractedImage[] {
+  if (mediaUrls.length === 0) return [];
+
+  // Build a lookup from URL → DOM element for alt/dimensions
+  const imgMap = new Map<string, HTMLImageElement>();
+  for (const img of scope.querySelectorAll('img')) {
+    const src = img.src || img.getAttribute('src') || '';
+    if (src) imgMap.set(src, img);
+  }
+
+  const results: ExtractedImage[] = [];
+  for (const url of mediaUrls) {
+    const img = imgMap.get(url);
+    const alt = img?.alt || '';
+    const width = img ? (img.naturalWidth || img.width || undefined) : undefined;
+    const height = img ? (img.naturalHeight || img.height || undefined) : undefined;
+    results.push({ url, alt, tier: 'inline', width, height });
+  }
+  return results;
 }
 
 function extractMetadata(scope: Element | Document): {

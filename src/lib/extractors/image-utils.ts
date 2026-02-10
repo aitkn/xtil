@@ -2,7 +2,7 @@ import type { ExtractedImage } from './types';
 
 // Minimum dimensions for a thumbnail image
 const MIN_THUMBNAIL_SOLO = 32;   // absolute minimum — skip if only image and smaller than this
-const MIN_THUMBNAIL_WITH_ALT = 64; // skip if there are better candidates available
+const MIN_THUMBNAIL_WITH_ALT = 256; // skip if there are better candidates available
 
 const GENERIC_ALT_PATTERNS = /^(image|photo|picture|img|icon|logo|avatar|thumbnail|banner|placeholder|decorative|spacer)$/i;
 

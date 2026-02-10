@@ -93,6 +93,7 @@ interface RedditPostData {
   thumbnail?: string;
   preview_url?: string;
   post_hint?: string;
+  gallery_urls?: string[];
 }
 
 export function buildRedditMarkdown(
@@ -162,23 +163,21 @@ export function buildRedditMarkdown(
   const wordCount = markdown.split(/\s+/).filter(Boolean).length;
 
   // Extract images from post
-  const thumbnailUrl = post.preview_url || (post.thumbnail && !['self', 'default', 'nsfw', 'spoiler', ''].includes(post.thumbnail) ? post.thumbnail : undefined);
+  // Build rich images from preview, gallery, or link post image
   const richImages: ExtractedImage[] = [];
-  if (post.preview_url) {
-    richImages.push({
-      url: post.preview_url,
-      alt: post.title,
-      tier: 'inline',
-    });
+  if (post.gallery_urls?.length) {
+    for (const gurl of post.gallery_urls) {
+      richImages.push({ url: gurl, alt: post.title, tier: 'inline' });
+    }
+  } else if (post.preview_url) {
+    richImages.push({ url: post.preview_url, alt: post.title, tier: 'inline' });
   }
-  // For link posts, the linked URL might be an image
-  if (!post.is_self && post.post_hint === 'image' && post.url && post.url !== post.preview_url) {
-    richImages.push({
-      url: post.url,
-      alt: post.title,
-      tier: 'inline',
-    });
+  if (!post.is_self && post.post_hint === 'image' && post.url &&
+      post.url !== post.preview_url && !post.gallery_urls?.length) {
+    richImages.push({ url: post.url, alt: post.title, tier: 'inline' });
   }
+  // Use first full-size image as thumbnail; never use Reddit's tiny thumbnail field
+  const thumbnailUrl = richImages[0]?.url || undefined;
 
   return {
     markdown,
@@ -271,6 +270,7 @@ export function parseRedditJson(json: unknown[]): { post: RedditPostData; commen
     thumbnail: (postData.thumbnail as string) || undefined,
     post_hint: (postData.post_hint as string) || undefined,
     preview_url: extractPreviewUrl(postData),
+    gallery_urls: extractGalleryUrls(postData),
   };
 
   const comments = commentListing?.data?.children || [];
@@ -284,6 +284,23 @@ function extractPreviewUrl(postData: Record<string, unknown>): string | undefine
     const url = preview?.images?.[0]?.source?.url;
     // Reddit HTML-encodes the URL in JSON (e.g. &amp;)
     return url ? url.replace(/&amp;/g, '&') : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function extractGalleryUrls(postData: Record<string, unknown>): string[] | undefined {
+  try {
+    const galleryData = postData.gallery_data as { items?: Array<{ media_id: string }> } | undefined;
+    const mediaMetadata = postData.media_metadata as Record<string, { s?: { u?: string } }> | undefined;
+    if (!galleryData?.items?.length || !mediaMetadata) return undefined;
+
+    const urls: string[] = [];
+    for (const item of galleryData.items) {
+      const source = mediaMetadata[item.media_id]?.s?.u;
+      if (source) urls.push(source.replace(/&amp;/g, '&'));
+    }
+    return urls.length > 0 ? urls : undefined;
   } catch {
     return undefined;
   }
