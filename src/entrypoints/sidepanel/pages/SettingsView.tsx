@@ -1387,18 +1387,20 @@ function SectionCard({ title, style, children }: { title: string; style?: Record
   );
 }
 
-function Label({ children, htmlFor }: { children: preact.ComponentChildren; htmlFor?: string }) {
-  return (
-    <label htmlFor={htmlFor} style={{
-      display: 'block',
-      font: 'var(--md-sys-typescale-label-medium)',
-      color: 'var(--md-sys-color-on-surface-variant)',
-      marginTop: '12px',
-      marginBottom: '4px',
-    }}>
-      {children}
-    </label>
-  );
+const labelStyle = {
+  display: 'block',
+  font: 'var(--md-sys-typescale-label-medium)',
+  color: 'var(--md-sys-color-on-surface-variant)',
+  marginTop: '12px',
+  marginBottom: '4px',
+} as const;
+
+function Label({ children, htmlFor, id }: { children: preact.ComponentChildren; htmlFor?: string; id?: string }) {
+  if (!htmlFor) {
+    // Not associated with a form field — render as span to avoid audit warnings
+    return <span id={id} style={labelStyle}>{children}</span>;
+  }
+  return <label id={id} htmlFor={htmlFor} style={labelStyle}>{children}</label>;
 }
 
 function StatusBadge({ type, children }: { type: 'success' | 'warning' | 'error'; children: preact.ComponentChildren }) {
