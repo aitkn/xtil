@@ -62,7 +62,7 @@ async function findMermaidErrors(
   const fields = [
     summary.tldr, summary.summary, summary.factCheck,
     summary.conclusion,
-    ...(summary.extraSections?.map(s => s.content) || []),
+    ...(summary.extraSections ? Object.values(summary.extraSections) : []),
   ].filter(Boolean) as string[];
 
   const errors: Array<{ source: string; error: string }> = [];
@@ -1150,8 +1150,8 @@ function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
     conclusion: (parsed.conclusion as string) || '',
     prosAndCons: pc ? { pros: Array.isArray(pc.pros) ? pc.pros : [], cons: Array.isArray(pc.cons) ? pc.cons : [] } : undefined,
     commentsHighlights: Array.isArray(parsed.commentsHighlights) ? parsed.commentsHighlights : undefined,
-    extraSections: Array.isArray(parsed.extraSections)
-      ? parsed.extraSections.filter((s: unknown) => s && typeof (s as Record<string, unknown>).title === 'string' && typeof (s as Record<string, unknown>).content === 'string') as Array<{ title: string; content: string }>
+    extraSections: parsed.extraSections && typeof parsed.extraSections === 'object' && !Array.isArray(parsed.extraSections)
+      ? Object.fromEntries(Object.entries(parsed.extraSections as Record<string, unknown>).filter(([, v]) => typeof v === 'string'))
       : undefined,
     relatedTopics: Array.isArray(parsed.relatedTopics) ? parsed.relatedTopics : [],
     tags: Array.isArray(parsed.tags) ? parsed.tags : [],
@@ -1196,12 +1196,9 @@ function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDoc
         break;
       }
       case 'extraSections':
-        if (Array.isArray(value)) {
-          result[key] = value.filter(
-            (s: unknown) =>
-              s && typeof (s as Record<string, unknown>).title === 'string' &&
-              typeof (s as Record<string, unknown>).content === 'string',
-          ) as Array<{ title: string; content: string }>;
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          // Keep raw entries — mergeSummaryUpdates handles __DELETE__ at sub-key level
+          result[key] = value;
         }
         break;
     }
@@ -1217,6 +1214,17 @@ function mergeSummaryUpdates(existing: SummaryDocument, updates: Partial<Summary
     if (key === 'llmProvider' || key === 'llmModel') continue;
     if (value === undefined) {
       delete (merged as Record<string, unknown>)[key];
+    } else if (key === 'extraSections' && value && typeof value === 'object' && !Array.isArray(value)) {
+      // Deep-merge extraSections: update/add individual keys, __DELETE__ removes them
+      const base = { ...(merged.extraSections || {}) };
+      for (const [sKey, sValue] of Object.entries(value as Record<string, unknown>)) {
+        if (sValue === DELETE_SENTINEL) {
+          delete base[sKey];
+        } else if (typeof sValue === 'string') {
+          base[sKey] = sValue;
+        }
+      }
+      merged.extraSections = Object.keys(base).length > 0 ? base : undefined;
     } else {
       (merged as Record<string, unknown>)[key] = value;
     }

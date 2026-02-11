@@ -228,8 +228,8 @@ function parseSummaryResponse(response: string, imageAnalysisEnabled = false): S
     prosAndCons: pc ? { pros: Array.isArray(pc.pros) ? pc.pros : [], cons: Array.isArray(pc.cons) ? pc.cons : [] } : undefined,
     factCheck: typeof parsed.factCheck === 'string' ? parsed.factCheck : undefined,
     commentsHighlights: Array.isArray(parsed.commentsHighlights) ? parsed.commentsHighlights : undefined,
-    extraSections: Array.isArray(parsed.extraSections)
-      ? parsed.extraSections.filter((s: unknown) => s && typeof (s as Record<string, unknown>).title === 'string' && typeof (s as Record<string, unknown>).content === 'string') as Array<{ title: string; content: string }>
+    extraSections: parsed.extraSections && typeof parsed.extraSections === 'object' && !Array.isArray(parsed.extraSections)
+      ? Object.fromEntries(Object.entries(parsed.extraSections as Record<string, unknown>).filter(([, v]) => typeof v === 'string'))
       : undefined,
     relatedTopics: Array.isArray(parsed.relatedTopics) ? parsed.relatedTopics : [],
     tags: Array.isArray(parsed.tags) ? parsed.tags : [],
@@ -273,7 +273,9 @@ function replacePlaceholders(doc: SummaryDocument, replacements: [string, string
     factCheck: doc.factCheck ? r(doc.factCheck) : undefined,
     commentsHighlights: doc.commentsHighlights ? ra(doc.commentsHighlights) : undefined,
     prosAndCons: doc.prosAndCons ? { pros: ra(doc.prosAndCons.pros), cons: ra(doc.prosAndCons.cons) } : undefined,
-    extraSections: doc.extraSections?.map((s) => ({ title: r(s.title), content: r(s.content) })),
+    extraSections: doc.extraSections
+      ? Object.fromEntries(Object.entries(doc.extraSections).map(([title, content]) => [r(title), r(content)]))
+      : undefined,
   };
 }
 

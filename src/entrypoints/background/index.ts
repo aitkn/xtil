@@ -461,7 +461,7 @@ Response format rules:
 - Each field you include is replaced entirely — you cannot patch part of a field. Always provide the complete value for any field you want to change.
 - To remove an optional field, set its value to the string "__DELETE__" (e.g. "factCheck": "__DELETE__").
 - IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.
-- To add custom sections (cheat sheets, tables, extras the user requests), use the "extraSections" array field: [{"title": "Section Name", "content": "markdown content"}]. Content supports full markdown and mermaid diagrams (flowchart, sequence, timeline, etc.).
+- "extraSections" is a key-value object: {"Section Title": "markdown content", ...}. To update a single section, include only that key. To delete a section, set its value to "__DELETE__". Content supports full markdown and mermaid diagrams.
 - MERMAID SYNTAX (MANDATORY): Node IDs must be ONLY letters or digits (A, B, C1, node1) — NO colons, dashes, dots, spaces, or any special characters in IDs. ALL display text goes inside brackets: A["Label with special:chars"], B{"Decision?"}. Edge labels use |label| syntax. Always use \`flowchart TD\` or \`flowchart LR\`, never \`graph\`. Example: \`flowchart TD\\n  A["Start"] --> B{"Check?"}\\n  B -->|Yes| C["Done"]\`
 - UI THEME: The user's interface is currently in **${theme || 'dark'} mode**. When generating diagrams, tables, or any visual elements with colors, choose colors that are readable and look good on a ${theme || 'dark'} background.
 

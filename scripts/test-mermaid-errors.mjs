@@ -33,7 +33,7 @@ async function findMermaidErrors(summary) {
   const fields = [
     summary.tldr, summary.summary, summary.factCheck,
     summary.conclusion,
-    ...(summary.extraSections?.map(s => s.content) || []),
+    ...(summary.extraSections ? Object.values(summary.extraSections) : []),
   ].filter(Boolean);
 
   const errors = [];
@@ -82,9 +82,9 @@ const tests = [
     summary: {
       tldr: '', summary: 'No diagrams here', conclusion: '',
       keyTakeaways: [], notableQuotes: [], relatedTopics: [], tags: [],
-      extraSections: [
-        { title: 'Architecture', content: '```mermaid\ngraph TD\n    A( --> B\n```' },
-      ],
+      extraSections: {
+        'Architecture': '```mermaid\ngraph TD\n    A( --> B\n```',
+      },
     },
     expectErrors: 1,
   },

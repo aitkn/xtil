@@ -283,7 +283,7 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
   if (!skipFactCheck) schema.push('"factCheck": "Analysis of factual accuracy..."');
   if (!skipComments) schema.push('"commentsHighlights": ["Notable comment/discussion point 1", ...]');
   schema.push('"relatedTopics": ["Related topic 1", "Related topic 2", ...]');
-  if (!skipExtraSections) schema.push('"extraSections": [{"title": "Section Title", "content": "section content"}]');
+  if (!skipExtraSections) schema.push('"extraSections": {"Section Title": "section content", ...}');
   schema.push('"tags": ["tag1", "tag2", ...]', '"sourceLanguage": "xx"', '"summaryLanguage": "xx"');
   if (!isGitHub) {
     schema.push('"translatedTitle": "Title in summary language or null"', '"inferredTitle": "Descriptive title or null"',

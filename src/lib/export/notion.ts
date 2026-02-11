@@ -361,9 +361,9 @@ export class NotionAdapter implements ExportAdapter {
       sections.push('## Conclusion\n\n' + summary.conclusion);
     }
 
-    if (summary.extraSections && summary.extraSections.length > 0) {
-      for (const section of summary.extraSections) {
-        sections.push(`## ${section.title}\n\n${section.content}`);
+    if (summary.extraSections) {
+      for (const [title, content] of Object.entries(summary.extraSections)) {
+        sections.push(`## ${title}\n\n${content}`);
       }
     }
 

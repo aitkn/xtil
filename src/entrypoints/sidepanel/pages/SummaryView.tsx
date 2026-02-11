@@ -138,10 +138,10 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
       )}
 
       {/* Extra sections (added via chat refinement) */}
-      {summary.extraSections && summary.extraSections.length > 0 && summary.extraSections.map((section, i) => (
-        <Section key={`extra-${i}`} title={section.title}>
+      {summary.extraSections && Object.entries(summary.extraSections).map(([title, content]) => (
+        <Section key={`extra-${title}`} title={title}>
           <div style={{ font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.6 }}>
-            <MarkdownRenderer content={section.content} />
+            <MarkdownRenderer content={content} />
           </div>
         </Section>
       ))}
@@ -530,8 +530,8 @@ function summaryToMarkdown(summary: SummaryDocument, content: ExtractedContent |
   }
 
   if (summary.extraSections) {
-    for (const s of summary.extraSections) {
-      lines.push(`## ${s.title}`, '', s.content, '');
+    for (const [title, content] of Object.entries(summary.extraSections)) {
+      lines.push(`## ${title}`, '', content, '');
     }
   }
 
