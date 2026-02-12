@@ -1600,7 +1600,7 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport,
       if (e.key.length === 1) {
         e.preventDefault();
         bufferRef.current += e.key.toLowerCase();
-        if (bufferRef.current.includes('debug')) {
+        if (bufferRef.current.includes('de')) {
           onToggleDebug();
           setListening(false);
           bufferRef.current = '';
@@ -1631,7 +1631,7 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport,
         <span
           title="Too Long; Didn't Read"
           onClick={handleTitleClick}
-          style={{ font: 'var(--md-sys-typescale-title-large)', color: 'var(--md-sys-color-on-surface)', cursor: 'pointer', userSelect: 'none' }}
+          style={{ font: 'var(--md-sys-typescale-title-large)', color: 'var(--md-sys-color-on-surface)', userSelect: 'none' }}
         >
           TL;DR
         </span>
