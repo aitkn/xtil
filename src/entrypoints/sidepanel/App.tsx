@@ -22,7 +22,7 @@ import type {
   SeekVideoMessage,
 } from '@/lib/messaging/types';
 import type { ModelInfo } from '@/lib/llm/types';
-import { SummaryContent, MetadataHeader, downloadMarkdown } from './pages/SummaryView';
+import { SummaryContent, MetadataHeader, downloadMarkdown, resetSectionState } from './pages/SummaryView';
 import { SettingsView } from './pages/SettingsView';
 import { getProviderDefinition } from '@/lib/llm/registry';
 import { Toast } from '@/components/Toast';
@@ -365,6 +365,7 @@ export function App() {
       });
     } else {
       setContent(null);
+      resetSectionState();
       setSummary(null);
       setChatMessages([]);
       setRawResponses([]);
@@ -621,8 +622,17 @@ export function App() {
     const el = scrollAreaRef.current;
     if (!el) return;
     const handler = (e: Event) => {
-      const { source, error } = (e as CustomEvent<{ source: string; error: string }>).detail;
+      const { source, error, retryBtn } = (e as CustomEvent<{ source: string; error: string; retryBtn?: HTMLButtonElement }>).detail;
       if (!summaryRef.current || !contentRef.current) return;
+
+      // Re-enable retry button helper (when fix fails or nothing changes)
+      const resetRetryBtn = () => {
+        if (retryBtn) {
+          retryBtn.disabled = false;
+          retryBtn.classList.remove('loading');
+          retryBtn.textContent = 'Retry fix';
+        }
+      };
 
       setChatLoading(true);
 
@@ -631,11 +641,14 @@ export function App() {
           const relevantRef = getRelevantCheatsheet([source]);
           const fixRequest = `The following mermaid diagram in the summary has a syntax error and failed to render:\n\nError: ${error}\n\nBroken diagram:\n\`\`\`mermaid\n${source}\n\`\`\`\n\nFix the mermaid syntax error silently. Rules:\n- Return ONLY the corrected fields in "updates". Set "text" to "".\n- Do NOT add any commentary, changelog, or "fixes applied" notes to the content — just fix the syntax.\n- All diagrams MUST use \`\`\`mermaid fenced code blocks (not plain \`\`\`).\n\n${MERMAID_ESSENTIAL_RULES}${relevantRef}`;
           const userMsg: DisplayMessage = { role: 'user', content: fixRequest, internal: true };
+          skipScrollRef.current = true;
           setChatMessages(prev => [...prev, userMsg]);
 
           const allMessages: ChatMessage[] = [
             ...chatMessagesRef.current.map(m => ({ role: m.role, content: m.content })),
           ];
+
+          const summaryBefore = JSON.stringify(summaryRef.current);
 
           const fixResponse = await sendMessage({
             type: 'CHAT_MESSAGE',
@@ -652,20 +665,31 @@ export function App() {
             const { updates, text: chatText } = extractJsonAndText(fixResponse.message);
             const displayText = chatText || (updates ? 'Diagram fixed.' : 'Failed to fix diagram.');
             const assistantMsg: DisplayMessage = { role: 'assistant', content: displayText, internal: true };
+            skipScrollRef.current = true;
             setChatMessages(prev => [...prev, assistantMsg]);
 
             if (updates && summaryRef.current) {
               const updated = mergeSummaryUpdates(summaryRef.current, updates);
               if (summaryRef.current.llmProvider) updated.llmProvider = summaryRef.current.llmProvider;
               if (summaryRef.current.llmModel) updated.llmModel = summaryRef.current.llmModel;
+              // Re-enable button if the summary didn't actually change
+              if (JSON.stringify(updated) === summaryBefore) {
+                resetRetryBtn();
+              }
               setSummary(updated);
               setNotionUrl(null);
+            } else {
+              resetRetryBtn();
             }
           } else {
+            skipScrollRef.current = true;
             setChatMessages(prev => [...prev, { role: 'assistant', content: 'Failed to fix diagram.', internal: true }]);
+            resetRetryBtn();
           }
         } catch {
+          skipScrollRef.current = true;
           setChatMessages(prev => [...prev, { role: 'assistant', content: 'Failed to fix diagram.', internal: true }]);
+          resetRetryBtn();
         } finally {
           setChatLoading(false);
         }
@@ -760,6 +784,7 @@ export function App() {
       );
 
       if (activeTabIdRef.current === originTabId) {
+        resetSectionState();
         setSummary(finalSummary);
         summaryDetailLevelRef.current = settings.summaryDetailLevel;
       } else if (originTabId != null) {

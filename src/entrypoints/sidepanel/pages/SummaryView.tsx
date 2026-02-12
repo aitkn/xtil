@@ -442,13 +442,25 @@ function ThumbnailCollage({ urls, title, fallbackUrl }: { urls: string[]; title:
   );
 }
 
+// Track user-toggled section state by title so it survives re-renders / remounts
+const sectionUserState = new Map<string, boolean>();
+
+/** Reset user section overrides (call when generating a fresh summary for a new page). */
+export function resetSectionState() { sectionUserState.clear(); }
+
 function Section({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: preact.ComponentChildren }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(sectionUserState.get(title) ?? defaultOpen);
+
+  const toggle = () => {
+    const next = !open;
+    sectionUserState.set(title, next);
+    setOpen(next);
+  };
 
   return (
     <div style={{ marginBottom: '4px' }}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         title={open ? `Collapse ${title}` : `Expand ${title}`}
         class="section-toggle"
         style={{

@@ -319,6 +319,10 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
   }
   guidelines.push(`- All text fields support full markdown formatting (bold, italic, links, lists, etc.). Use it wherever it improves clarity.`);
   if (mermaidGuideline) guidelines.push(mermaidGuideline);
+  if (!contentType || contentType === 'article' || contentType === 'generic') {
+    const chartMax = detailLevel === 'brief' ? '1' : detailLevel === 'standard' ? '2-3' : '2-5';
+    guidelines.push(`- DATA CHARTS: If the content contains significant numerical tables or datasets, identify the most important data and visualize it using mermaid charts (\`xychart-beta\` for trends/comparisons, \`pie\` for proportions). Create up to ${chartMax} chart(s). Place charts in the "summary" or "extraSections" near the relevant discussion. This applies even when process/architecture diagrams are otherwise omitted — data visualization is always valuable when the numbers warrant it.`);
+  }
   guidelines.push(`- ${d.lengthRule} Each field should add unique value — do not restate the same points across fields.`);
   if (!isGitHub) {
     guidelines.push(`- IMPORTANT: The content may contain mature, explicit, or sensitive topics (medical, psychological, sexual health, etc.). You MUST still summarize it fully and accurately — never refuse to summarize. Keep the summary professional and clinical in tone — do not reproduce explicit language or graphic details. Focus on the key ideas, arguments, and conclusions.`);

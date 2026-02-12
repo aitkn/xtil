@@ -34,7 +34,12 @@ export const articleExtractor: ContentExtractor = {
       undefined;
 
     // Convert HTML content to simple markdown
-    const content = htmlToMarkdown(article.content);
+    let content = htmlToMarkdown(article.content);
+
+    // Rescue data tables that Readability may have stripped
+    const rescued = rescueDataTables(doc, article.content);
+    if (rescued) content += '\n\n' + rescued;
+
     const wordCount = content.split(/\s+/).filter(Boolean).length;
 
     // Extract image URLs
@@ -145,6 +150,53 @@ function htmlToMarkdown(html: string): string {
         return `\n${children}\n`;
       case 'figcaption':
         return `\n*${children.trim()}*\n`;
+      case 'table': {
+        const caption = el.querySelector(':scope > caption');
+        const captionText = caption
+          ? `**${Array.from(caption.childNodes).map(processNode).join('').trim()}**\n\n`
+          : '';
+        // Collect rows respecting thead/tbody/tfoot structure
+        const headRows: Element[] = [];
+        const bodyRows: Element[] = [];
+        for (const child of Array.from(el.children)) {
+          if (child.tagName === 'THEAD') {
+            headRows.push(...Array.from(child.children).filter(c => c.tagName === 'TR'));
+          } else if (child.tagName === 'TBODY' || child.tagName === 'TFOOT') {
+            bodyRows.push(...Array.from(child.children).filter(c => c.tagName === 'TR'));
+          } else if (child.tagName === 'TR') {
+            bodyRows.push(child);
+          }
+        }
+        // If no thead, promote first body row to header
+        if (headRows.length === 0 && bodyRows.length > 0) {
+          headRows.push(bodyRows.shift()!);
+        }
+        if (headRows.length === 0 && bodyRows.length === 0) return captionText;
+        const allRows = [...headRows, ...bodyRows];
+        // Build 2D grid
+        const grid: string[][] = allRows.map(row => {
+          const cells = Array.from(row.children).filter(c => c.tagName === 'TH' || c.tagName === 'TD');
+          return cells.map(cell =>
+            Array.from(cell.childNodes).map(processNode).join('')
+              .trim().replace(/\n/g, ' ').replace(/\|/g, '\\|')
+          );
+        });
+        // Normalize column count
+        const colCount = Math.max(...grid.map(r => r.length));
+        for (const row of grid) {
+          while (row.length < colCount) row.push('');
+        }
+        // Build markdown pipe table
+        const lines: string[] = [];
+        for (let i = 0; i < headRows.length; i++) {
+          lines.push('| ' + grid[i].join(' | ') + ' |');
+        }
+        lines.push('| ' + Array(colCount).fill('---').join(' | ') + ' |');
+        for (let i = headRows.length; i < grid.length; i++) {
+          lines.push('| ' + grid[i].join(' | ') + ' |');
+        }
+        return '\n' + captionText + lines.join('\n') + '\n';
+      }
       case 'div':
       case 'section':
       case 'article':
@@ -160,4 +212,30 @@ function htmlToMarkdown(html: string): string {
 
   // Clean up excessive whitespace
   return md.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Rescue data tables from the original DOM that Readability tends to strip. */
+function rescueDataTables(doc: Document, readabilityHtml: string): string {
+  const contentRoot = doc.querySelector(
+    '#mw-content-text, article, [role="main"], main, .content, .post-content, .entry-content'
+  ) || doc.body;
+  if (!contentRoot) return '';
+
+  const skipClasses = /navbox|sidebar|infobox|metadata|ambox|mbox|footer|navigation/i;
+  const parts: string[] = [];
+
+  for (const table of Array.from(contentRoot.querySelectorAll('table'))) {
+    const rows = table.querySelectorAll('tr');
+    const dataCells = table.querySelectorAll('td');
+    // Must be a substantial data table
+    if (rows.length < 3 || dataCells.length < 3) continue;
+    // Skip navigation/metadata tables
+    if (skipClasses.test(table.className)) continue;
+    // Skip tables that Readability already preserved — check via unique cell text
+    const sampleCell = table.querySelector('td:nth-child(2)')?.textContent?.trim().substring(0, 40);
+    if (sampleCell && readabilityHtml.includes(sampleCell)) continue;
+    parts.push(htmlToMarkdown(table.outerHTML));
+  }
+
+  return parts.join('\n\n');
 }

@@ -263,9 +263,11 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           retryBtn.title = 'Send this diagram to LLM for another fix attempt';
           retryBtn.addEventListener('click', () => {
             retryBtn.disabled = true;
+            retryBtn.classList.add('loading');
+            retryBtn.textContent = 'Fixing...';
             el.dispatchEvent(new CustomEvent('mermaid-retry', {
               bubbles: true,
-              detail: { source, error: msg },
+              detail: { source, error: msg, retryBtn },
             }));
           });
           el.appendChild(retryBtn);
