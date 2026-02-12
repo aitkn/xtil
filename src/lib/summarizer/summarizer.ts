@@ -51,6 +51,8 @@ export interface SummarizeOptions {
   onSystemPrompt?: (prompt: string) => void;
   /** Called with the full conversation messages before each LLM call (for debug panel). */
   onConversation?: (messages: ChatMessage[]) => void;
+  /** Called with the rolling summary text when chunked summarization is used (for debug panel). */
+  onRollingSummary?: (summary: string) => void;
 }
 
 /** Build the full system prompt for summarization (includes skill catalog when appropriate). */
@@ -78,7 +80,7 @@ export async function summarize(
   content: ExtractedContent,
   options: SummarizeOptions,
 ): Promise<SummaryDocument> {
-  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, userInstructions, fetchedImages, imageUrlList, signal, onRawResponse, onSystemPrompt, onConversation } = options;
+  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, userInstructions, fetchedImages, imageUrlList, signal, onRawResponse, onSystemPrompt, onConversation, onRollingSummary } = options;
   const imageContents: ImageContent[] | undefined = fetchedImages?.map((fi) => ({
     base64: fi.base64,
     mimeType: fi.mimeType,
@@ -99,7 +101,7 @@ export async function summarize(
       if (chunks.length === 1) {
         return await oneShotSummarize(provider, content, systemPrompt, detailLevel, imageContents, imageUrlList, signal, onRawResponse, onConversation);
       } else {
-        return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, imageContents, imageUrlList, signal, onRawResponse, onConversation);
+        return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, imageContents, imageUrlList, signal, onRawResponse, onConversation, onRollingSummary);
       }
     } catch (err) {
       // Don't retry cancellation, text responses, no-content, or image requests
@@ -154,6 +156,7 @@ async function rollingContextSummarize(
   signal?: AbortSignal,
   onRawResponse?: (response: string) => void,
   onConversation?: (messages: ChatMessage[]) => void,
+  onRollingSummary?: (summary: string) => void,
 ): Promise<SummaryDocument> {
   let rollingSummary = '';
 
@@ -208,6 +211,7 @@ async function rollingContextSummarize(
 
     // For intermediate chunks, use the response as rolling context
     rollingSummary = response;
+    onRollingSummary?.(rollingSummary);
   }
 
   throw new Error('No chunks to process');

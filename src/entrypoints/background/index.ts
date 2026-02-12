@@ -4,7 +4,6 @@ import { createProvider, getProviderDefinition } from '@/lib/llm/registry';
 import { fetchModels } from '@/lib/llm/models';
 import { summarize, ImageRequestError } from '@/lib/summarizer/summarizer';
 import { getSystemPrompt } from '@/lib/summarizer/prompts';
-import { MERMAID_ESSENTIAL_RULES } from '@/lib/mermaid-rules';
 import { fetchImages } from '@/lib/images/fetcher';
 import { probeVision } from '@/lib/llm/vision-probe';
 import type { FetchedImage } from '@/lib/images/fetcher';
@@ -344,6 +343,8 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
     const onConversation = (msgs: { role: string; content: string }[]) => {
       lastConversation = msgs.map(m => ({ role: m.role, content: m.content }));
     };
+    let rollingSummaryText = '';
+    const onRollingSummary = (s: string) => { rollingSummaryText = s; };
 
     try {
       const result = await summarize(provider, content, {
@@ -358,10 +359,11 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         onRawResponse,
         onSystemPrompt,
         onConversation,
+        onRollingSummary,
       });
       result.llmProvider = providerName;
       result.llmModel = llmConfig.model;
-      return { type: 'SUMMARY_RESULT', success: true, data: result, rawResponses, systemPrompt: actualSystemPrompt, conversationLog: lastConversation };
+      return { type: 'SUMMARY_RESULT', success: true, data: result, rawResponses, systemPrompt: actualSystemPrompt, conversationLog: lastConversation, rollingSummary: rollingSummaryText || undefined };
     } catch (err) {
       // Round-trip: LLM requested additional images
       if (err instanceof ImageRequestError && imageAnalysisEnabled) {
@@ -458,6 +460,17 @@ async function handleChatMessage(
       content.wordCount,
     );
 
+    let imageSection = '';
+    if (hasImages) {
+      imageSection += `\n\nYou have multimodal capabilities — images from the page are attached to this conversation. You can analyze and reference them when answering questions or updating the summary.`;
+      if (cachedImageUrls.length > 0) {
+        const urlLines = cachedImageUrls.map((img, i) =>
+          `${i + 1}. ${img.url}${img.alt ? ` — "${img.alt}"` : ''}`,
+        );
+        imageSection += `\nOriginal image URLs (use for ![alt](url) embeds in summary/responses):\n${urlLines.join('\n')}`;
+      }
+    }
+
     const staticSystem = `${summarizationPrompt}
 
 ---
@@ -468,15 +481,7 @@ USER AUTHORITY: The user's messages in this chat are the highest-priority instru
 
 IMPORTANT: When answering questions about the content, always use the original page content below as your primary source of truth — it contains the full detail. Only refer to the current summary JSON when the user specifically asks about the summary or requests changes to it.
 
-Source metadata:
-${metaLines.join('\n')}
-${originalContent ? `\nOriginal page content:\n${originalContent}` : ''}`;
-
-    // --- SYSTEM MSG 2: Dynamic per-turn context ---
-    let dynamicSystem = `Current summary (JSON):
-${JSON.stringify(summary, null, 2)}
-
-Response format rules:
+Chat response format:
 - You MUST respond with a JSON object: {"text": "your message", "updates": <changed fields or null>}
 - "text": your conversational response to the user. Markdown supported. Use "" if you have nothing to say beyond the update.
 - "updates": an object with ONLY the summary fields you want to change. Omit fields that stay the same. Set to null if no changes needed (e.g. just answering a question).
@@ -484,24 +489,15 @@ Response format rules:
 - To remove an optional field, set its value to the string "__DELETE__" (e.g. "factCheck": "__DELETE__").
 - IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.
 - "extraSections" is DEEP-MERGED — only include the keys you are changing. To add or update a section: {"extraSections": {"New Title": "content"}}. To delete one: {"extraSections": {"Old Title": "__DELETE__"}}. Do NOT resend unchanged sections. Keys are plain-text titles (no markdown). Content supports full markdown and mermaid diagrams.
-${MERMAID_ESSENTIAL_RULES}
 - UI THEME: The user's interface is currently in **${theme || 'dark'} mode**. When generating diagrams, tables, or any visual elements with colors, choose colors that are readable and look good on a ${theme || 'dark'} background.
+${imageSection}
+Source metadata:
+${metaLines.join('\n')}
+${originalContent ? `\nOriginal page content:\n${originalContent}` : ''}`;
 
-Formatting reminder (when updating the summary):
-- "summary" MUST use ### subheadings to break into 2-4 sections when longer than one paragraph; keep paragraphs to 3-4 sentences max.
-- Each "keyTakeaways" item must start with "**Bold label** — " then the explanation.
-- Bold key terms, names, and statistics throughout all text fields.
-- The summary must be SHORTER than the original content. Never pad or repeat information across fields.`;
-
-    if (hasImages) {
-      dynamicSystem += `\n\nYou have multimodal capabilities — images from the page are attached to this conversation. You can analyze and reference them when answering questions or updating the summary.`;
-      if (cachedImageUrls.length > 0) {
-        const urlLines = cachedImageUrls.map((img, i) =>
-          `${i + 1}. ${img.url}${img.alt ? ` — "${img.alt}"` : ''}`,
-        );
-        dynamicSystem += `\n\nOriginal image URLs (use for ![alt](url) embeds in summary/responses):\n${urlLines.join('\n')}`;
-      }
-    }
+    // --- SYSTEM MSG 2: Dynamic per-turn context (only the changing summary) ---
+    const dynamicSystem = `Current summary (JSON):
+${JSON.stringify(summary, null, 2)}`;
 
     const chatMessages: ChatMessage[] = [
       { role: 'system', content: staticSystem, cacheBreakpoint: true },
@@ -517,13 +513,17 @@ Formatting reminder (when updating the summary):
       }
     }
 
-    const chatSystemPrompt = staticSystem + '\n\n---\n\n' + dynamicSystem;
     const rawResponses: string[] = [];
 
     const response = await provider.sendChat(chatMessages, { jsonMode: true });
     rawResponses.push(response);
 
-    return { type: 'CHAT_RESPONSE', success: true, message: response, rawResponses, systemPrompt: chatSystemPrompt };
+    const conversationLog = [
+      ...chatMessages.map(m => ({ role: m.role, content: m.content })),
+      { role: 'assistant', content: response },
+    ];
+
+    return { type: 'CHAT_RESPONSE', success: true, message: response, rawResponses, conversationLog };
   } catch (err) {
     return {
       type: 'CHAT_RESPONSE',

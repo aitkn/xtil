@@ -40,7 +40,7 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
 
   return (
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions
-    <div ref={containerRef} onClick={handleLinkClick}>
+    <div ref={containerRef} data-summary-container onClick={handleLinkClick}>
       {/* TLDR */}
       <Section title="TL;DR" defaultOpen>
         <div class="summary-callout">
@@ -684,7 +684,7 @@ async function svgToPng(liveSvg: SVGSVGElement): Promise<string> {
 
 const STORE_URL = 'https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon';
 
-async function copyToClipboard(summary: SummaryDocument, content: ExtractedContent | null, containerEl: HTMLElement | null) {
+export async function copyToClipboard(summary: SummaryDocument, content: ExtractedContent | null, containerEl: HTMLElement | null) {
   const md = summaryToMarkdown(summary, content);
 
   // Clone rendered DOM to preserve mermaid diagrams, then clean up UI chrome

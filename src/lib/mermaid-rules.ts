@@ -38,9 +38,11 @@ export const MERMAID_ESSENTIAL_RULES = `## MERMAID SYNTAX RULES
 |------|-------------|
 | Process flow / algorithm | \`flowchart\` |
 | API call sequence / protocol | \`sequenceDiagram\` |
+| Sequence diagrams (alt syntax) | \`zenuml\` |
 | OOP / system structure | \`classDiagram\` |
 | State machine / lifecycle | \`stateDiagram-v2\` |
 | Database schema | \`erDiagram\` |
+| Requirements tracing | \`requirementDiagram\` |
 | Project timeline / schedule | \`gantt\` |
 | Distribution / proportions | \`pie\` |
 | Brainstorming / hierarchy | \`mindmap\` |
@@ -49,7 +51,30 @@ export const MERMAID_ESSENTIAL_RULES = `## MERMAID SYNTAX RULES
 | UX user flow satisfaction | \`journey\` |
 | 2D comparison matrix | \`quadrantChart\` |
 | Line/bar charts | \`xychart-beta\` |
-| Cloud / infra architecture | \`architecture-beta\` |`;
+| Flow / energy diagrams | \`sankey-beta\` |
+| Block diagrams | \`block-beta\` |
+| Network packet structure | \`packet-beta\` |
+| Kanban boards | \`kanban\` |
+| Cloud / infra architecture | \`architecture-beta\` |
+| Radar / spider charts | \`radar-beta\` |
+| Hierarchical proportions | \`treemap-beta\` |
+| C4 architecture model | \`C4Context\` / \`C4Container\` / \`C4Component\` / \`C4Deployment\` |
+
+## MERMAID COLORS & LEGENDS
+Always apply custom colors using YAML frontmatter with \`theme: base\`. Add a manual Markdown legend below the diagram when there is no built-in legend.
+
+**Color config by diagram type (YAML frontmatter):**
+- **xychart-beta** — ordered comma-separated palette: \`themeVariables: { xyChart: { plotColorPalette: "#4472C4, #ED7D31, #2CA02C" } }\`
+- **pie** — per-slice: \`themeVariables: { pie1: "#4472C4", pie2: "#ED7D31" }\`
+- **gantt** — task state: \`themeVariables: { taskBkgColor: "#4472C4", activeTaskBkgColor: "#2CA02C", critBkgColor: "#E00000", doneTaskBkgColor: "#999" }\`
+- **sequence** — actors/signals: \`themeVariables: { actorBkg: "#4472C4", actorTextColor: "#fff", signalColor: "#333", noteBkgColor: "#2CA02C" }\`
+- **quadrantChart** — quadrant fills: \`themeVariables: { quadrant1Fill: "#2CA02C", quadrant2Fill: "#4472C4", quadrant3Fill: "#ED7D31", quadrant4Fill: "#E00000" }\`
+- **timeline** — section scale: \`themeVariables: { cScale0: "#4472C4", cScale1: "#ED7D31", cScale2: "#2CA02C" }\`
+- **flowchart** — use \`classDef\` in body, NOT config: \`classDef blue fill:#4472C4,stroke:#333,color:#fff\` then \`A[Node]:::blue\`
+
+**Legend rules:**
+- **pie**: has built-in legend — no action needed.
+- **All others**: add a Markdown legend line below the diagram, e.g.: \`🔵 Series A · 🟠 Series B · 🟢 Series C\``;
 
 /**
  * Map from mermaid diagram keyword → raw doc content.

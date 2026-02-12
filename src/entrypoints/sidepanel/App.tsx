@@ -22,7 +22,7 @@ import type {
   SeekVideoMessage,
 } from '@/lib/messaging/types';
 import type { ModelInfo } from '@/lib/llm/types';
-import { SummaryContent, MetadataHeader, downloadMarkdown, resetSectionState } from './pages/SummaryView';
+import { SummaryContent, MetadataHeader, downloadMarkdown, resetSectionState, copyToClipboard } from './pages/SummaryView';
 import { SettingsView } from './pages/SettingsView';
 import { getProviderDefinition } from '@/lib/llm/registry';
 import { Toast } from '@/components/Toast';
@@ -41,6 +41,10 @@ interface DisplayMessage {
   role: 'user' | 'assistant';
   content: string;
   internal?: boolean;
+  /** Snapshot of the summary before this user message was processed. */
+  summaryBefore?: SummaryDocument;
+  /** Whether this user message caused the summary to change. */
+  didUpdateSummary?: boolean;
 }
 
 interface TabState {
@@ -50,6 +54,7 @@ interface TabState {
   rawResponses: string[];
   actualSystemPrompt: string;
   conversationLog: { role: string; content: string }[];
+  rollingSummary: string;
   notionUrl: string | null;
   extractEpoch: number;
   loading: boolean;
@@ -327,6 +332,7 @@ export function App() {
   const [rawResponses, setRawResponses] = useState<string[]>([]);
   const [actualSystemPrompt, setActualSystemPrompt] = useState('');
   const [conversationLog, setConversationLog] = useState<{ role: string; content: string }[]>([]);
+  const [rollingSummary, setRollingSummary] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
 
@@ -359,6 +365,7 @@ export function App() {
   const rawResponsesRef = useRef<string[]>([]);
   const actualSystemPromptRef = useRef('');
   const conversationLogRef = useRef<{ role: string; content: string }[]>([]);
+  const rollingSummaryRef = useRef('');
   const notionUrlRef = useRef<string | null>(null);
   const extractEpochRef = useRef<number>(0);
   const activeTabIdRef = useRef<number | null>(null);
@@ -373,6 +380,7 @@ export function App() {
   rawResponsesRef.current = rawResponses;
   actualSystemPromptRef.current = actualSystemPrompt;
   conversationLogRef.current = conversationLog;
+  rollingSummaryRef.current = rollingSummary;
   notionUrlRef.current = notionUrl;
   extractEpochRef.current = extractEpoch;
   activeTabIdRef.current = activeTabId;
@@ -389,6 +397,7 @@ export function App() {
       rawResponses: rawResponsesRef.current,
       actualSystemPrompt: actualSystemPromptRef.current,
       conversationLog: conversationLogRef.current,
+      rollingSummary: rollingSummaryRef.current,
       notionUrl: notionUrlRef.current,
       extractEpoch: extractEpochRef.current,
       loading: loadingRef.current,
@@ -408,6 +417,7 @@ export function App() {
       setRawResponses(saved.rawResponses);
       setActualSystemPrompt(saved.actualSystemPrompt);
       setConversationLog(saved.conversationLog);
+      setRollingSummary(saved.rollingSummary);
       setNotionUrl(saved.notionUrl);
       setExtractEpoch(saved.extractEpoch);
       setLoading(saved.loading);
@@ -662,14 +672,19 @@ export function App() {
     return () => { clearInterval(id); clearTimeout(initial); };
   }, [extractEpoch, activeTabId]); // re-run on every new extraction or tab switch
 
-  // Scroll to bottom when new chat messages arrive (skip on tab restore)
+  // Scroll to bottom only when a new *visible assistant* message arrives (skip internal/user)
+  const prevVisibleAssistantCountRef = useRef(0);
   useEffect(() => {
     if (skipScrollRef.current) {
       skipScrollRef.current = false;
       return;
     }
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages, chatLoading]);
+    const visibleAssistantCount = chatMessages.filter(m => !m.internal && m.role === 'assistant').length;
+    if (visibleAssistantCount > prevVisibleAssistantCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevVisibleAssistantCountRef.current = visibleAssistantCount;
+  }, [chatMessages]);
 
   // Track the detail level that produced the current summary, so cycling back clears the re-summarize state
   const [pendingResummarize, setPendingResummarize] = useState(false);
@@ -743,6 +758,9 @@ export function App() {
       if (summaryResponse.conversationLog?.length) {
         setConversationLog(summaryResponse.conversationLog);
       }
+      if (summaryResponse.rollingSummary) {
+        setRollingSummary(summaryResponse.rollingSummary);
+      }
 
       if (!summaryResponse.success || !summaryResponse.data) {
         throw new Error(summaryResponse.error || 'Failed to generate summary');
@@ -771,6 +789,9 @@ export function App() {
           }
           if (summaryResponse.conversationLog?.length) {
             saved.conversationLog = summaryResponse.conversationLog;
+          }
+          if (summaryResponse.rollingSummary) {
+            saved.rollingSummary = summaryResponse.rollingSummary;
           }
         }
       }
@@ -900,7 +921,15 @@ export function App() {
     if (!content) return;
     const originTabId = activeTabIdRef.current;
 
-    setChatMessages((prev) => [...prev, { role: 'user', content: text }]);
+    // Snapshot the current summary so we can revert to this point later
+    const snapshotBefore = summary ? structuredClone(summary) : null;
+
+    setChatMessages((prev) => [...prev, {
+      role: 'user',
+      content: text,
+      summaryBefore: snapshotBefore ?? undefined,
+      didUpdateSummary: false, // will be patched after we know
+    }]);
     setChatLoading(true);
 
     try {
@@ -930,7 +959,7 @@ export function App() {
       // Store raw LLM responses for debug panel (includes skill round-trips)
       const chatRaw = response.rawResponses?.length ? response.rawResponses : [response.message!];
       setRawResponses(prev => [...prev, ...chatRaw]);
-      if (response.systemPrompt) setActualSystemPrompt(response.systemPrompt);
+      if (response.conversationLog?.length) setConversationLog(response.conversationLog);
 
       // Parse response: extract updates (partial or full) and remaining text (chat)
       const { updates, text: chatText } = extractJsonAndText(response.message!);
@@ -954,6 +983,22 @@ export function App() {
       const fixedJson = updatedSummary
         ? await autoFixMermaid(updatedSummary, content, resolvedTheme, (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses)
         : null;
+
+      // Patch didUpdateSummary on the user message we added earlier
+      const summaryDidChange = fixedJson != null;
+      if (summaryDidChange) {
+        setChatMessages((prev) => {
+          const copy = [...prev];
+          // Find the last user message (the one we just added)
+          for (let i = copy.length - 1; i >= 0; i--) {
+            if (copy[i].role === 'user' && copy[i].summaryBefore !== undefined) {
+              copy[i] = { ...copy[i], didUpdateSummary: true };
+              break;
+            }
+          }
+          return copy;
+        });
+      }
 
       if (activeTabIdRef.current === originTabId) {
         if (fixedJson) {
@@ -994,6 +1039,23 @@ export function App() {
       }
     }
   }, [summary, content, chatMessages, resolvedTheme]);
+
+  /** Revert summary to the state before a given user message and truncate chat history. */
+  const handleChatRevert = useCallback((messageIndex: number) => {
+    const visibleMessages = chatMessages.filter(m => !m.internal);
+    const target = visibleMessages[messageIndex];
+    if (!target || target.role !== 'user' || !target.summaryBefore) return;
+
+    // Find the actual index in the full (including internal) messages array
+    const actualIndex = chatMessages.indexOf(target);
+    if (actualIndex < 0) return;
+
+    setSummary(structuredClone(target.summaryBefore));
+    setChatMessages(chatMessages.slice(0, actualIndex));
+    setInputValue(target.content);
+    setNotionUrl(null);
+    setToast({ message: 'Reverted to earlier version', type: 'success' });
+  }, [chatMessages]);
 
   const handleSubmit = useCallback(() => {
     const text = inputValue.trim();
@@ -1113,6 +1175,7 @@ export function App() {
         onRefresh={handleRefresh}
         onExport={settings.notion.apiKey && summary ? handleExport : undefined}
         onSaveMd={summary && content ? () => downloadMarkdown(summary, content) : undefined}
+        onCopy={summary ? () => copyToClipboard(summary, content, scrollAreaRef.current?.querySelector('[data-summary-container]') as HTMLElement | null) : undefined}
         notionUrl={notionUrl}
         exporting={exporting}
         detailLevel={settings.summaryDetailLevel}
@@ -1174,8 +1237,8 @@ export function App() {
             content={content}
             settings={settings}
             summary={summary}
-            actualSystemPrompt={actualSystemPrompt}
-            chatMessages={chatMessages}
+            conversationLog={conversationLog}
+            rollingSummary={rollingSummary}
           />
         )}
 
@@ -1253,7 +1316,14 @@ export function App() {
               Chat
             </div>
             {chatMessages.filter(m => !m.internal).map((msg, i) => (
-              <ChatBubble key={i} role={msg.role} content={msg.content} />
+              <ChatBubble
+                key={i}
+                role={msg.role}
+                content={msg.content}
+                didUpdateSummary={msg.didUpdateSummary}
+                canRevert={msg.role === 'user' && msg.summaryBefore !== undefined}
+                onRevert={() => handleChatRevert(i)}
+              />
             ))}
             {chatLoading && (
               <div style={{ padding: '8px 12px', font: 'var(--md-sys-typescale-body-medium)', color: 'var(--md-sys-color-on-surface-variant)' }}>
@@ -1550,13 +1620,14 @@ function IndicatorChip({ icon, label, variant }: { icon: string; label: string; 
   );
 }
 
-function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport, onSaveMd, notionUrl, exporting, detailLevel, onDetailLevelCycle, debugOpen, onToggleDebug, onPrint }: {
+function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport, onSaveMd, onCopy, notionUrl, exporting, detailLevel, onDetailLevelCycle, debugOpen, onToggleDebug, onPrint }: {
   onThemeToggle: () => void;
   themeMode: string;
   onOpenSettings: () => void;
   onRefresh: () => void;
   onExport?: () => void;
   onSaveMd?: () => void;
+  onCopy?: () => void;
   notionUrl?: string | null;
   exporting?: boolean;
   detailLevel: 'brief' | 'standard' | 'detailed';
@@ -1566,6 +1637,9 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport,
   onPrint?: () => void;
 }) {
   const [mdSaved, setMdSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+  // Reset copied when onCopy changes (new summary)
+  useEffect(() => setCopied(false), [onCopy]);
   // Reset mdSaved when onSaveMd changes (new summary)
   useEffect(() => setMdSaved(false), [onSaveMd]);
 
@@ -1653,6 +1727,13 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport,
         <IconButton onClick={onSaveMd && !mdSaved ? () => { onSaveMd(); setMdSaved(true); } : undefined} label={mdSaved ? 'Saved' : 'Save .md'} disabled={!onSaveMd || mdSaved}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" /></svg>
         </IconButton>
+        <IconButton onClick={onCopy && !copied ? () => { onCopy(); setCopied(true); setTimeout(() => setCopied(false), 1500); } : undefined} label={copied ? 'Copied!' : 'Copy'} disabled={!onCopy || copied}>
+          {copied ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--md-sys-color-tertiary)"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" /></svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" /></svg>
+          )}
+        </IconButton>
         <IconButton onClick={onPrint} label="Print" disabled={!onPrint}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z" /></svg>
         </IconButton>
@@ -1736,37 +1817,88 @@ function IconButton({ onClick, label, children, disabled, active }: { onClick?: 
   );
 }
 
-function ChatBubble({ role, content: text }: { role: 'user' | 'assistant'; content: string }) {
+function ChatBubble({ role, content: text, didUpdateSummary, canRevert, onRevert }: {
+  role: 'user' | 'assistant';
+  content: string;
+  didUpdateSummary?: boolean;
+  canRevert?: boolean;
+  onRevert?: () => void;
+}) {
   const isUser = role === 'user';
+  const [hovered, setHovered] = useState(false);
   return (
     <div
-      style={{
-        marginBottom: '8px',
-        padding: '10px 14px',
-        borderRadius: 'var(--md-sys-shape-corner-medium)',
-        font: 'var(--md-sys-typescale-body-medium)',
-        lineHeight: 1.5,
-        backgroundColor: isUser ? 'var(--md-sys-color-primary-container)' : 'var(--md-sys-color-surface-container-high)',
-        color: isUser ? 'var(--md-sys-color-on-primary-container)' : 'var(--md-sys-color-on-surface)',
-        maxWidth: '90%',
-        marginLeft: isUser ? 'auto' : '0',
-        marginRight: isUser ? '0' : 'auto',
-      }}
+      style={{ position: 'relative', marginBottom: '8px', maxWidth: '90%', marginLeft: isUser ? 'auto' : '0', marginRight: isUser ? '0' : 'auto' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {isUser ? text : <MarkdownRenderer content={text} />}
+      <div
+        style={{
+          padding: '10px 14px',
+          borderRadius: 'var(--md-sys-shape-corner-medium)',
+          font: 'var(--md-sys-typescale-body-medium)',
+          lineHeight: 1.5,
+          backgroundColor: isUser ? 'var(--md-sys-color-primary-container)' : 'var(--md-sys-color-surface-container-high)',
+          color: isUser ? 'var(--md-sys-color-on-primary-container)' : 'var(--md-sys-color-on-surface)',
+        }}
+      >
+        {isUser ? text : <MarkdownRenderer content={text} />}
+      </div>
+      {/* Revert button + update indicator for user messages */}
+      {isUser && canRevert && hovered && (
+        <button
+          onClick={onRevert}
+          title="Revert summary to before this message"
+          style={{
+            position: 'absolute',
+            top: '-6px',
+            left: '-6px',
+            width: '22px',
+            height: '22px',
+            borderRadius: '50%',
+            border: '1px solid var(--md-sys-color-outline-variant)',
+            backgroundColor: 'var(--md-sys-color-surface-container-highest)',
+            color: 'var(--md-sys-color-on-surface)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            padding: 0,
+            lineHeight: 1,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+          }}
+        >
+          ↩
+        </button>
+      )}
+      {isUser && didUpdateSummary && (
+        <div
+          title="This message updated the summary"
+          style={{
+            position: 'absolute',
+            bottom: '-3px',
+            left: '-3px',
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            backgroundColor: 'var(--md-sys-color-primary)',
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function DebugPanel({ content, settings, summary, actualSystemPrompt, chatMessages }: {
+function DebugPanel({ content, settings, summary, conversationLog, rollingSummary }: {
   content: ExtractedContent;
   settings: Settings;
   summary: SummaryDocument | null;
-  actualSystemPrompt: string;
-  chatMessages: DisplayMessage[];
+  conversationLog: { role: string; content: string }[];
+  rollingSummary: string;
 }) {
-  // Use the actual system prompt when available (after summarization), otherwise preview
-  const systemPrompt = actualSystemPrompt || (() => {
+  // Before summarization runs, show a preview of what will be sent
+  const previewPrompt = conversationLog.length === 0 ? (() => {
     const imageCount = content.richImages?.length ?? 0;
     let imageAnalysisEnabled = false;
     if (imageCount > 0) {
@@ -1784,7 +1916,24 @@ function DebugPanel({ content, settings, summary, actualSystemPrompt, chatMessag
       content.type,
       content.githubPageType,
     );
-  })();
+  })() : '';
+
+  const totalChars = conversationLog.reduce((sum, m) => sum + m.content.length, 0);
+
+  // Check if extracted document differs from what's in the prompt
+  // (truncated in chat, or chunked in summarization)
+  const promptContainsFullContent = conversationLog.some(m => m.content.includes(content.content));
+
+  const labelStyle = {
+    font: 'var(--md-sys-typescale-label-medium)',
+    color: 'var(--md-sys-color-on-surface-variant)',
+    marginBottom: '6px',
+  };
+
+  const dividerStyle = {
+    borderTop: '1px dashed var(--md-sys-color-outline-variant)',
+    margin: '8px 0 6px',
+  };
 
   return (
     <div class="no-print" style={{
@@ -1794,23 +1943,55 @@ function DebugPanel({ content, settings, summary, actualSystemPrompt, chatMessag
       backgroundColor: 'var(--md-sys-color-surface-container-low)',
       border: '1px solid var(--md-sys-color-outline-variant)',
     }}>
-      <div style={{
-        font: 'var(--md-sys-typescale-label-medium)',
-        color: 'var(--md-sys-color-on-surface-variant)',
-        marginBottom: '6px',
-      }}>
-        Debug: Prompts
+      <div style={labelStyle}>
+        {conversationLog.length > 0
+          ? `LLM Prompt — ${conversationLog.length} messages, ${totalChars.toLocaleString()} chars total`
+          : 'LLM Prompt (preview)'}
       </div>
-      <DebugSection title="System Prompt" content={systemPrompt} />
-      <DebugSection title="Extracted Document" content={content.content} />
-      {summary && (
-        <DebugSection title="Summary" content={JSON.stringify(summary, null, 2)} />
+      {conversationLog.length > 0
+        ? (() => {
+            const systemMsgs = conversationLog.filter(m => m.role === 'system');
+            const nonSystemMsgs = conversationLog.filter(m => m.role !== 'system');
+            const isChat = nonSystemMsgs.some(m => m.role === 'assistant');
+            let idx = 0;
+            return (
+              <>
+                {systemMsgs.map((m, i) => (
+                  <DebugSection key={`s${i}`} title={`${++idx}. [system]`} content={m.content} />
+                ))}
+                {isChat
+                  ? nonSystemMsgs.length > 0 && (
+                      <DebugSection
+                        key="chat"
+                        title={`${++idx}. Chat (${nonSystemMsgs.length} messages)`}
+                        content={nonSystemMsgs.map(m => `[${m.role}]\n${m.content}`).join('\n\n---\n\n')}
+                      />
+                    )
+                  : nonSystemMsgs.map((m, i) => (
+                      <DebugSection key={`u${i}`} title={`${++idx}. [${m.role}]`} content={m.content} />
+                    ))
+                }
+              </>
+            );
+          })()
+        : <DebugSection title="[system] (preview)" content={previewPrompt} />
+      }
+
+      {/* --- Bonus sections --- */}
+      {((!promptContainsFullContent && conversationLog.length > 0) || rollingSummary || summary) && (
+        <div style={dividerStyle} />
       )}
-      {chatMessages.length > 0 && (
-        <DebugSection
-          title={`Conversation (${chatMessages.length} messages)`}
-          content={chatMessages.map((m) => `--- [${m.role}${m.internal ? ' (internal)' : ''}] ---\n${m.content}`).join('\n\n')}
-        />
+      {(!promptContainsFullContent && conversationLog.length > 0) && (
+        <div style={labelStyle}>Additional context</div>
+      )}
+      {!promptContainsFullContent && conversationLog.length > 0 && (
+        <DebugSection title="Full Extracted Document" content={content.content} />
+      )}
+      {rollingSummary && (
+        <DebugSection title="Pre-summarized Document" content={rollingSummary} />
+      )}
+      {summary && (
+        <DebugSection title="Summary Result" content={JSON.stringify(summary, null, 2)} />
       )}
     </div>
   );

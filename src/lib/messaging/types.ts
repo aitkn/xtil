@@ -71,6 +71,8 @@ export interface SummaryResultMessage {
   systemPrompt?: string;
   /** Full conversation messages sent to the LLM (for debug panel). */
   conversationLog?: { role: string; content: string }[];
+  /** Rolling summary from chunked summarization (for debug panel). */
+  rollingSummary?: string;
 }
 
 export interface ChatMessageRequest {
@@ -88,6 +90,8 @@ export interface ChatResponseMessage {
   error?: string;
   rawResponses?: string[];
   systemPrompt?: string;
+  /** Full message array sent to the LLM (for debug panel). */
+  conversationLog?: { role: string; content: string }[];
 }
 
 export interface ChatChunkMessage {
