@@ -207,54 +207,6 @@
       [data-theme="dark"] .markdown-content pre.mermaid .legend text,
       [data-theme="dark"] .markdown-content pre.mermaid .slice { color: #e3e2e6 !important; fill: #e3e2e6 !important; }
 
-      /* Mermaid diagram error fallback */
-      .markdown-content pre.mermaid.mermaid-error {
-        font-size: 11px;
-        white-space: pre-wrap;
-        word-break: break-word;
-        opacity: 0.75;
-        cursor: help;
-        position: relative;
-      }
-      .markdown-content pre.mermaid .mermaid-error-hint {
-        display: block;
-        margin-top: 8px;
-        padding-top: 6px;
-        border-top: 1px solid var(--md-sys-color-outline-variant);
-        font-size: 10px;
-        color: var(--md-sys-color-error);
-        font-style: italic;
-        user-select: text;
-        cursor: text;
-      }
-
-      .markdown-content pre.mermaid .mermaid-retry-btn {
-        display: inline-block;
-        margin-top: 6px;
-        padding: 3px 10px;
-        border: 1px solid var(--md-sys-color-outline-variant);
-        border-radius: var(--md-sys-shape-corner-small);
-        background: var(--md-sys-color-surface-container);
-        color: var(--md-sys-color-primary);
-        font: var(--md-sys-typescale-label-small);
-        cursor: pointer;
-        opacity: 0.9;
-      }
-      .markdown-content pre.mermaid .mermaid-retry-btn:hover { background: var(--md-sys-color-surface-container-high); }
-      .markdown-content pre.mermaid .mermaid-retry-btn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
-      .markdown-content pre.mermaid .mermaid-retry-btn.loading::before {
-        content: '';
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        margin-right: 4px;
-        border: 2px solid var(--md-sys-color-outline-variant);
-        border-top-color: var(--md-sys-color-primary);
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-        vertical-align: middle;
-      }
-
       /* Summary callout cards */
       .summary-callout {
         background: var(--md-sys-color-info-container);

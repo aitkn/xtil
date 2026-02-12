@@ -189,6 +189,18 @@ export function extractMermaidSources(md: string): string[] {
   return sources;
 }
 
+/** Remove ```mermaid...``` blocks whose source matches any in the broken list. */
+export function stripBrokenMermaidBlocks(md: string, brokenSources: string[]): string {
+  if (brokenSources.length === 0) return md;
+  let result = md;
+  for (const source of brokenSources) {
+    const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('```mermaid\\n' + escaped + '\\n```', 'g');
+    result = result.replace(re, '');
+  }
+  return result;
+}
+
 // Fix unlabeled mermaid code blocks: ```\nflowchart → ```mermaid\nflowchart
 const MERMAID_KEYWORDS = 'flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|gitgraph|mindmap|timeline|sankey|xychart|block|packet|architecture|kanban';
 const FIX_MERMAID_RE = new RegExp('```\\n((?:' + MERMAID_KEYWORDS + ')\\b)', 'g');
@@ -248,30 +260,9 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         } catch (err) {
           if (cancelled) return;
           const msg = err instanceof Error ? err.message : String(err);
-          el.classList.add('mermaid-error');
-          el.title = msg;
           el.dataset.error = msg;
-          const hint = document.createElement('span');
-          hint.className = 'mermaid-error-hint';
-          hint.textContent = msg;
-          el.appendChild(hint);
-
-          // Retry button — dispatches a bubbling custom event for App to handle
-          const retryBtn = document.createElement('button');
-          retryBtn.className = 'mermaid-retry-btn';
-          retryBtn.textContent = 'Retry fix';
-          retryBtn.title = 'Send this diagram to LLM for another fix attempt';
-          retryBtn.addEventListener('click', () => {
-            retryBtn.disabled = true;
-            retryBtn.classList.add('loading');
-            retryBtn.textContent = 'Fixing...';
-            el.dispatchEvent(new CustomEvent('mermaid-retry', {
-              bubbles: true,
-              detail: { source, error: msg, retryBtn },
-            }));
-          });
-          el.appendChild(retryBtn);
-
+          // Hide broken diagram entirely — autoFixMermaid handles recovery
+          el.style.display = 'none';
           // Clean up orphaned mermaid render container
           document.getElementById('d' + renderId)?.remove();
         }

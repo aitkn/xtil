@@ -28,8 +28,8 @@ import { getProviderDefinition } from '@/lib/llm/registry';
 import { Toast } from '@/components/Toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Spinner } from '@/components/Spinner';
-import { MarkdownRenderer, extractMermaidSources, fixMermaidBlocks } from '@/components/MarkdownRenderer';
-import { MERMAID_ESSENTIAL_RULES, getRelevantCheatsheet } from '@/lib/mermaid-rules';
+import { MarkdownRenderer, extractMermaidSources, fixMermaidBlocks, stripBrokenMermaidBlocks } from '@/components/MarkdownRenderer';
+import { MERMAID_ESSENTIAL_RULES, annotateMermaidErrors, getRecoveryDocs } from '@/lib/mermaid-rules';
 import mermaid from 'mermaid';
 import { SettingsDrawer } from '@/components/SettingsDrawer';
 import { ChatInputBar } from '@/components/ChatInputBar';
@@ -81,11 +81,50 @@ async function findMermaidErrors(
   return errors;
 }
 
-/** Validate mermaid blocks in a summary and auto-fix via chat round-trip (max 2 attempts). */
+/** Strip broken mermaid blocks from all text fields in a summary. */
+function stripBrokenFromSummary(summary: SummaryDocument, brokenSources: string[]): SummaryDocument {
+  const strip = (s: string | undefined) => s ? stripBrokenMermaidBlocks(s, brokenSources) : s;
+  return {
+    ...summary,
+    tldr: strip(summary.tldr) || '',
+    summary: strip(summary.summary) || '',
+    conclusion: strip(summary.conclusion) || '',
+    factCheck: strip(summary.factCheck),
+    extraSections: summary.extraSections
+      ? Object.fromEntries(Object.entries(summary.extraSections).map(([k, v]) => [k, strip(v) || '']))
+      : undefined,
+  };
+}
+
+/** Annotate broken mermaid blocks in all text fields of a summary with inline error comments. */
+function annotateSummaryFields(
+  summary: SummaryDocument,
+  errors: Array<{ source: string; error: string }>,
+): SummaryDocument {
+  const annotate = (s: string | undefined) => s ? annotateMermaidErrors(s, errors) : s;
+  return {
+    ...summary,
+    tldr: annotate(summary.tldr) || '',
+    summary: annotate(summary.summary) || '',
+    conclusion: annotate(summary.conclusion) || '',
+    factCheck: annotate(summary.factCheck),
+    extraSections: summary.extraSections
+      ? Object.fromEntries(Object.entries(summary.extraSections).map(([k, v]) => [k, annotate(v) || '']))
+      : undefined,
+  };
+}
+
+/**
+ * Validate mermaid blocks and auto-recover via LLM round-trips (max 5 attempts).
+ * Attempts 1-4: fix errors with annotated context + docs.
+ * Attempt 5: ask LLM to remove all broken diagrams.
+ * Final fallback: strip broken blocks client-side.
+ */
 async function autoFixMermaid(
   summary: SummaryDocument,
   content: ExtractedContent,
   theme: 'light' | 'dark',
+  setSummary: (s: SummaryDocument) => void,
   baseChatMessages: DisplayMessage[],
   setChatMessages: (fn: (prev: DisplayMessage[]) => DisplayMessage[]) => void,
   setRawResponses: (fn: (prev: string[]) => string[]) => void,
@@ -93,16 +132,26 @@ async function autoFixMermaid(
   let finalSummary = summary;
   const fixMessages: DisplayMessage[] = [];
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 1; attempt <= 5; attempt++) {
     const errors = await findMermaidErrors(finalSummary);
     if (errors.length === 0) break;
 
-    const errorDescs = errors.map(e =>
-      `Error: ${e.error}\n\nBroken diagram:\n\`\`\`mermaid\n${e.source}\n\`\`\``
-    ).join('\n\n---\n\n');
+    // Show intermediate summary with broken charts hidden
+    const strippedSummary = stripBrokenFromSummary(finalSummary, errors.map(e => e.source));
+    setSummary(strippedSummary);
 
-    const relevantRef = getRelevantCheatsheet(errors.map(e => e.source));
-    const fixRequest = `The following mermaid diagram(s) in the summary have syntax errors and failed to render:\n\n${errorDescs}\n\nFix the mermaid syntax errors silently. Rules:\n- Return ONLY the corrected fields in "updates". Set "text" to "".\n- Do NOT add any commentary, changelog, or "fixes applied" notes to the content — just fix the syntax.\n- All diagrams MUST use \`\`\`mermaid fenced code blocks (not plain \`\`\`).\n\n${MERMAID_ESSENTIAL_RULES}${relevantRef}`;
+    let fixRequest: string;
+    if (attempt <= 4) {
+      // Annotate the ORIGINAL summary fields with inline errors
+      const annotatedSummary = annotateSummaryFields(finalSummary, errors);
+      const docs = getRecoveryDocs(errors);
+      fixRequest = `You generated this summary but ${errors.length} mermaid chart(s) have errors.\nThe errors are annotated inline as <!-- MERMAID ERROR: ... --> comments right after the broken diagrams.\n\nCurrent summary:\n${JSON.stringify(annotatedSummary, null, 2)}\n\nHere is documentation that may help you resolve the issues:\n${docs}\n\nThis is your attempt ${attempt} of 4 to fix all issues. Return the corrected fields in "updates". Set "text" to "".\nRules:\n- Fix the mermaid syntax errors in place.\n- Do NOT add commentary or changelog.\n- All diagrams MUST use \`\`\`mermaid fenced code blocks.\n${MERMAID_ESSENTIAL_RULES}`;
+    } else {
+      // Attempt 5: ask LLM to remove all broken diagrams
+      const annotatedSummary = annotateSummaryFields(finalSummary, errors);
+      fixRequest = `You generated this summary but ${errors.length} mermaid chart(s) still have errors after 4 fix attempts.\nREMOVE all broken mermaid diagrams from the summary. If any surrounding text references a removed diagram, rewrite it to make sense without the diagram.\nThe broken diagrams are annotated with <!-- MERMAID ERROR: ... --> comments.\n\nCurrent summary:\n${JSON.stringify(annotatedSummary, null, 2)}\n\nReturn the corrected fields in "updates". Set "text" to "".`;
+    }
+
     const userMsg: DisplayMessage = { role: 'user', content: fixRequest, internal: true };
     fixMessages.push(userMsg);
     setChatMessages(prev => [...prev, userMsg]);
@@ -134,6 +183,12 @@ async function autoFixMermaid(
         finalSummary.llmModel = summary.llmModel;
       } else break;
     } else break;
+  }
+
+  // Final fallback: strip any remaining broken blocks client-side
+  const remainingErrors = await findMermaidErrors(finalSummary);
+  if (remainingErrors.length > 0) {
+    finalSummary = stripBrokenFromSummary(finalSummary, remainingErrors.map(e => e.source));
   }
 
   return finalSummary;
@@ -616,89 +671,6 @@ export function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, chatLoading]);
 
-  // Manual mermaid retry — user clicks "Retry fix" on a broken diagram
-  useEffect(() => {
-    const el = scrollAreaRef.current;
-    if (!el) return;
-    const handler = (e: Event) => {
-      const { source, error, retryBtn } = (e as CustomEvent<{ source: string; error: string; retryBtn?: HTMLButtonElement }>).detail;
-      if (!summaryRef.current || !contentRef.current) return;
-
-      // Re-enable retry button helper (when fix fails or nothing changes)
-      const resetRetryBtn = () => {
-        if (retryBtn) {
-          retryBtn.disabled = false;
-          retryBtn.classList.remove('loading');
-          retryBtn.textContent = 'Retry fix';
-        }
-      };
-
-      setChatLoading(true);
-
-      (async () => {
-        try {
-          const relevantRef = getRelevantCheatsheet([source]);
-          const fixRequest = `The following mermaid diagram in the summary has a syntax error and failed to render:\n\nError: ${error}\n\nBroken diagram:\n\`\`\`mermaid\n${source}\n\`\`\`\n\nFix the mermaid syntax error silently. Rules:\n- Return ONLY the corrected fields in "updates". Set "text" to "".\n- Do NOT add any commentary, changelog, or "fixes applied" notes to the content — just fix the syntax.\n- All diagrams MUST use \`\`\`mermaid fenced code blocks (not plain \`\`\`).\n\n${MERMAID_ESSENTIAL_RULES}${relevantRef}`;
-          const userMsg: DisplayMessage = { role: 'user', content: fixRequest, internal: true };
-          skipScrollRef.current = true;
-          setChatMessages(prev => [...prev, userMsg]);
-
-          const allMessages: ChatMessage[] = [
-            ...chatMessagesRef.current.map(m => ({ role: m.role, content: m.content })),
-          ];
-
-          const summaryBefore = JSON.stringify(summaryRef.current);
-
-          const fixResponse = await sendMessage({
-            type: 'CHAT_MESSAGE',
-            messages: allMessages,
-            summary: summaryRef.current!,
-            content: contentRef.current!,
-            theme: resolvedTheme,
-          }) as ChatResponseMessage;
-
-          if (fixResponse.success && fixResponse.message) {
-            if (fixResponse.rawResponses?.length) {
-              setRawResponses(prev => [...prev, ...fixResponse.rawResponses!]);
-            }
-            const { updates, text: chatText } = extractJsonAndText(fixResponse.message);
-            const displayText = chatText || (updates ? 'Diagram fixed.' : 'Failed to fix diagram.');
-            const assistantMsg: DisplayMessage = { role: 'assistant', content: displayText, internal: true };
-            skipScrollRef.current = true;
-            setChatMessages(prev => [...prev, assistantMsg]);
-
-            if (updates && summaryRef.current) {
-              const updated = mergeSummaryUpdates(summaryRef.current, updates);
-              if (summaryRef.current.llmProvider) updated.llmProvider = summaryRef.current.llmProvider;
-              if (summaryRef.current.llmModel) updated.llmModel = summaryRef.current.llmModel;
-              // Re-enable button if the summary didn't actually change
-              if (JSON.stringify(updated) === summaryBefore) {
-                resetRetryBtn();
-              }
-              setSummary(updated);
-              setNotionUrl(null);
-            } else {
-              resetRetryBtn();
-            }
-          } else {
-            skipScrollRef.current = true;
-            setChatMessages(prev => [...prev, { role: 'assistant', content: 'Failed to fix diagram.', internal: true }]);
-            resetRetryBtn();
-          }
-        } catch {
-          skipScrollRef.current = true;
-          setChatMessages(prev => [...prev, { role: 'assistant', content: 'Failed to fix diagram.', internal: true }]);
-          resetRetryBtn();
-        } finally {
-          setChatLoading(false);
-        }
-      })();
-    };
-
-    el.addEventListener('mermaid-retry', handler);
-    return () => el.removeEventListener('mermaid-retry', handler);
-  }, [resolvedTheme]);
-
   // Track the detail level that produced the current summary, so cycling back clears the re-summarize state
   const [pendingResummarize, setPendingResummarize] = useState(false);
   const summaryDetailLevelRef = useRef<Settings['summaryDetailLevel'] | null>(null);
@@ -779,7 +751,7 @@ export function App() {
       // Validate mermaid diagrams and auto-fix via chat round-trip (spinner stays active)
       const finalSummary = await autoFixMermaid(
         summaryResponse.data, extractedContent, resolvedTheme,
-        chatMessagesRef.current, setChatMessages, setRawResponses,
+        (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses,
       );
 
       if (activeTabIdRef.current === originTabId) {
@@ -980,7 +952,7 @@ export function App() {
 
       // Auto-fix broken mermaid diagrams in the updated summary
       const fixedJson = updatedSummary
-        ? await autoFixMermaid(updatedSummary, content, resolvedTheme, chatMessagesRef.current, setChatMessages, setRawResponses)
+        ? await autoFixMermaid(updatedSummary, content, resolvedTheme, (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses)
         : null;
 
       if (activeTabIdRef.current === originTabId) {
@@ -1203,7 +1175,7 @@ export function App() {
             settings={settings}
             summary={summary}
             actualSystemPrompt={actualSystemPrompt}
-            conversationLog={conversationLog}
+            chatMessages={chatMessages}
           />
         )}
 
@@ -1786,12 +1758,12 @@ function ChatBubble({ role, content: text }: { role: 'user' | 'assistant'; conte
   );
 }
 
-function DebugPanel({ content, settings, summary, actualSystemPrompt, conversationLog }: {
+function DebugPanel({ content, settings, summary, actualSystemPrompt, chatMessages }: {
   content: ExtractedContent;
   settings: Settings;
   summary: SummaryDocument | null;
   actualSystemPrompt: string;
-  conversationLog: { role: string; content: string }[];
+  chatMessages: DisplayMessage[];
 }) {
   // Use the actual system prompt when available (after summarization), otherwise preview
   const systemPrompt = actualSystemPrompt || (() => {
@@ -1834,10 +1806,10 @@ function DebugPanel({ content, settings, summary, actualSystemPrompt, conversati
       {summary && (
         <DebugSection title="Summary" content={JSON.stringify(summary, null, 2)} />
       )}
-      {conversationLog.length > 0 && (
+      {chatMessages.length > 0 && (
         <DebugSection
-          title={`Conversation (${conversationLog.length} messages)`}
-          content={conversationLog.map((m) => `--- [${m.role}] (${m.content.length.toLocaleString()} chars) ---\n${m.content}`).join('\n\n')}
+          title={`Conversation (${chatMessages.length} messages)`}
+          content={chatMessages.map((m) => `--- [${m.role}${m.internal ? ' (internal)' : ''}] ---\n${m.content}`).join('\n\n')}
         />
       )}
     </div>

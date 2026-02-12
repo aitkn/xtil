@@ -5,7 +5,6 @@ import { fetchModels } from '@/lib/llm/models';
 import { summarize, ImageRequestError } from '@/lib/summarizer/summarizer';
 import { getSystemPrompt } from '@/lib/summarizer/prompts';
 import { MERMAID_ESSENTIAL_RULES } from '@/lib/mermaid-rules';
-import { resolveSkills, getChatSkillCatalog } from '@/lib/skills/registry';
 import { fetchImages } from '@/lib/images/fetcher';
 import { probeVision } from '@/lib/llm/vision-probe';
 import type { FetchedImage } from '@/lib/images/fetcher';
@@ -486,7 +485,6 @@ Response format rules:
 - IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.
 - "extraSections" is DEEP-MERGED — only include the keys you are changing. To add or update a section: {"extraSections": {"New Title": "content"}}. To delete one: {"extraSections": {"Old Title": "__DELETE__"}}. Do NOT resend unchanged sections. Keys are plain-text titles (no markdown). Content supports full markdown and mermaid diagrams.
 ${MERMAID_ESSENTIAL_RULES}
-${getChatSkillCatalog()}
 - UI THEME: The user's interface is currently in **${theme || 'dark'} mode**. When generating diagrams, tables, or any visual elements with colors, choose colors that are readable and look good on a ${theme || 'dark'} background.
 
 Formatting reminder (when updating the summary):
@@ -522,30 +520,8 @@ Formatting reminder (when updating the summary):
     const chatSystemPrompt = staticSystem + '\n\n---\n\n' + dynamicSystem;
     const rawResponses: string[] = [];
 
-    let response = await provider.sendChat(chatMessages, { jsonMode: true });
+    const response = await provider.sendChat(chatMessages, { jsonMode: true });
     rawResponses.push(response);
-
-    // Handle skill request: resolve docs, inject as assistant+user turn, re-send.
-    // Must NEVER let a raw {"skillsNeeded": [...]} response reach the UI.
-    const skillsNeeded = extractSkillsNeeded(response);
-    if (skillsNeeded) {
-      const skillDocs = resolveSkills(skillsNeeded);
-      if (skillDocs) {
-        console.log('[skills:chat] Resolving skills:', skillsNeeded.join(', '));
-        chatMessages.push(
-          { role: 'assistant', content: response },
-          { role: 'user', content: `Here is the documentation you requested. Now please proceed with the original request.\n${skillDocs}` },
-        );
-      } else {
-        console.log('[skills:chat] Unknown skills requested:', skillsNeeded.join(', '), '— retrying without');
-        chatMessages.push(
-          { role: 'assistant', content: response },
-          { role: 'user', content: `The requested skills are not available. Please proceed with the original request using your existing knowledge.` },
-        );
-      }
-      response = await provider.sendChat(chatMessages, { jsonMode: true });
-      rawResponses.push(response);
-    }
 
     return { type: 'CHAT_RESPONSE', success: true, message: response, rawResponses, systemPrompt: chatSystemPrompt };
   } catch (err) {
@@ -911,21 +887,6 @@ async function handleFetchModels(
       error: err instanceof Error ? err.message : String(err),
     };
   }
-}
-
-/** Parse a potential skill request from an LLM response (handles markdown fences). */
-function extractSkillsNeeded(response: string): string[] | null {
-  try {
-    let cleaned = response.trim();
-    if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
-    }
-    const parsed = JSON.parse(cleaned);
-    if (Array.isArray(parsed?.skillsNeeded) && parsed.skillsNeeded.length > 0) {
-      return parsed.skillsNeeded as string[];
-    }
-  } catch { /* not valid JSON — not a skill request */ }
-  return null;
 }
 
 async function fetchRedditJson(redditUrl: string): Promise<unknown[]> {

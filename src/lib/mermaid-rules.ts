@@ -106,6 +106,39 @@ export const mermaidDocFiles: Record<string, string> = /* @__PURE__ */ (() => {
 })();
 
 /**
+ * Annotate mermaid errors inline: for each broken ```mermaid...``` block in `fieldText`,
+ * append an HTML comment with the error message right after the closing ```.
+ */
+export function annotateMermaidErrors(
+  fieldText: string,
+  errors: Array<{ source: string; error: string }>,
+): string {
+  let result = fieldText;
+  for (const { source, error } of errors) {
+    // Match the exact mermaid block containing this source
+    const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('```mermaid\\n' + escaped + '\\n```');
+    result = result.replace(re, (match) => `${match}\n<!-- MERMAID ERROR: ${error} -->`);
+  }
+  return result;
+}
+
+/**
+ * Get recovery documentation for broken diagrams: relevant cheatsheets + optional styling docs.
+ */
+export function getRecoveryDocs(errors: Array<{ source: string; error: string }>): string {
+  const cheatsheet = getRelevantCheatsheet(errors.map(e => e.source));
+  // If any error mentions style/config issues, append styling docs
+  const needsStyling = errors.some(e =>
+    /style|config|theme|class|css/i.test(e.error),
+  );
+  const stylingDocs = needsStyling && mermaidDocFiles['styling']
+    ? '\n\n---\n\nMermaid Styling Reference:\n\n' + mermaidDocFiles['styling']
+    : '';
+  return cheatsheet + stylingDocs;
+}
+
+/**
  * Get relevant documentation for the given broken diagram sources.
  * Deduplicates when multiple diagrams use the same type.
  */

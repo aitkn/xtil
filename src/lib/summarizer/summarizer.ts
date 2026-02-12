@@ -10,8 +10,6 @@ import {
   getRollingContextPrompt,
   getFinalChunkPrompt,
 } from './prompts';
-import { SkillRequestError } from '../skills/types';
-import { getSkillCatalog, resolveSkills } from '../skills/registry';
 
 /** Thrown when the LLM returns a text response instead of structured JSON (e.g. refusal). Not retryable. */
 export class LLMTextResponse extends Error {
@@ -68,13 +66,6 @@ export function buildSummarizationSystemPrompt(
 ): string {
   let systemPrompt = getSystemPrompt(detailLevel, language, languageExcept, hasImages, wordCount, contentType, githubPageType);
 
-  // Inject skill catalog when diagrams are allowed (not brief, not GitHub non-code)
-  const isGitHub = contentType === 'github';
-  const diagramsAllowed = detailLevel !== 'brief' && (!isGitHub || githubPageType === 'code');
-  if (diagramsAllowed) {
-    systemPrompt += `\n${getSkillCatalog()}\n- You may respond with {"skillsNeeded": ["skill-id-1", ...]} to request documentation before generating. You will receive the docs and be asked to generate again. Only use this when you plan to create content requiring specialized knowledge (e.g. mermaid diagrams).`;
-  }
-
   if (userInstructions) {
     systemPrompt += `\n\nAdditional user instructions (HIGHEST PRIORITY — these override any prior rules or guidelines above): ${userInstructions}`;
   }
@@ -100,48 +91,29 @@ export async function summarize(
   const chunkOptions: ChunkOptions = { contextWindow };
   const chunks = chunkContent(content.content, chunkOptions);
 
-  let skillContext: string | undefined;
+  let lastError: Error | null = null;
 
-  const runSummarization = async (): Promise<SummaryDocument> => {
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      if (signal?.aborted) throw new Error('Summarization cancelled');
-      try {
-        if (chunks.length === 1) {
-          return await oneShotSummarize(provider, content, systemPrompt, detailLevel, imageContents, imageUrlList, signal, skillContext, onRawResponse, onConversation);
-        } else {
-          return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, imageContents, imageUrlList, signal, skillContext, onRawResponse, onConversation);
-        }
-      } catch (err) {
-        // Don't retry cancellation, text responses, no-content, image requests, or skill requests
-        if (err instanceof LLMTextResponse || err instanceof NoContentError || err instanceof ImageRequestError || err instanceof SkillRequestError) throw err;
-        const errMsg = err instanceof Error ? err.message : String(err);
-        if (errMsg === 'Summarization cancelled') throw err;
-        lastError = err instanceof Error ? err : new Error(errMsg);
-        if (attempt < maxRetries) {
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-        }
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (signal?.aborted) throw new Error('Summarization cancelled');
+    try {
+      if (chunks.length === 1) {
+        return await oneShotSummarize(provider, content, systemPrompt, detailLevel, imageContents, imageUrlList, signal, onRawResponse, onConversation);
+      } else {
+        return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, imageContents, imageUrlList, signal, onRawResponse, onConversation);
+      }
+    } catch (err) {
+      // Don't retry cancellation, text responses, no-content, or image requests
+      if (err instanceof LLMTextResponse || err instanceof NoContentError || err instanceof ImageRequestError) throw err;
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg === 'Summarization cancelled') throw err;
+      lastError = err instanceof Error ? err : new Error(errMsg);
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
     }
-
-    throw lastError || new Error('Summarization failed');
-  };
-
-  try {
-    return await runSummarization();
-  } catch (err) {
-    if (err instanceof SkillRequestError && !skillContext) {
-      console.log('[skills] LLM requested skills:', err.requestedSkills.join(', '));
-      skillContext = resolveSkills(err.requestedSkills);
-      if (skillContext) {
-        console.log('[skills] Injecting %d chars of documentation, retrying…', skillContext.length);
-        return await runSummarization();
-      }
-      console.warn('[skills] No matching skills found, proceeding without');
-    }
-    throw err;
   }
+
+  throw lastError || new Error('Summarization failed');
 }
 
 async function oneShotSummarize(
@@ -152,7 +124,6 @@ async function oneShotSummarize(
   images?: ImageContent[],
   imageUrlList?: { url: string; alt: string }[],
   signal?: AbortSignal,
-  skillContext?: string,
   onRawResponse?: (response: string) => void,
   onConversation?: (messages: ChatMessage[]) => void,
 ): Promise<SummaryDocument> {
@@ -165,14 +136,6 @@ async function oneShotSummarize(
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt, images },
   ];
-
-  // Inject skill docs as conversation turns so system/user prompts stay unchanged
-  if (skillContext) {
-    messages.push(
-      { role: 'assistant', content: JSON.stringify({ skillsNeeded: ['(requested)'] }) },
-      { role: 'user', content: `Here is the documentation you requested. Now please proceed with the original request.\n${skillContext}` },
-    );
-  }
 
   onConversation?.(messages);
   const response = await provider.sendChat(messages, { maxTokens: 8192, jsonMode: true, signal });
@@ -189,7 +152,6 @@ async function rollingContextSummarize(
   images?: ImageContent[],
   imageUrlList?: { url: string; alt: string }[],
   signal?: AbortSignal,
-  skillContext?: string,
   onRawResponse?: (response: string) => void,
   onConversation?: (messages: ChatMessage[]) => void,
 ): Promise<SummaryDocument> {
@@ -236,14 +198,6 @@ async function rollingContextSummarize(
       { role: 'user', content: userPrompt, images: i === 0 ? images : undefined },
     ];
 
-    // Inject skill docs as conversation turns so system/user prompts stay unchanged
-    if (i === 0 && skillContext) {
-      messages.push(
-        { role: 'assistant', content: JSON.stringify({ skillsNeeded: ['(requested)'] }) },
-        { role: 'user', content: `Here is the documentation you requested. Now please proceed with the original request.\n${skillContext}` },
-      );
-    }
-
     onConversation?.(messages);
     const response = await provider.sendChat(messages, { maxTokens: 8192, jsonMode: isLast, signal });
     onRawResponse?.(response);
@@ -283,12 +237,6 @@ function parseSummaryResponse(response: string, imageAnalysisEnabled = false): S
   if (!parsed || typeof parsed !== 'object') {
     // LLM returned text instead of JSON — surface it as a chat message, not a broken summary
     throw new LLMTextResponse(cleaned);
-  }
-
-  // Check if LLM is requesting skill documentation before generating (must be checked BEFORE noSummary —
-  // user may say "don't summarize, just request skill X" and the LLM might set both fields)
-  if (Array.isArray(parsed.skillsNeeded) && parsed.skillsNeeded.length > 0) {
-    throw new SkillRequestError(parsed.skillsNeeded as string[]);
   }
 
   // LLM respected "don't summarize" request — surface the message as a chat response
