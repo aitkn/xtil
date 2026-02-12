@@ -219,7 +219,11 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   useEffect(() => {
     if (!ref.current) return;
     const handleError = (e: Event) => {
-      if (e.target instanceof HTMLImageElement) e.target.style.display = 'none';
+      if (e.target instanceof HTMLImageElement) {
+        const wrapper = e.target.closest('.dismissable-media');
+        if (wrapper) (wrapper as HTMLElement).style.display = 'none';
+        else e.target.style.display = 'none';
+      }
     };
     // error events don't bubble — must use capture phase
     ref.current.addEventListener('error', handleError, true);
@@ -257,6 +261,15 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           if (cancelled) return;
           el.innerHTML = svg;
           bindFunctions?.(el);
+          // Add dismiss button
+          if (!el.querySelector('.dismiss-media-btn')) {
+            const btn = document.createElement('button');
+            btn.className = 'dismiss-media-btn no-print';
+            btn.textContent = '\u00d7';
+            btn.title = 'Remove diagram';
+            btn.addEventListener('click', (e) => { e.stopPropagation(); el.remove(); });
+            el.appendChild(btn);
+          }
         } catch (err) {
           if (cancelled) return;
           const msg = err instanceof Error ? err.message : String(err);
@@ -270,6 +283,25 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     })();
     return () => { cancelled = true; };
   }, [html, theme]);
+
+  // Add dismiss buttons to images
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.querySelectorAll<HTMLImageElement>('img').forEach(img => {
+      if (img.style.display === 'none') return;
+      if (img.closest('.dismissable-media')) return;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'dismissable-media';
+      img.parentNode!.insertBefore(wrapper, img);
+      wrapper.appendChild(img);
+      const btn = document.createElement('button');
+      btn.className = 'dismiss-media-btn no-print';
+      btn.textContent = '\u00d7';
+      btn.title = 'Remove image';
+      btn.addEventListener('click', (e) => { e.stopPropagation(); wrapper.remove(); });
+      wrapper.appendChild(btn);
+    });
+  }, [html]);
 
   return <div ref={ref} class="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />;
 }

@@ -185,7 +185,37 @@
         margin: 12px 0;
         overflow-x: auto;
       }
+      .markdown-content pre.mermaid { position: relative; }
       .markdown-content pre.mermaid svg { display: block; margin: 0 auto; }
+
+      /* Dismiss button for diagrams and images */
+      .dismissable-media { position: relative; }
+      .dismiss-media-btn {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: none;
+        background: var(--md-sys-color-surface-container-highest);
+        color: var(--md-sys-color-on-surface-variant);
+        font-size: 14px;
+        line-height: 20px;
+        text-align: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.15s;
+        padding: 0;
+        z-index: 1;
+      }
+      .markdown-content pre.mermaid:hover > .dismiss-media-btn,
+      .dismissable-media:hover > .dismiss-media-btn { opacity: 0.8; }
+      .dismiss-media-btn:hover {
+        opacity: 1 !important;
+        background: var(--md-sys-color-error-container);
+        color: var(--md-sys-color-on-error-container);
+      }
       .markdown-content pre.mermaid .node rect,
       .markdown-content pre.mermaid .node polygon,
       .markdown-content pre.mermaid .node circle { rx: 8; ry: 8; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.10)); }
