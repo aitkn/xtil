@@ -2,6 +2,8 @@ import { useState, useEffect } from 'preact/hooks';
 import type { SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent } from '@/lib/extractors/types';
 import { MarkdownRenderer, InlineMarkdown } from '@/components/MarkdownRenderer';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 const LANG_LABELS: Record<string, string> = {
   en: 'EN', es: 'ES', fr: 'FR', de: 'DE',
@@ -19,7 +21,8 @@ interface SummaryContentProps {
 
 export function SummaryContent({ summary, content, onExport, notionUrl, exporting, onNavigate }: SummaryContentProps) {
   const [mdSaved, setMdSaved] = useState(false);
-  useEffect(() => setMdSaved(false), [summary]);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { setMdSaved(false); setCopied(false); }, [summary]);
 
   // Split TL;DR into body and status line for color-coded rendering
   const { body: tldrBody, statusLabel, statusText } = splitTldrStatus(summary.tldr);
@@ -255,6 +258,28 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           }}
         >
           {mdSaved ? 'Saved' : 'Save .md'}
+        </button>
+        <button
+          onClick={() => {
+            copyToClipboard(summary, content).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            });
+          }}
+          disabled={copied}
+          title={copied ? 'Copied!' : 'Copy as rich text (Ctrl+V) or plain markdown (Ctrl+Shift+V)'}
+          style={{
+            padding: '8px 20px',
+            borderRadius: '20px',
+            border: '1px solid var(--md-sys-color-outline)',
+            backgroundColor: 'transparent',
+            color: copied ? 'var(--md-sys-color-tertiary)' : 'var(--md-sys-color-on-surface)',
+            font: 'var(--md-sys-typescale-label-large)',
+            cursor: copied ? 'default' : 'pointer',
+            opacity: copied ? 0.7 : 1,
+          }}
+        >
+          {copied ? '\u2713 Copied' : 'Copy'}
         </button>
       </div>
     </div>
@@ -568,6 +593,16 @@ export function downloadMarkdown(summary: SummaryDocument, content: ExtractedCon
   a.download = `${slug}.md`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+async function copyToClipboard(summary: SummaryDocument, content: ExtractedContent | null) {
+  const md = summaryToMarkdown(summary, content);
+  const html = DOMPurify.sanitize(marked.parse(md, { async: false }) as string);
+  const item = new ClipboardItem({
+    'text/plain': new Blob([md], { type: 'text/plain' }),
+    'text/html': new Blob([html], { type: 'text/html' }),
+  });
+  await navigator.clipboard.write([item]);
 }
 
 /** Status label → badge color mapping */
