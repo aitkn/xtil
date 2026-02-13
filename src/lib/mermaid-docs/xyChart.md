@@ -2,77 +2,60 @@
 
 **Declaration:** `xychart-beta`
 
-## Basic Syntax
+## Comprehensive Example
 
 ```
 xychart-beta
-    title "Monthly Sales"
-    x-axis [jan, feb, mar, apr, may, jun]
-    y-axis "Revenue (USD)" 0 --> 5000
-    bar [1200, 1500, 2100, 2800, 3200, 4500]
-    line [1000, 1400, 2000, 2600, 3000, 4200]
+    title "Quarterly Revenue by Region"
+    x-axis [Q1, Q2, Q3, Q4]
+    y-axis "Revenue (USD)"
+    bar "North America" [4200, 5100, 6300, 7800]
+    bar "Europe" [3100, 3400, 3900, 4200]
+    bar "Asia" [1800, 2200, 2800, 3500]
+    line "Total Target" [9000, 10000, 12000, 14000]
 ```
 
-## Minimal Example
+This shows all features together. Here's what's required vs optional:
 
-Only two requirements: chart name and one dataset:
+**Required:**
+- `xychart-beta` declaration
+- At least one `bar` or `line` dataset with values in `[brackets]`
+
+**Optional:**
+- `title "..."` — chart title (quote multi-word titles)
+- `x-axis [...]` — categorical labels; omit for auto-numbered
+- `y-axis "title"` — axis label; omit for no label
+- `horizontal` after `xychart-beta` — rotates chart (default: vertical)
+- Series names: `bar "Revenue" [...]` — quote multi-word names; always provide a name for legend clarity
+
+## Y-Axis: Always Prefer Auto-Scale
+
+Use `y-axis "Label"` **without** a manual range. Mermaid auto-scales to fit data with sensible margins.
+
+Manual range (`y-axis "Label" 0 --> 5000`) is only appropriate when you need a fixed baseline for comparison across multiple charts showing the same metric — e.g., a set of monthly dashboards that must share identical axes so visual proportions stay consistent. In practice this almost never applies to summarization output.
+
+## Multiple Series
+
+You can stack multiple `bar` and `line` entries — each becomes a separate series:
+
 ```
-xychart-beta
-    line [+1.3, .6, 2.4, -.34]
+bar "Product A" [10, 20, 30]
+bar "Product B" [15, 25, 35]
+line "Average" [12, 22, 32]
 ```
 
-## Orientation
-
-```
-xychart-beta horizontal
-    ...
-```
-
-Default is vertical.
-
-## Title
-
-```
-xychart-beta
-    title "Multi-word title in quotes"
-```
-
-Single-word titles don't require quotes.
+Bars stack on top of each other. Lines overlay on the same axes.
 
 ## Axes
 
 ### X-Axis
-- Categorical: `x-axis "title" [cat1, "cat2 with space", cat3]`
-- Numeric range: `x-axis title min --> max`
-- Optional (auto-generated from data)
+- Categorical: `x-axis [jan, feb, "Q1 2024", mar]`
+- Numeric range: `x-axis "Time" 0 --> 100`
+- Omit entirely for auto-generated indices
 
 ### Y-Axis
-- With range: `y-axis title min --> max`
-- Auto-range: `y-axis title`
-- Optional (auto-generated from data)
-
-## Chart Types
-
-### Line Chart
-```
-line [2.3, 45, .98, -3.4]
-```
-
-### Bar Chart
-```
-bar [2.3, 45, .98, -3.4]
-```
-
-Both can be combined in one chart.
-
-## Named Series
-
-```
-bar "Revenue" [1200, 1500, 2100]
-line "Trend" [1000, 1400, 2000]
-```
-
-Multi-word series names need double quotes.
+- With label: `y-axis "Revenue (USD)"`
+- Omit entirely for auto-generated scale
 
 ## Text Rules
 

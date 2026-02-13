@@ -2,26 +2,7 @@
 
 **Declaration:** `treemap-beta`
 
-## Basic Syntax
-
-```
-treemap-beta
-    "Section 1"
-        "Leaf 1.1": 12
-        "Section 1.2"
-            "Leaf 1.2.1": 12
-    "Section 2"
-        "Leaf 2.1": 20
-        "Leaf 2.2": 25
-```
-
-## Node Rules
-
-- **Parent nodes**: Quoted text `"Section Name"` (no value)
-- **Leaf nodes**: Quoted text with colon and value `"Leaf Name": value`
-- **Hierarchy**: Created through indentation (spaces or tabs)
-
-## Example
+## Comprehensive Example
 
 ```
 treemap-beta
@@ -34,6 +15,15 @@ treemap-beta
             "Consulting": 250
             "Support": 150
 ```
+
+**Required:**
+- `treemap-beta` declaration
+- At least one leaf node with a value
+
+**Node rules:**
+- **Parent nodes**: Quoted text, no value — `"Section Name"`
+- **Leaf nodes**: Quoted text with colon and value — `"Leaf Name": 300`
+- **Hierarchy**: Created through indentation (spaces or tabs)
 
 ## Limitations
 

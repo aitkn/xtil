@@ -2,7 +2,7 @@
 
 **Declaration:** `quadrantChart`
 
-## Basic Syntax
+## Comprehensive Example
 
 ```
 quadrantChart
@@ -18,27 +18,19 @@ quadrantChart
     Campaign C: [0.5, 0.2]
 ```
 
-## Structure
+**Required:**
+- `quadrantChart` declaration
+- At least one data point: `Name: [x, y]` where x and y range from 0 to 1
 
-### Title
-```
-quadrantChart
-    title This is a sample example
-```
+**Optional:**
+- `title` — chart title
+- `x-axis Low --> High` — labels for both ends (or left only: `x-axis Low`)
+- `y-axis Low --> High` — labels for both ends (or bottom only: `y-axis Low`)
+- `quadrant-1` through `quadrant-4` — custom quadrant labels
 
-### X-Axis
-- Both labels: `x-axis Low Effort --> High Effort`
-- Left only: `x-axis Low Effort`
+## Quadrant Numbering
 
-### Y-Axis
-- Both labels: `y-axis Low Impact --> High Impact`
-- Bottom only: `y-axis Low Impact`
-
-### Quadrant Labels
 - `quadrant-1`: top right
 - `quadrant-2`: top left
 - `quadrant-3`: bottom left
 - `quadrant-4`: bottom right
-
-### Data Points
-`Point Name: [x, y]` where x and y range from 0 to 1.

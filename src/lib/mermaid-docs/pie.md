@@ -2,44 +2,27 @@
 
 **Declaration:** `pie`
 
-## Basic Syntax
+## Comprehensive Example
 
 ```
-pie title Favorite Pets
+pie showData
+    title Favorite Pets
     "Dogs" : 45
     "Cats" : 30
     "Birds" : 15
     "Fish" : 10
 ```
 
-## Structure
+**Required:**
+- `pie` declaration
+- At least one data entry: `"Label" : value`
 
-### pie keyword
-Required. Starts the diagram.
+**Optional:**
+- `showData` — renders actual values after legend text
+- `title` — chart title
 
-### showData (Optional)
-Renders actual data values after legend text:
-```
-pie showData
-    title Favorite Pets
-    "Dogs" : 45
-    "Cats" : 30
-```
+## Data Entries
 
-### title (Optional)
-```
-pie title "Your Title Here"
-```
-
-### Data Entries
-- **Label**: Text in quotation marks
-- **Separator**: Colon `:`
-- **Value**: Positive numeric value (up to two decimal places)
-
-Slices display clockwise in label order.
-
-## Data Requirements
-
-- Values must be positive numbers greater than zero
-- Negative values cause errors
-- Supports decimal values up to two places (e.g., `10.50`)
+- **Label**: Text in double quotes
+- **Value**: Positive numeric (up to two decimal places, e.g. `10.50`)
+- Slices display clockwise in label order

@@ -2,50 +2,7 @@
 
 **Declaration:** `journey`
 
-## Basic Syntax
-
-```
-journey
-    title My Working Day
-    section Morning
-        Make coffee: 5: Me
-        Commute: 2: Me, Bus
-        Work: 3: Me, Colleagues
-    section Afternoon
-        Lunch: 4: Me, Friends
-        Code review: 3: Me
-        Go home: 5: Me
-```
-
-## Structure
-
-### Title
-
-```
-journey
-    title My Working Day
-```
-
-### Sections
-
-Sections group related tasks:
-```
-section Section Name
-    Task1: score: actors
-    Task2: score: actors
-```
-
-### Task Format
-
-```
-Task name: <score>: <comma separated list of actors>
-```
-
-- **Task name**: Description of the step
-- **Score**: Numeric value 1-5 (1 = bad, 5 = great)
-- **Actors**: Comma-separated list of participants
-
-## Example
+## Comprehensive Example
 
 ```
 journey
@@ -61,4 +18,31 @@ journey
     section Delivery
         Track shipment: 3: Customer
         Receive package: 5: Customer, Courier
+```
+
+**Required:**
+- `journey` declaration
+- At least one task in format `Task name: score: actors`
+
+**Optional:**
+- `title` — diagram title
+- `section` — groups related tasks visually
+
+## Task Format
+
+```
+Task name: <score>: <comma separated list of actors>
+```
+
+- **Task name**: Description of the step
+- **Score**: Numeric value 1-5 (1 = bad, 5 = great)
+- **Actors**: Comma-separated list of participants
+
+## Sections
+
+Sections group related tasks:
+```
+section Section Name
+    Task1: score: actors
+    Task2: score: actors
 ```
