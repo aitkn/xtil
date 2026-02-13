@@ -43,9 +43,3 @@ Slices display clockwise in label order.
 - Values must be positive numbers greater than zero
 - Negative values cause errors
 - Supports decimal values up to two places (e.g., `10.50`)
-
-## Configuration
-
-| Parameter | Purpose | Default |
-|-----------|---------|---------|
-| `textPosition` | Label position along radius (0.0 = center, 1.0 = edge) | `0.75` |

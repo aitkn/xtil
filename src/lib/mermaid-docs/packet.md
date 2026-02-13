@@ -50,12 +50,3 @@ packet-beta
     128-143: "Checksum"
     144-159: "Urgent Pointer"
 ```
-
-## Configuration
-
-Configurable settings include:
-- Bits per row
-- Bit width
-- Padding values
-- Row height
-- Bit visibility settings

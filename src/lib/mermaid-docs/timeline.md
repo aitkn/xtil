@@ -57,37 +57,6 @@ Text wraps automatically. Force line breaks with `<br>`:
 {time period} : {event with <br> line break}
 ```
 
-## Color Styling
-
-### Default Behavior
-Without sections, each time period gets its own color (multiColor mode).
-
-### Disable MultiColor
-```javascript
-mermaid.initialize({
-    timeline: { disableMulticolor: false }
-});
-```
-
-### Custom Colors
-
-Use theme variables `cScale0` to `cScale11` for background colors (up to 12).
-Use `cScaleLabel0` to `cScaleLabel11` for foreground colors.
-
-```javascript
-mermaid.initialize({
-    theme: 'base',
-    timeline: {
-        cScale0: '#color1',
-        cScale1: '#color2'
-    }
-});
-```
-
-## Themes
-
-Available: `base`, `forest`, `dark`, `default`, `neutral`
-
 ## Important Notes
 
 - Time periods and events are simple text (not limited to numbers)

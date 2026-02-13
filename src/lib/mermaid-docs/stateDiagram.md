@@ -142,29 +142,6 @@ stateDiagram-v2
 
 Options: `LR`, `RL`, `TB`, `BT`
 
-## Styling with classDef
-
-```
-classDef movement font-style:italic
-classDef badEvent fill:#f00,color:white,font-weight:bold,stroke-width:2px,stroke:yellow
-```
-
-### Apply via `class` Statement
-
-```
-class State1 movement
-class State2, State3 badEvent
-```
-
-### Apply via `:::` Operator
-
-```
-[*] --> State1:::movement
-State1:::movement --> State2:::badEvent
-```
-
-Limitations: Cannot apply styles to `[*]` or composite states.
-
 ## States with Spaces
 
 Use state ID with description:

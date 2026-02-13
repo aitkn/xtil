@@ -3,6 +3,25 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import mermaid from 'mermaid';
 
+/** Master color palette — 12 colors per theme. Used for pie, cScale, xyChart, and auto-legends. */
+export const PALETTE = {
+  light: ['#1a56db','#16a34a','#d97706','#dc2626','#7c3aed','#0891b2','#be185d','#4f46e5',
+          '#059669','#ea580c','#4338ca','#b91c1c'],
+  dark:  ['#b4c5ff','#4ade80','#fbbf24','#f87171','#a78bfa','#22d3ee','#f472b6','#818cf8',
+          '#34d399','#fb923c','#a5b4fc','#fca5a5'],
+} as const;
+
+/** Derive pie1-pie12 and cScale0-cScale11 from PALETTE */
+function paletteVars(theme: 'light' | 'dark') {
+  const colors = PALETTE[theme];
+  const vars: Record<string, string> = {};
+  for (let i = 0; i < colors.length; i++) {
+    vars[`pie${i + 1}`] = colors[i];
+    vars[`cScale${i}`] = colors[i];
+  }
+  return vars;
+}
+
 const MERMAID_THEME_VARS = {
   light: {
     primaryColor: '#dbe4ff',
@@ -39,15 +58,8 @@ const MERMAID_THEME_VARS = {
     noteBorderColor: '#74777f',
     activationBkgColor: '#dbe4ff',
     activationBorderColor: '#1a56db',
-    // Pie / other
-    pie1: '#1a56db',
-    pie2: '#16a34a',
-    pie3: '#d97706',
-    pie4: '#dc2626',
-    pie5: '#7c3aed',
-    pie6: '#0891b2',
-    pie7: '#be185d',
-    pie8: '#4f46e5',
+    // Pie / timeline / cScale — generated from PALETTE
+    ...paletteVars('light'),
     pieTitleTextColor: '#0a2463',
     pieSectionTextColor: '#ffffff',
     pieLegendTextColor: '#1a1c1e',
@@ -95,15 +107,8 @@ const MERMAID_THEME_VARS = {
     noteBorderColor: '#8e9099',
     activationBkgColor: '#1a3a8a',
     activationBorderColor: '#b4c5ff',
-    // Pie / other
-    pie1: '#b4c5ff',
-    pie2: '#4ade80',
-    pie3: '#fbbf24',
-    pie4: '#f87171',
-    pie5: '#a78bfa',
-    pie6: '#22d3ee',
-    pie7: '#f472b6',
-    pie8: '#818cf8',
+    // Pie / timeline / cScale — generated from PALETTE
+    ...paletteVars('dark'),
     pieTitleTextColor: '#dbe4ff',
     pieSectionTextColor: '#1a1c1e',
     pieLegendTextColor: '#e3e2e6',
@@ -123,7 +128,13 @@ function getMermaidConfig(theme: 'light' | 'dark') {
     startOnLoad: false,
     theme: 'base' as const,
     securityLevel: 'strict' as const,
-    themeVariables: MERMAID_THEME_VARS[theme],
+    themeVariables: {
+      ...MERMAID_THEME_VARS[theme],
+      xyChart: {
+        backgroundColor: theme === 'dark' ? '#212326' : '#f3f4f6',
+        plotColorPalette: PALETTE[theme].join(', '),
+      },
+    },
   };
 }
 
@@ -150,6 +161,24 @@ marked.setOptions({
   gfm: true,
   breaks: true,
   renderer,
+});
+
+// Override del tokenizer: require double tildes ~~text~~ only (not single ~text~)
+marked.use({
+  tokenizer: {
+    del(src) {
+      const match = src.match(/^~~(?=\S)([\s\S]*?\S)~~/);
+      if (match) {
+        return {
+          type: 'del',
+          raw: match[0],
+          text: match[1],
+          tokens: this.lexer.inlineTokens(match[1]),
+        };
+      }
+      return undefined;
+    },
+  },
 });
 
 function useResolvedTheme(): 'light' | 'dark' {
@@ -209,6 +238,94 @@ export function fixMermaidBlocks(md: string): string {
   return md.replace(FIX_MERMAID_RE, '```mermaid\n$1');
 }
 
+/** Parse xychart-beta series — returns array of {type, name} or null if <2 series. */
+function parseXyChartSeries(source: string): { type: 'line' | 'bar'; name: string }[] | null {
+  const re = /^\s*(line|bar)\s*(?:"([^"]*)")?\s*\[/gm;
+  const series: { type: 'line' | 'bar'; name: string }[] = [];
+  let m;
+  let idx = 0;
+  while ((m = re.exec(source)) !== null) {
+    idx++;
+    series.push({ type: m[1] as 'line' | 'bar', name: m[2] || `Series ${idx}` });
+  }
+  return series.length >= 2 ? series : null;
+}
+
+/**
+ * Transform xychart-beta bar series for visual stacking.
+ * Mermaid draws bars overlapping at the same x position (later series on top).
+ * To create a stacked effect, each bar's values become the cumulative sum of
+ * itself + all subsequent bar series. The first bar (at back) is tallest,
+ * the last bar (in front) keeps its original values.
+ */
+function stackBarSeries(source: string): string {
+  if (!source.match(/^\s*xychart-beta/m)) return source;
+
+  // Collect bar lines with their values
+  const barRe = /^(\s*bar\s*(?:"[^"]*")?\s*)\[([\d\s.,eE+-]+)\]/gm;
+  const bars: { fullMatch: string; prefix: string; values: number[] }[] = [];
+  let m;
+  while ((m = barRe.exec(source)) !== null) {
+    bars.push({
+      fullMatch: m[0],
+      prefix: m[1],
+      values: m[2].split(',').map(v => parseFloat(v.trim())),
+    });
+  }
+  if (bars.length < 2) return source;
+
+  // Compute reverse cumulative: bar[i] += bar[i+1] + bar[i+2] + ...
+  const len = bars[0].values.length;
+  const cumulative = bars.map(b => [...b.values]);
+  for (let i = bars.length - 2; i >= 0; i--) {
+    for (let j = 0; j < len; j++) {
+      cumulative[i][j] = (cumulative[i][j] || 0) + (cumulative[i + 1][j] || 0);
+    }
+  }
+
+  // Replace values in source; also fix y-axis max if specified
+  let result = source;
+  for (let i = 0; i < bars.length; i++) {
+    result = result.replace(bars[i].fullMatch, bars[i].prefix + '[' + cumulative[i].join(', ') + ']');
+  }
+
+  // Adjust y-axis max if explicitly set and cumulative total exceeds it
+  const yAxisRe = /^(\s*y-axis\s+"[^"]*"\s+[\d.]+\s*-->\s*)([\d.]+)/m;
+  const yMatch = result.match(yAxisRe);
+  if (yMatch) {
+    const currentMax = parseFloat(yMatch[2]);
+    const stackMax = Math.max(...cumulative[0]);
+    if (stackMax > currentMax) {
+      result = result.replace(yAxisRe, '$1' + Math.ceil(stackMax * 1.1));
+    }
+  }
+
+  return result;
+}
+
+/** Create a legend element for xychart-beta series. Uses inline styles for copy/paste survival. */
+function createLegendElement(series: { type: 'line' | 'bar'; name: string }[], theme: 'light' | 'dark'): HTMLDivElement {
+  const colors = PALETTE[theme];
+  const legend = document.createElement('div');
+  legend.className = 'mermaid-legend';
+  for (let i = 0; i < series.length; i++) {
+    const s = series[i];
+    const color = colors[i % colors.length];
+    const item = document.createElement('span');
+    item.style.cssText = 'display:inline-flex;align-items:center;gap:4px;';
+    const swatch = document.createElement('span');
+    if (s.type === 'line') {
+      swatch.style.cssText = `display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};`;
+    } else {
+      swatch.style.cssText = `display:inline-block;width:10px;height:10px;border-radius:2px;background:${color};`;
+    }
+    item.appendChild(swatch);
+    item.appendChild(document.createTextNode(s.name));
+    legend.appendChild(item);
+  }
+  return legend;
+}
+
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const ref = useRef<HTMLDivElement>(null);
   const theme = useResolvedTheme();
@@ -257,8 +374,9 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         const source = el.dataset.source || el.textContent || '';
         if (!source.trim()) continue;
         const renderId = `mermaid-${Date.now()}-${renderCounter++}`;
+        const renderSource = stackBarSeries(source);
         try {
-          const { svg, bindFunctions } = await mermaid.render(renderId, source);
+          const { svg, bindFunctions } = await mermaid.render(renderId, renderSource);
           if (cancelled) return;
           el.innerHTML = svg;
           bindFunctions?.(el);
@@ -270,6 +388,12 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             btn.title = 'Remove diagram';
             btn.addEventListener('click', (e) => { e.stopPropagation(); el.remove(); });
             el.appendChild(btn);
+          }
+          // Auto-legend for xychart-beta (only type needing it — pie has built-in, others have visible labels)
+          const xySeries = parseXyChartSeries(source);
+          if (xySeries) {
+            el.querySelector('.mermaid-legend')?.remove();
+            el.appendChild(createLegendElement(xySeries, theme));
           }
         } catch (err) {
           if (cancelled) return;

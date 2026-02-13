@@ -97,45 +97,6 @@ erDiagram
 
 Options: `TB`, `BT`, `LR`, `RL`
 
-## Styling
-
-### Individual Node
-```
-style CUSTOMER fill:#f9f,stroke:#333,stroke-width:4px
-```
-
-Multiple nodes:
-```
-style CUSTOMER,ORDER fill:#f9f
-```
-
-### Class Definition
-```
-classDef className fill:#f9f,stroke:#333,stroke-width:4px
-class CUSTOMER className
-```
-
-Shorthand:
-```
-CUSTOMER:::className
-```
-
-### Default Class
-```
-classDef default fill:#f9f,stroke:#333,stroke-width:4px
-```
-
-## Layout Configuration
-
-For complex diagrams, use ELK layout:
-```
----
-config:
-  layout: elk
----
-erDiagram
-```
-
 ## Important Notes
 
 - Entity names with spaces need `"double quotes"`

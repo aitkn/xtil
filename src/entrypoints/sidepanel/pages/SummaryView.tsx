@@ -789,7 +789,16 @@ export async function copyToClipboard(summary: SummaryDocument, content: Extract
         img.src = pngUrl;
         img.alt = 'Diagram';
         img.style.maxWidth = '100%';
-        clonePres[i].replaceWith(img);
+        // Preserve auto-generated legend from the clone
+        const legendEl = clonePres[i].querySelector('.mermaid-legend');
+        if (legendEl) {
+          const wrapper = document.createElement('div');
+          wrapper.appendChild(img);
+          wrapper.appendChild(legendEl);
+          clonePres[i].replaceWith(wrapper);
+        } else {
+          clonePres[i].replaceWith(img);
+        }
       } catch {
         clonePres[i].remove();
       }

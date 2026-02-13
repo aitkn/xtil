@@ -102,22 +102,3 @@ Options: `TB` (default), `BT`, `LR`, `RL`
 ## Markdown Formatting
 
 User-defined text supports markdown: `"**bold** and *italics*"`
-
-## Styling
-
-### Direct Styling
-```
-style node_name fill:#color,stroke:#color,stroke-width:2px
-```
-
-### Class Definitions
-```
-classDef className fill:#f9f,stroke:#333,stroke-width:4px
-class node1,node2 className
-node1:::className   %% shorthand
-```
-
-### Default Class
-```
-classDef default fill:#f9f,stroke:#333,stroke-width:4px
-```

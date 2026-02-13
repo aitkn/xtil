@@ -57,9 +57,6 @@ sequenceDiagram
     box rgb(33,66,99)
         participant John
     end
-    box rgba(33,66,99,0.5)
-        participant Jane
-    end
     box transparent Aqua
         actor Martin
     end
@@ -215,20 +212,6 @@ end
 autonumber
 ```
 
-Or via configuration: `sequence: { showSequenceNumbers: true }`
-
-## Actor Menus (Links)
-
-```
-link Alice: Dashboard @ https://dashboard.example.com
-link Alice: Wiki @ https://wiki.example.com
-```
-
-JSON syntax:
-```
-links Alice: {"Dashboard": "https://dashboard.example.com", "Wiki": "https://wiki.example.com"}
-```
-
 ## Entity Codes / Escaping
 
 Use `#` + base 10 number + `;`:
@@ -246,24 +229,3 @@ HTML character names also supported.
 ## Important Warning
 
 The word `end` in lowercase can break the diagram. Wrap it: `(end)`, `[end]`, `{end}`, or `"end"`.
-
-## Configuration
-
-```javascript
-mermaid.sequenceConfig = {
-    diagramMarginX: 50,
-    diagramMarginY: 10,
-    boxTextMargin: 5,
-    noteMargin: 10,
-    messageMargin: 35,
-    mirrorActors: true,
-};
-```
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| mirrorActors | Render actors below and above | false |
-| actorFontSize | Actor font size | 14 |
-| noteFontSize | Note font size | 14 |
-| noteAlign | Note text alignment | center |
-| messageFontSize | Message font size | 16 |

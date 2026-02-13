@@ -65,51 +65,14 @@ bar [2.3, 45, .98, -3.4]
 
 Both can be combined in one chart.
 
-## Configuration Parameters
+## Named Series
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| width | Chart width | 700 |
-| height | Chart height | 500 |
-| titlePadding | Title padding | 10 |
-| titleFontSize | Title font size | 20 |
-| showTitle | Display title | true |
-| chartOrientation | 'vertical' or 'horizontal' | 'vertical' |
-| plotReservedSpacePercent | Minimum plot space | 50 |
-| showDataLabel | Display values in bars | false |
-
-### Axis Parameters
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| showLabel | Show axis labels | true |
-| labelFontSize | Label font size | 14 |
-| labelPadding | Label padding | 5 |
-| showTitle | Show axis title | true |
-| titleFontSize | Axis title font size | 16 |
-| titlePadding | Axis title padding | 5 |
-| showTick | Display ticks | true |
-| tickLength | Tick length | 5 |
-| tickWidth | Tick width | 2 |
-| showAxisLine | Display axis line | true |
-| axisLineWidth | Axis line thickness | 2 |
-
-## Theme Variables
-
-```yaml
----
-config:
-  themeVariables:
-    xyChart:
-      titleColor: '#ff0000'
-      backgroundColor: '#ffffff'
-      xAxisLabelColor: '#333'
-      yAxisLabelColor: '#333'
-      plotColorPalette: "#f3456, #43445, #bb3322"
----
+```
+bar "Revenue" [1200, 1500, 2100]
+line "Trend" [1000, 1400, 2000]
 ```
 
-Key variables: `backgroundColor`, `titleColor`, `xAxisLabelColor`, `xAxisTitleColor`, `xAxisTickColor`, `xAxisLineColor`, `yAxisLabelColor`, `yAxisTitleColor`, `yAxisTickColor`, `yAxisLineColor`, `plotColorPalette`
+Multi-word series names need double quotes.
 
 ## Text Rules
 

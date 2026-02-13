@@ -12,6 +12,7 @@ import type { ChatMessage, ImageContent, VisionSupport, LLMProvider } from '@/li
 import type { SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent } from '@/lib/extractors/types';
 import { parseRedditJson, buildRedditMarkdown } from '@/lib/extractors/reddit';
+import { getPersistedTabState, deletePersistedTabState } from '@/lib/storage/tab-state';
 
 // Persist images across service worker restarts via chrome.storage.session
 const chromeStorage = () => (globalThis as unknown as { chrome: { storage: typeof chrome.storage } }).chrome.storage;
@@ -54,6 +55,23 @@ export default defineBackground(() => {
       return true; // keep channel open for async response
     },
   );
+
+  // Clean up persisted tab state when a tab is closed
+  chromeObj.tabs.onRemoved.addListener((tabId: number) => {
+    deletePersistedTabState(tabId).catch(() => {});
+  });
+
+  // Clean up persisted tab state when a tab navigates to a different URL
+  chromeObj.tabs.onUpdated.addListener((tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+    if (!changeInfo.url) return;
+    getPersistedTabState(tabId).then((persisted) => {
+      if (!persisted) return;
+      // Different URL → invalidate
+      if (persisted.url !== changeInfo.url) {
+        deletePersistedTabState(tabId).catch(() => {});
+      }
+    }).catch(() => {});
+  });
 });
 
 async function getModelVision(
@@ -104,7 +122,7 @@ async function handleMessage(message: Message): Promise<Message> {
       return { type: 'CANCEL_SUMMARIZE', success: true } as Message;
     }
     case 'CHAT_MESSAGE':
-      return handleChatMessage(message.messages, message.summary, message.content, message.theme);
+      return handleChatMessage(message.messages, message.summary, message.content);
     case 'EXPORT':
       return handleExport(message.adapterId, message.summary, message.content, message.replacePageId);
     case 'CHECK_NOTION_DUPLICATE':
@@ -419,7 +437,6 @@ async function handleChatMessage(
   messages: ChatMessage[],
   summary: SummaryDocument,
   content: ExtractedContent,
-  theme?: 'light' | 'dark',
 ): Promise<ChatResponseMessage> {
   try {
     const settings = await getSettings();
@@ -451,7 +468,7 @@ async function handleChatMessage(
         : content.content)
       : '';
 
-    // --- SYSTEM MSG 1: Static prefix (cached across turns) ---
+    // --- SYSTEM MSG 1: Rules & instructions (cached across turns) ---
     const summarizationPrompt = getSystemPrompt(
       settings.summaryDetailLevel,
       settings.summaryLanguage,
@@ -460,18 +477,12 @@ async function handleChatMessage(
       content.wordCount,
     );
 
-    let imageSection = '';
+    let imageCapabilityNote = '';
     if (hasImages) {
-      imageSection += `\n\nYou have multimodal capabilities — images from the page are attached to this conversation. You can analyze and reference them when answering questions or updating the summary.`;
-      if (cachedImageUrls.length > 0) {
-        const urlLines = cachedImageUrls.map((img, i) =>
-          `${i + 1}. ${img.url}${img.alt ? ` — "${img.alt}"` : ''}`,
-        );
-        imageSection += `\nOriginal image URLs (use for ![alt](url) embeds in summary/responses):\n${urlLines.join('\n')}`;
-      }
+      imageCapabilityNote = `\n\nYou have multimodal capabilities — images from the page are attached to this conversation. You can analyze and reference them when answering questions or updating the summary.`;
     }
 
-    const staticSystem = `${summarizationPrompt}
+    const rulesSystem = `${summarizationPrompt}
 
 ---
 
@@ -488,20 +499,27 @@ Chat response format:
 - Each field you include is replaced entirely (exception: "extraSections" — see below). Always provide the complete value for any field you want to change.
 - To remove an optional field, set its value to the string "__DELETE__" (e.g. "factCheck": "__DELETE__").
 - IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.
-- "extraSections" is DEEP-MERGED — only include the keys you are changing. To add or update a section: {"extraSections": {"New Title": "content"}}. To delete one: {"extraSections": {"Old Title": "__DELETE__"}}. Do NOT resend unchanged sections. Keys are plain-text titles (no markdown). Content supports full markdown and mermaid diagrams.
-- UI THEME: The user's interface is currently in **${theme || 'dark'} mode**. When generating diagrams, tables, or any visual elements with colors, choose colors that are readable and look good on a ${theme || 'dark'} background.
-${imageSection}
-Source metadata:
-${metaLines.join('\n')}
-${originalContent ? `\nOriginal page content:\n${originalContent}` : ''}`;
+- "extraSections" is DEEP-MERGED — only include the keys you are changing. To add or update a section: {"extraSections": {"New Title": "content"}}. To delete one: {"extraSections": {"Old Title": "__DELETE__"}}. Do NOT resend unchanged sections. Keys are plain-text titles (no markdown). Content supports full markdown and mermaid diagrams.${imageCapabilityNote}`;
 
-    // --- SYSTEM MSG 2: Dynamic per-turn context (only the changing summary) ---
-    const dynamicSystem = `Current summary (JSON):
-${JSON.stringify(summary, null, 2)}`;
+    // --- SYSTEM MSG 2: Document extract (cached across turns) ---
+    let documentSystem = `Source metadata:\n${metaLines.join('\n')}`;
+    if (hasImages && cachedImageUrls.length > 0) {
+      const urlLines = cachedImageUrls.map((img, i) =>
+        `${i + 1}. ${img.url}${img.alt ? ` — "${img.alt}"` : ''}`,
+      );
+      documentSystem += `\n\nOriginal image URLs (use for ![alt](url) embeds in summary/responses):\n${urlLines.join('\n')}`;
+    }
+    if (originalContent) {
+      documentSystem += `\n\nOriginal page content:\n${originalContent}`;
+    }
+
+    // --- SYSTEM MSG 3: Current summary (changes each turn) ---
+    const summarySystem = `Current summary (JSON):\n${JSON.stringify(summary, null, 2)}`;
 
     const chatMessages: ChatMessage[] = [
-      { role: 'system', content: staticSystem, cacheBreakpoint: true },
-      { role: 'system', content: dynamicSystem },
+      { role: 'system', content: rulesSystem },
+      { role: 'system', content: documentSystem, cacheBreakpoint: true },
+      { role: 'system', content: summarySystem },
       ...messages,
     ];
 

@@ -126,76 +126,6 @@ flowchart TD
     Line 2`"]
 ```
 
-Disable auto-wrap:
-```
----
-config:
-  markdownAutoWrap: false
----
-```
-
-## Styling
-
-### Individual Node
-```
-style id fill:#f9f,stroke:#333,stroke-width:2px
-```
-
-### Class Definition
-```
-classDef className fill:#bbf,stroke:#333
-class A,B className
-A:::className --> B    %% inline class assignment
-```
-
-### Default Class
-```
-classDef default fill:#f9f,stroke:#333,stroke-width:4px
-```
-
-### Link Styling (by index)
-```
-linkStyle 0 stroke:#ff3,stroke-width:4px    %% style first edge (0-indexed)
-linkStyle 1,2,7 color:blue                  %% multiple links
-linkStyle default stroke:#333,stroke-width:2px  %% all edges
-```
-
-## Edge IDs & Animation (v11+)
-
-```
-e1@ A --> B            %% assign ID "e1" to edge
-e1@{ animate: true }   %% animate the edge
-e1@{ animation: fast }  %% fast or slow
-```
-
-## Edge Curve Types (v11.10+)
-
-Per-edge (requires edge ID):
-```
-e1@ A --> B
-e1@{ curve: stepBefore }
-```
-
-Diagram-level (in frontmatter):
-```
----
-config:
-  flowchart:
-    curve: monotoneX
----
-```
-
-Available curves: `basis`, `bumpX`, `bumpY`, `cardinal`, `catmullRom`, `linear`, `monotoneX`, `monotoneY`, `natural`, `step`, `stepAfter`, `stepBefore`
-
-## Click Events
-
-```
-click A callback "Tooltip"     %% JS callback (securityLevel: loose)
-click A href "https://..." "Tooltip" _blank  %% hyperlink
-```
-
-Supported targets: `_self`, `_blank`, `_parent`, `_top`
-
 ## FontAwesome Icons
 
 ```
@@ -204,18 +134,6 @@ flowchart TD
 ```
 
 Supported prefixes: `fa`, `fab`, `fas`, `far`, `fal`, `fad`
-
-## Renderer Configuration
-
-```
----
-config:
-  flowchart:
-    defaultRenderer: "elk"
----
-```
-
-Options: `dagre` (default), `elk`
 
 ## Comments
 

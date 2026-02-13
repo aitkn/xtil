@@ -146,53 +146,10 @@ Deploy :vert, v1, 2024-04-01, 0d
 
 ## Today Marker
 
-Style: `todayMarker stroke-width:5px,stroke:#0f0,opacity:0.5`
 Hide: `todayMarker off`
-
-## Compact Mode
-
-Enable via YAML:
-```
----
-config:
-  gantt:
-    displayMode: compact
----
-```
-
-## Interaction
-
-```
-click taskId href "https://example.com"
-click taskId call callback("arg1", "arg2")
-```
-
-Requires `securityLevel: 'loose'`.
 
 ## Comments
 
 ```
 %% This is a comment
-```
-
-## Configuration
-
-```javascript
-mermaid.ganttConfig = {
-    titleTopMargin: 25,
-    barHeight: 20,
-    barGap: 4,
-    topPadding: 75,
-    rightPadding: 75,
-    leftPadding: 75,
-    gridLineStartPadding: 10,
-    fontSize: 12,
-    sectionFontSize: 24,
-    numberSectionStyles: 1,
-    axisFormat: '%d/%m',
-    tickInterval: '1week',
-    topAxis: true,
-    displayMode: 'compact',
-    weekday: 'sunday',
-};
 ```

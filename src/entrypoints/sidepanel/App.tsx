@@ -7,6 +7,7 @@ import { getActiveProviderConfig } from '@/lib/storage/types';
 import { DEFAULT_SETTINGS } from '@/lib/storage/types';
 import { parseJsonSafe, findMatchingBrace } from '@/lib/json-repair';
 import { sendMessage } from '@/lib/messaging/bridge';
+import { savePersistedTabState, getPersistedTabState, deletePersistedTabState, type DisplayMessage, type PersistedTabState } from '@/lib/storage/tab-state';
 import type {
   ExtractResultMessage,
   SummaryResultMessage,
@@ -36,16 +37,6 @@ import { ChatInputBar } from '@/components/ChatInputBar';
 import type { SummarizeVariant } from '@/components/ChatInputBar';
 import { useTheme } from '@/hooks/useTheme';
 import { buildSummarizationSystemPrompt } from '@/lib/summarizer/summarizer';
-
-interface DisplayMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  internal?: boolean;
-  /** Snapshot of the summary before this user message was processed. */
-  summaryBefore?: SummaryDocument;
-  /** Whether this user message caused the summary to change. */
-  didUpdateSummary?: boolean;
-}
 
 interface TabState {
   content: ExtractedContent | null;
@@ -152,20 +143,21 @@ interface PendingMermaidFix {
   initialChartCount: number;
   errors: Array<{ source: string; error: string }>;
   skipped?: boolean;
+  /** The fix prompt that will be sent on the next attempt (for debug preview). */
+  previewPrompt?: string;
 }
 
-/** Build the fix request prompt for a mermaid fix attempt (pure, no side effects). */
+/** Build the fix request prompt for a mermaid fix attempt (pure, no side effects).
+ * The annotated summary JSON is provided separately via the summary system message. */
 function buildMermaidFixPrompt(
-  finalSummary: SummaryDocument,
   errors: Array<{ source: string; error: string }>,
   attempt: number,
 ): string {
-  const annotatedSummary = annotateSummaryFields(finalSummary, errors);
   if (attempt <= 4) {
     const docs = getRecoveryDocs(errors);
-    return `You generated this summary but ${errors.length} mermaid chart(s) have errors.\nThe errors are annotated inline as <!-- MERMAID ERROR: ... --> comments right after the broken diagrams.\n\nCurrent summary:\n${JSON.stringify(annotatedSummary, null, 2)}\n\nHere is documentation that may help you resolve the issues:\n${docs}\n\nThis is your attempt ${attempt} of 4 to fix all issues. Return the corrected fields in "updates". Set "text" to "".\nRules:\n- Fix the mermaid syntax errors in place.\n- Do NOT add commentary or changelog.\n- All diagrams MUST use \`\`\`mermaid fenced code blocks.\n${MERMAID_ESSENTIAL_RULES}`;
+    return `The current summary has ${errors.length} mermaid chart(s) with syntax errors.\nThe errors are annotated inline as <!-- MERMAID ERROR: ... --> comments right after the broken diagrams in the summary JSON above.\n\nHere is documentation that may help you resolve the issues:\n${docs}\n\nThis is your attempt ${attempt} of 4 to fix all issues. Return the corrected fields in "updates". Set "text" to "".\nRules:\n- Fix the mermaid syntax errors in place.\n- Do NOT add commentary or changelog.\n- All diagrams MUST use \`\`\`mermaid fenced code blocks.\n${MERMAID_ESSENTIAL_RULES}`;
   }
-  return `You generated this summary but ${errors.length} mermaid chart(s) still have errors after 4 fix attempts.\nREMOVE all broken mermaid diagrams from the summary. You MUST also:\n- Remove any legend line that accompanied a removed diagram (e.g. lines with colored squares like 🟦 🟧 🟩 or circles like 🔵 🟠 🟢).\n- If an extraSection existed ONLY to hold a diagram (and now has no meaningful content), delete it with "__DELETE__".\n- Rewrite any surrounding text that references a removed diagram so it reads naturally without it.\nThe broken diagrams are annotated with <!-- MERMAID ERROR: ... --> comments.\n\nCurrent summary:\n${JSON.stringify(annotatedSummary, null, 2)}\n\nReturn the corrected fields in "updates". Set "text" to "".`;
+  return `The current summary has ${errors.length} mermaid chart(s) that still have errors after 4 fix attempts.\nREMOVE all broken mermaid diagrams from the summary. You MUST also:\n- Remove any legend line that accompanied a removed diagram (e.g. lines with colored squares like 🟦 🟧 🟩 or circles like 🔵 🟠 🟢).\n- If an extraSection existed ONLY to hold a diagram (and now has no meaningful content), delete it with "__DELETE__".\n- Rewrite any surrounding text that references a removed diagram so it reads naturally without it.\nThe broken diagrams are annotated with <!-- MERMAID ERROR: ... --> comments in the summary JSON above.\n\nReturn the corrected fields in "updates". Set "text" to "".`;
 }
 
 /**
@@ -184,7 +176,8 @@ async function runMermaidFixAttempt(
   setRawResponses: (fn: (prev: string[]) => string[]) => void,
   setConversationLog?: (log: { role: string; content: string }[]) => void,
 ): Promise<{ summary: SummaryDocument | null; fixMessages: DisplayMessage[] }> {
-  const fixRequest = buildMermaidFixPrompt(finalSummary, errors, attempt);
+  const fixRequest = buildMermaidFixPrompt(errors, attempt);
+  const annotatedSummary = annotateSummaryFields(finalSummary, errors);
 
   const userMsg: DisplayMessage = { role: 'user', content: fixRequest, internal: true };
   fixMessages.push(userMsg);
@@ -198,7 +191,7 @@ async function runMermaidFixAttempt(
   const fixResponse = await sendMessage({
     type: 'CHAT_MESSAGE',
     messages: allMessages,
-    summary: finalSummary,
+    summary: annotatedSummary,
     content,
     theme,
   }) as ChatResponseMessage;
@@ -284,10 +277,18 @@ async function autoFixMermaidStepped(
   setRawResponses: (fn: (prev: string[]) => string[]) => void,
   setPendingFix: (fix: PendingMermaidFix | null) => void,
   setConversationLog?: (log: { role: string; content: string }[]) => void,
+  currentConversationLog?: { role: string; content: string }[],
 ): Promise<AutoFixResult> {
   let finalSummary = summary;
   const fixMessages: DisplayMessage[] = [];
   const initialChartCount = countMermaidBlocks(summary);
+
+  // Track the latest conversation log for building previews across iterations
+  let lastConvLog = currentConversationLog;
+  const wrappedSetConversationLog = setConversationLog ? (log: { role: string; content: string }[]) => {
+    lastConvLog = log;
+    setConversationLog(log);
+  } : undefined;
 
   for (let attempt = 1; attempt <= 5; attempt++) {
     const errors = await findMermaidErrors(finalSummary);
@@ -296,16 +297,24 @@ async function autoFixMermaidStepped(
     const strippedSummary = stripBrokenFromSummary(finalSummary, errors.map(e => e.source));
     setSummary(strippedSummary);
 
-    // Pre-build the fix prompt so the debug panel can show it before the user clicks
-    const previewPrompt = buildMermaidFixPrompt(finalSummary, errors, attempt);
-    if (setConversationLog) {
-      // Show what will be sent: previous messages + the upcoming fix request
+    // Pre-build the fix prompt so the pending UI can show it
+    const previewPrompt = buildMermaidFixPrompt(errors, attempt);
+    const annotatedSummary = annotateSummaryFields(finalSummary, errors);
+
+    // Build preview conversationLog showing exactly what will be sent
+    if (wrappedSetConversationLog && lastConvLog?.length) {
+      const systemMsgs = lastConvLog.filter(m => m.role === 'system');
       const previewLog = [
+        // Reuse rules (msg 1) and document (msg 2) from last conversation log
+        ...(systemMsgs.length >= 2 ? systemMsgs.slice(0, 2) : []),
+        // Updated summary with error annotations (msg 3)
+        { role: 'system', content: `Current summary (JSON):\n${JSON.stringify(annotatedSummary, null, 2)}` },
+        // Chat conversation: base messages + fix messages + upcoming fix prompt
         ...baseChatMessages.map(m => ({ role: m.role, content: m.content })),
         ...fixMessages.map(m => ({ role: m.role, content: m.content })),
         { role: 'user', content: previewPrompt },
       ];
-      setConversationLog(previewLog);
+      wrappedSetConversationLog(previewLog);
     }
 
     // Pause: set pending state and wait for user to click "Next attempt" or "Skip"
@@ -318,6 +327,7 @@ async function autoFixMermaidStepped(
       fixMessages: [...fixMessages],
       initialChartCount,
       errors,
+      previewPrompt,
     };
     await new Promise<void>((resolve) => {
       (pending as PendingMermaidFix & { _resolve: () => void })._resolve = resolve;
@@ -330,7 +340,7 @@ async function autoFixMermaidStepped(
 
     const result = await runMermaidFixAttempt(
       finalSummary, summary, errors, attempt, content, theme,
-      baseChatMessages, fixMessages, setChatMessages, setRawResponses, setConversationLog,
+      baseChatMessages, fixMessages, setChatMessages, setRawResponses, wrappedSetConversationLog,
     );
     if (result.summary) {
       finalSummary = result.summary;
@@ -536,6 +546,30 @@ export function App() {
   chatLoadingRef.current = chatLoading;
   inputValueRef.current = inputValue;
 
+  /** Persist display-relevant state to chrome.storage.session for survival across sidepanel close/reopen.
+   *  Deferred via setTimeout so Preact re-renders first and refs reflect the latest state. */
+  const persistToSession = useCallback((tabId: number | null) => {
+    if (tabId == null) return;
+    setTimeout(() => {
+      const s = summaryRef.current;
+      const c = contentRef.current;
+      // Only persist if there's something meaningful (summary or chat)
+      if (!s && chatMessagesRef.current.length === 0) return;
+      if (!c?.url) return;
+      const persisted: PersistedTabState = {
+        summary: s,
+        content: c,
+        chatMessages: chatMessagesRef.current.map(m => ({
+          role: m.role, content: m.content, internal: m.internal,
+          summaryBefore: m.summaryBefore, didUpdateSummary: m.didUpdateSummary,
+        })),
+        notionUrl: notionUrlRef.current,
+        url: c.url,
+      };
+      savePersistedTabState(tabId, persisted).catch(() => {});
+    }, 0);
+  }, []);
+
   const saveTabState = useCallback((tabId: number | null) => {
     if (tabId == null) return;
     tabStatesRef.current.set(tabId, {
@@ -553,9 +587,10 @@ export function App() {
       inputValue: inputValueRef.current,
       scrollTop: scrollAreaRef.current?.scrollTop ?? 0,
     });
-  }, []);
+    persistToSession(tabId);
+  }, [persistToSession]);
 
-  const restoreTabState = useCallback((tabId: number) => {
+  const restoreTabState = useCallback(async (tabId: number): Promise<boolean> => {
     skipScrollRef.current = true;
     const saved = tabStatesRef.current.get(tabId);
     if (saved) {
@@ -575,18 +610,55 @@ export function App() {
       requestAnimationFrame(() => {
         if (scrollAreaRef.current) scrollAreaRef.current.scrollTop = top;
       });
-    } else {
-      setContent(null);
-      resetSectionState();
-      setSummary(null);
-      setChatMessages([]);
-      setRawResponses([]);
-      setActualSystemPrompt('');
-      setNotionUrl(null);
-      setLoading(false);
-      setChatLoading(false);
-      setInputValue('');
+      return true;
     }
+
+    // Fall back to session storage (survives sidepanel close/reopen)
+    try {
+      const persisted = await getPersistedTabState(tabId);
+      if (persisted && persisted.summary) {
+        setContent(persisted.content);
+        setSummary(persisted.summary);
+        setChatMessages(persisted.chatMessages);
+        setRawResponses([]);
+        setActualSystemPrompt('');
+        setConversationLog([]);
+        setRollingSummary('');
+        setNotionUrl(persisted.notionUrl);
+        setLoading(false);
+        setChatLoading(false);
+        setInputValue('');
+        // Populate in-memory cache so subsequent switches are instant
+        tabStatesRef.current.set(tabId, {
+          content: persisted.content,
+          summary: persisted.summary,
+          chatMessages: persisted.chatMessages,
+          rawResponses: [],
+          actualSystemPrompt: '',
+          conversationLog: [],
+          rollingSummary: '',
+          notionUrl: persisted.notionUrl,
+          extractEpoch: 0,
+          loading: false,
+          chatLoading: false,
+          inputValue: '',
+          scrollTop: 0,
+        });
+        return true;
+      }
+    } catch { /* session storage unavailable — proceed fresh */ }
+
+    setContent(null);
+    resetSectionState();
+    setSummary(null);
+    setChatMessages([]);
+    setRawResponses([]);
+    setActualSystemPrompt('');
+    setNotionUrl(null);
+    setLoading(false);
+    setChatLoading(false);
+    setInputValue('');
+    return false;
   }, []);
 
   // Extract content from active tab
@@ -599,6 +671,42 @@ export function App() {
         if (response.tabId && activeTabIdRef.current != null && response.tabId !== activeTabIdRef.current) {
           return;
         }
+
+        const tabId = response.tabId ?? activeTabIdRef.current;
+
+        // Check session storage for persisted state (survives sidepanel close/reopen)
+        if (tabId != null && !summaryRef.current && !tabStatesRef.current.has(tabId)) {
+          try {
+            const persisted = await getPersistedTabState(tabId);
+            if (persisted?.summary && persisted.url === response.data.url) {
+              // Restore from session — use fresh extracted content but persisted summary/chat
+              setContent(response.data);
+              setSummary(persisted.summary);
+              setChatMessages(persisted.chatMessages);
+              setNotionUrl(persisted.notionUrl);
+              // Populate in-memory cache
+              tabStatesRef.current.set(tabId, {
+                content: response.data,
+                summary: persisted.summary,
+                chatMessages: persisted.chatMessages,
+                rawResponses: [],
+                actualSystemPrompt: '',
+                conversationLog: [],
+                rollingSummary: '',
+                notionUrl: persisted.notionUrl,
+                extractEpoch: 0,
+                loading: false,
+                chatLoading: false,
+                inputValue: '',
+                scrollTop: 0,
+              });
+              return;
+            }
+            // URL mismatch — delete stale entry
+            if (persisted) deletePersistedTabState(tabId).catch(() => {});
+          } catch { /* ignore */ }
+        }
+
         setContent(response.data);
         setExtractEpoch((n) => n + 1);
         setSummary(null);
@@ -622,6 +730,7 @@ export function App() {
         setLoading(false);
       }
       tabStatesRef.current.delete(tabId);
+      deletePersistedTabState(tabId).catch(() => {});
     }
     setSummary(null);
     setChatMessages([]);
@@ -693,21 +802,12 @@ export function App() {
     const isUnreachable = (url?: string) =>
       !url || url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('chrome-extension://');
 
-    const switchToTab = (tabId: number) => {
+    const switchToTab = async (tabId: number) => {
       const prevTabId = activeTabIdRef.current;
       saveTabState(prevTabId);
       setActiveTabId(tabId);
-      const cached = tabStatesRef.current.get(tabId);
-      if (cached?.content) {
-        restoreTabState(tabId);
-      } else {
-        setContent(null);
-        setSummary(null);
-        setChatMessages([]);
-        setNotionUrl(null);
-        setLoading(false);
-        setChatLoading(false);
-        setInputValue('');
+      const restored = await restoreTabState(tabId);
+      if (!restored) {
         extractContent();
       }
     };
@@ -746,6 +846,8 @@ export function App() {
       } else if (tabStatesRef.current.has(tabId)) {
         // Background tab navigated — invalidate cache; re-extract on next switch
         tabStatesRef.current.delete(tabId);
+        // Background listener also clears session storage, but clear here for immediate effect
+        deletePersistedTabState(tabId).catch(() => {});
       }
     };
 
@@ -919,7 +1021,7 @@ export function App() {
         ? await autoFixMermaidStepped(
             summaryResponse.data, extractedContent, resolvedTheme,
             (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses,
-            setPendingFix, setConversationLog,
+            setPendingFix, setConversationLog, conversationLogRef.current,
           )
         : await autoFixMermaid(
             summaryResponse.data, extractedContent, resolvedTheme,
@@ -949,6 +1051,8 @@ export function App() {
           }
         }
       }
+      // Persist to session storage so it survives sidepanel close/reopen
+      persistToSession(originTabId);
     } catch (err) {
       // Route failures to chat as assistant messages (silently swallow cancellation)
       const message = err instanceof Error ? err.message : String(err);
@@ -970,7 +1074,7 @@ export function App() {
         if (saved) saved.loading = false;
       }
     }
-  }, [content, resolvedTheme]);
+  }, [content, resolvedTheme, persistToSession]);
 
   const [exporting, setExporting] = useState(false);
   const [duplicateInfo, setDuplicateInfo] = useState<{ pageId: string; pageUrl: string; title: string } | null>(null);
@@ -992,6 +1096,8 @@ export function App() {
       if (response.success && response.url) {
         setNotionUrl(response.url);
         setToast({ message: replacePageId ? 'Updated in Notion!' : 'Exported to Notion!', type: 'success' });
+        // Persist updated notionUrl to session storage
+        persistToSession(activeTabIdRef.current);
       } else {
         setToast({ message: response.error || 'Export failed', type: 'error' });
       }
@@ -1000,7 +1106,7 @@ export function App() {
     } finally {
       setExporting(false);
     }
-  }, [summary, content]);
+  }, [summary, content, persistToSession]);
 
   // Navigate the active browser tab instead of opening new windows
   const handleNavigate = useCallback((url: string) => {
@@ -1105,7 +1211,6 @@ export function App() {
         messages: allMessages,
         summary: summary || emptySummary,
         content,
-        theme: resolvedTheme,
       }) as ChatResponseMessage;
 
       if (!response.success || !response.message) {
@@ -1138,7 +1243,7 @@ export function App() {
       // Auto-fix broken mermaid diagrams in the updated summary
       const fixResult = updatedSummary
         ? debugOpenRef.current
-          ? await autoFixMermaidStepped(updatedSummary, content, resolvedTheme, (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses, setPendingFix, setConversationLog)
+          ? await autoFixMermaidStepped(updatedSummary, content, resolvedTheme, (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses, setPendingFix, setConversationLog, conversationLogRef.current)
           : await autoFixMermaid(updatedSummary, content, resolvedTheme, (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses, setConversationLog)
         : null;
       const fixedJson = fixResult?.summary ?? null;
@@ -1201,8 +1306,10 @@ export function App() {
         const saved = tabStatesRef.current.get(originTabId);
         if (saved) saved.chatLoading = false;
       }
+      // Persist to session storage so it survives sidepanel close/reopen
+      persistToSession(originTabId);
     }
-  }, [summary, content, chatMessages, resolvedTheme]);
+  }, [summary, content, chatMessages, resolvedTheme, persistToSession]);
 
   /** Revert summary to the state before a given user message and truncate chat history. */
   const handleChatRevert = useCallback((messageIndex: number) => {
@@ -1219,7 +1326,8 @@ export function App() {
     setInputValue(target.content);
     setNotionUrl(null);
     setToast({ message: 'Reverted to earlier version', type: 'success' });
-  }, [chatMessages]);
+    persistToSession(activeTabIdRef.current);
+  }, [chatMessages, persistToSession]);
 
   const handleSubmit = useCallback(() => {
     const text = inputValue.trim();
@@ -1537,61 +1645,63 @@ export function App() {
 
         {/* Step-by-step mermaid fix button (debug mode) */}
         {pendingFix && (
-          <div class="no-print" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              flex: 1,
-              font: 'var(--md-sys-typescale-body-small)',
-              color: 'var(--md-sys-color-on-surface-variant)',
-              padding: '8px 12px',
-              borderRadius: 'var(--md-sys-shape-corner-medium)',
-              backgroundColor: 'var(--md-sys-color-error-container)',
-              lineHeight: 1.4,
-            }}>
-              {pendingFix.errors.length} broken diagram{pendingFix.errors.length > 1 ? 's' : ''} — attempt {pendingFix.attempt}/5
-              {pendingFix.errors.map((e, i) => (
-                <div key={i} style={{ marginTop: '4px', fontSize: '11px', opacity: 0.8 }}>
-                  {e.error.slice(0, 120)}{e.error.length > 120 ? '...' : ''}
-                </div>
-              ))}
-            </div>
-            <button
-              onClick={() => {
-                const resolve = (pendingFix as PendingMermaidFix & { _resolve?: () => void })._resolve;
-                if (resolve) resolve();
-              }}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 'var(--md-sys-shape-corner-full)',
-                border: 'none',
-                backgroundColor: 'var(--md-sys-color-primary)',
-                color: 'var(--md-sys-color-on-primary)',
-                font: 'var(--md-sys-typescale-label-medium)',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {pendingFix.attempt <= 4 ? `Fix attempt ${pendingFix.attempt}` : 'Remove broken'}
-            </button>
-            <button
-              onClick={() => {
-                // Skip all remaining attempts — just strip client-side
-                pendingFix.skipped = true;
-                const resolve = (pendingFix as PendingMermaidFix & { _resolve?: () => void })._resolve;
-                if (resolve) resolve();
-              }}
-              style={{
+          <div class="no-print" style={{ padding: '8px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                flex: 1,
+                font: 'var(--md-sys-typescale-body-small)',
+                color: 'var(--md-sys-color-on-surface-variant)',
                 padding: '8px 12px',
-                borderRadius: 'var(--md-sys-shape-corner-full)',
-                border: '1px solid var(--md-sys-color-outline)',
-                backgroundColor: 'transparent',
-                color: 'var(--md-sys-color-on-surface)',
-                font: 'var(--md-sys-typescale-label-medium)',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Skip
-            </button>
+                borderRadius: 'var(--md-sys-shape-corner-medium)',
+                backgroundColor: 'var(--md-sys-color-error-container)',
+                lineHeight: 1.4,
+              }}>
+                {pendingFix.errors.length} broken diagram{pendingFix.errors.length > 1 ? 's' : ''} — attempt {pendingFix.attempt}/5
+                {pendingFix.errors.map((e, i) => (
+                  <div key={i} style={{ marginTop: '4px', fontSize: '11px', opacity: 0.8 }}>
+                    {e.error.slice(0, 120)}{e.error.length > 120 ? '...' : ''}
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  const resolve = (pendingFix as PendingMermaidFix & { _resolve?: () => void })._resolve;
+                  if (resolve) resolve();
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 'var(--md-sys-shape-corner-full)',
+                  border: 'none',
+                  backgroundColor: 'var(--md-sys-color-primary)',
+                  color: 'var(--md-sys-color-on-primary)',
+                  font: 'var(--md-sys-typescale-label-medium)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {pendingFix.attempt <= 4 ? `Fix attempt ${pendingFix.attempt}` : 'Remove broken'}
+              </button>
+              <button
+                onClick={() => {
+                  // Skip all remaining attempts — just strip client-side
+                  pendingFix.skipped = true;
+                  const resolve = (pendingFix as PendingMermaidFix & { _resolve?: () => void })._resolve;
+                  if (resolve) resolve();
+                }}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 'var(--md-sys-shape-corner-full)',
+                  border: '1px solid var(--md-sys-color-outline)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--md-sys-color-on-surface)',
+                  font: 'var(--md-sys-typescale-label-medium)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Skip
+              </button>
+            </div>
           </div>
         )}
 
@@ -2182,10 +2292,6 @@ function DebugPanel({ content, settings, summary, conversationLog, rollingSummar
 
   const totalChars = conversationLog.reduce((sum, m) => sum + m.content.length, 0);
 
-  // Check if extracted document differs from what's in the prompt
-  // (truncated in chat, or chunked in summarization)
-  const promptContainsFullContent = conversationLog.some(m => m.content.includes(content.content));
-
   const labelStyle = {
     font: 'var(--md-sys-typescale-label-medium)',
     color: 'var(--md-sys-color-on-surface-variant)',
@@ -2214,46 +2320,50 @@ function DebugPanel({ content, settings, summary, conversationLog, rollingSummar
         ? (() => {
             const systemMsgs = conversationLog.filter(m => m.role === 'system');
             const nonSystemMsgs = conversationLog.filter(m => m.role !== 'system');
-            const isChat = nonSystemMsgs.some(m => m.role === 'assistant');
+            // Chat mode: 3 system messages (rules, document, summary) + conversation
+            const isChatMode = systemMsgs.length >= 3;
+            if (isChatMode) {
+              const chatLabels = ['System prompt (cached)', 'Document extract', 'Current summary'];
+              return (
+                <>
+                  {systemMsgs.map((m, i) => (
+                    <DebugSection key={`s${i}`} title={`${i + 1}. ${chatLabels[i] || '[system]'}`} content={m.content} />
+                  ))}
+                  {nonSystemMsgs.length > 0 && (
+                    <DebugSection
+                      key="chat"
+                      title={`${systemMsgs.length + 1}. Conversation (${nonSystemMsgs.length} messages)`}
+                      content={nonSystemMsgs.map(m => `[${m.role}]\n${m.content}`).join('\n\n---\n\n')}
+                    />
+                  )}
+                </>
+              );
+            }
+            // Summarization mode: generic system/user layout
             let idx = 0;
             return (
               <>
                 {systemMsgs.map((m, i) => (
                   <DebugSection key={`s${i}`} title={`${++idx}. [system]`} content={m.content} />
                 ))}
-                {isChat
-                  ? nonSystemMsgs.length > 0 && (
-                      <DebugSection
-                        key="chat"
-                        title={`${++idx}. Chat (${nonSystemMsgs.length} messages)`}
-                        content={nonSystemMsgs.map(m => `[${m.role}]\n${m.content}`).join('\n\n---\n\n')}
-                      />
-                    )
-                  : nonSystemMsgs.map((m, i) => (
-                      <DebugSection key={`u${i}`} title={`${++idx}. [${m.role}]`} content={m.content} />
-                    ))
-                }
+                {nonSystemMsgs.map((m, i) => (
+                  <DebugSection key={`u${i}`} title={`${++idx}. [${m.role}]`} content={m.content} />
+                ))}
               </>
             );
           })()
         : <DebugSection title="[system] (preview)" content={previewPrompt} />
       }
 
-      {/* --- Bonus sections --- */}
-      {((!promptContainsFullContent && conversationLog.length > 0) || rollingSummary || summary) && (
+      {/* --- Reference sections (not part of the LLM prompt) --- */}
+      {(rollingSummary || summary) && (
         <div style={dividerStyle} />
-      )}
-      {(!promptContainsFullContent && conversationLog.length > 0) && (
-        <div style={labelStyle}>Additional context</div>
-      )}
-      {!promptContainsFullContent && conversationLog.length > 0 && (
-        <DebugSection title="Full Extracted Document" content={content.content} />
       )}
       {rollingSummary && (
         <DebugSection title="Pre-summarized Document" content={rollingSummary} />
       )}
       {summary && (
-        <DebugSection title="Summary Result" content={JSON.stringify(summary, null, 2)} />
+        <DebugSection title="Summary Result (local)" content={JSON.stringify(summary, null, 2)} />
       )}
     </div>
   );

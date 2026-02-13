@@ -106,22 +106,6 @@ a --- b        %% line (no arrow)
 a -->|Label| b %% arrow with text
 ```
 
-## Styling
-
-### Individual Block Styling
-
-```
-style a fill:#ff9999,stroke:#333,color:#fff
-style b fill:#99ccff,stroke:#333,color:#fff
-```
-
-### Class-Based Styling
-
-```
-classDef blue fill:#0099ff,stroke:#005599,color:#fff
-class a blue
-```
-
 ## Comments
 
 ```

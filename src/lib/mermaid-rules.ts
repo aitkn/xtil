@@ -61,34 +61,9 @@ export const MERMAID_ESSENTIAL_RULES = `## MERMAID SYNTAX RULES
 | C4 architecture model | \`C4Context\` / \`C4Container\` / \`C4Component\` / \`C4Deployment\` |
 
 ## MERMAID COLORS & LEGENDS
-IMPORTANT! Custom colors MUST be applied! Apply them with YAML frontmatter. Without custom colors they will look wrong AND the colors will not match the legend. CRITICAL: the top-level key MUST be \`config:\` — putting \`theme:\` at the top level is WRONG and will be ignored.
-
-**Correct frontmatter structure** (note \`config:\` wrapper):
-\`\`\`
----
-config:
-  theme: base
-  themeVariables:
-    ...
----
-\`\`\`
-WRONG (missing config:): \`--- theme: base ... ---\`. ALWAYS nest under \`config:\`.
-
-**themeVariables by diagram type:**
-- **xychart-beta**: \`xyChart: { plotColorPalette: "#4472C4, #ED7D31, #2CA02C" }\`
-- **pie**: \`pie1: "#4472C4", pie2: "#ED7D31"\` (pie1–pie12 per slice)
-- **gantt**: \`taskBkgColor: "#4472C4", activeTaskBkgColor: "#2CA02C", critBkgColor: "#E00000", doneTaskBkgColor: "#999"\`
-- **sequence**: \`actorBkg: "#4472C4", actorTextColor: "#fff", signalColor: "#333", noteBkgColor: "#2CA02C"\`
-- **quadrantChart**: \`quadrant1Fill: "#2CA02C", quadrant2Fill: "#4472C4", quadrant3Fill: "#ED7D31", quadrant4Fill: "#E00000"\`
-- **timeline**: \`cScale0: "#4472C4", cScale1: "#ED7D31", cScale2: "#2CA02C"\`
-- **flowchart** — use \`classDef\` in diagram body, NOT frontmatter: \`classDef blue fill:#4472C4,stroke:#333,color:#fff\` then \`A[Node]:::blue\`
-
-**Legend rules (CRITICAL — colors and count must match the chart data):**
-- **pie**: has built-in legend — no legend needed.
-- **All other diagram types**: add a Markdown legend line BELOW the closing \`\`\` of the mermaid block.
-- The legend MUST have exactly the same number of items as data series/categories in the chart, using matching colors.
-- Example for 3 series: \`🟦 Series A · 🟧 Series B · 🟩 Series C\`
-- If the chart has 5 bars, the legend must list all 5 with matching color squares.`;
+- Do NOT add YAML frontmatter with config/theme/themeVariables — colors are applied automatically.
+- Do NOT add emoji legend lines (🟦 🟧 etc.) below diagrams — legends are generated automatically.
+- For flowchart node styling, classDef in diagram body is still allowed.`;
 
 /**
  * Map from mermaid diagram keyword → raw doc content.
@@ -163,18 +138,10 @@ export function annotateMermaidErrors(
 }
 
 /**
- * Get recovery documentation for broken diagrams: relevant cheatsheets + optional styling docs.
+ * Get recovery documentation for broken diagrams: relevant cheatsheets.
  */
 export function getRecoveryDocs(errors: Array<{ source: string; error: string }>): string {
-  const cheatsheet = getRelevantCheatsheet(errors.map(e => e.source));
-  // If any error mentions style/config issues, append styling docs
-  const needsStyling = errors.some(e =>
-    /style|config|theme|class|css/i.test(e.error),
-  );
-  const stylingDocs = needsStyling && mermaidDocFiles['styling']
-    ? '\n\n---\n\nMermaid Styling Reference:\n\n' + mermaidDocFiles['styling']
-    : '';
-  return cheatsheet + stylingDocs;
+  return getRelevantCheatsheet(errors.map(e => e.source));
 }
 
 /**

@@ -63,18 +63,6 @@ kanban
 | `ticket` | Links to ticket/issue | Ticket number |
 | `priority` | Task urgency | `Very High`, `High`, `Low`, `Very Low` |
 
-## Configuration
-
-```yaml
----
-config:
-  kanban:
-    ticketBaseUrl: 'https://yourproject.atlassian.net/browse/#TICKET#'
----
-```
-
-`ticketBaseUrl` creates clickable ticket links by replacing `#TICKET#` with the actual ticket value from metadata.
-
 ## Important Notes
 
 - All identifiers must be unique throughout the diagram

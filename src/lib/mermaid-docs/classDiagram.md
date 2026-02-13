@@ -163,38 +163,6 @@ note "General note\nline2"
 note for ClassName "Specific note\nline2"
 ```
 
-## Styling
-
-### Individual Node
-```
-style Animal fill:#f9f,stroke:#333,stroke-width:4px
-```
-
-### Class Definition
-```
-classDef className fill:#f9f,stroke:#333,stroke-width:4px
-class A,B className
-A:::className   %% shorthand
-```
-
-### Default Class
-```
-classDef default fill:#f9f,stroke:#333,stroke-width:4px
-```
-
-## Interactions
-
-```
-click className call callback() "tooltip"
-click className href "url" "tooltip"
-```
-
-Disabled at `securityLevel='strict'`.
-
-## Configuration
-
-Set `hideEmptyMembersBox: true` to hide empty member compartments.
-
 ## Comments
 
 ```

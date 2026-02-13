@@ -59,17 +59,6 @@ mindmap
 
 This feature is experimental.
 
-## CSS Classes
-
-```
-mindmap
-    Root
-        Normal node
-        Important:::urgent
-```
-
-Multiple classes are space-separated. Classes must be defined by site administrators.
-
 ## Markdown Strings
 
 Supports bold, italics, and automatic text wrapping:
@@ -84,22 +73,3 @@ mindmap
 - Bold: `**text**`
 - Italic: `*text*`
 - Newlines work directly (no `<br>` needed)
-
-## Tidy Tree Layout (v11.10+)
-
-```
----
-config:
-  layout: tidy-tree
----
-mindmap
-    root((Root))
-        Child1
-        Child2
-```
-
-## Configuration Options
-
-- `layoutAlgorithm`: Algorithm selection
-- `maxNodeWidth`: Maximum node width
-- `padding`: Spacing parameters
