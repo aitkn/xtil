@@ -574,11 +574,9 @@ function extractCommit(url: string, doc: Document): ExtractedContent {
   const commitTitle = textOf(titleEl) || 'Commit';
   // Gather ALL .commit-desc elements (GitHub may split the extended message across multiple containers)
   const descEls = doc.querySelectorAll('.commit-desc');
-  const commitDescParts: string[] = [];
-  for (const el of descEls) {
-    const text = markdownBodyToText(el) || textOf(el);
-    if (text) commitDescParts.push(text);
-  }
+  const commitDescParts = Array.from(descEls)
+    .map(el => markdownBodyToText(el) || textOf(el))
+    .filter(Boolean) as string[];
   // Fallback: try modern GitHub selectors if .commit-desc yielded nothing
   if (commitDescParts.length === 0) {
     const altDesc = doc.querySelector('.commit-message-container .comment-body, .commit-message-container .markdown-body');
