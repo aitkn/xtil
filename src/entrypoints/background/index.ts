@@ -12,7 +12,7 @@ import type { ChatMessage, ImageContent, VisionSupport, LLMProvider } from '@/li
 import type { SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent } from '@/lib/extractors/types';
 import { parseRedditJson, buildRedditMarkdown } from '@/lib/extractors/reddit';
-import { getPersistedTabState, deletePersistedTabState } from '@/lib/storage/tab-state';
+import { getPersistedTabState, deletePersistedTabState, pruneStaleTabStates } from '@/lib/storage/tab-state';
 
 // Persist images across service worker restarts via chrome.storage.session
 const chromeStorage = () => (globalThis as unknown as { chrome: { storage: typeof chrome.storage } }).chrome.storage;
@@ -55,6 +55,9 @@ export default defineBackground(() => {
       return true; // keep channel open for async response
     },
   );
+
+  // Prune stale tab states on service worker startup (handles extension reload, missed events)
+  pruneStaleTabStates().catch(() => {});
 
   // Clean up persisted tab state when a tab is closed
   chromeObj.tabs.onRemoved.addListener((tabId: number) => {

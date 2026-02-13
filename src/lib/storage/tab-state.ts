@@ -45,3 +45,23 @@ export async function clearAllPersistedTabStates(): Promise<void> {
     await chromeStorage().session.remove(keys);
   }
 }
+
+/** Remove entries whose tab IDs no longer exist. Call on service worker startup. */
+export async function pruneStaleTabStates(): Promise<void> {
+  const chromeTabs = (globalThis as unknown as { chrome: { tabs: typeof chrome.tabs } }).chrome.tabs;
+  const all = await chromeStorage().session.get(null);
+  const keys = Object.keys(all).filter(k => k.startsWith(PREFIX));
+  if (keys.length === 0) return;
+
+  const tabs = await chromeTabs.query({});
+  const liveTabIds = new Set(tabs.map(t => t.id));
+
+  const stale = keys.filter(k => {
+    const tabId = parseInt(k.slice(PREFIX.length), 10);
+    return !liveTabIds.has(tabId);
+  });
+
+  if (stale.length > 0) {
+    await chromeStorage().session.remove(stale);
+  }
+}
