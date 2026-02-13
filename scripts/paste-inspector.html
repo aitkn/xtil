@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>Paste Inspector</title></head>
+<body style="font-family:sans-serif;margin:20px">
+  <h3>Ctrl+V below to see raw clipboard HTML</h3>
+  <div contenteditable="true" id="target" style="border:2px solid #999;padding:16px;min-height:100px;margin-bottom:16px;border-radius:8px">Click here, then Ctrl+V</div>
+  <h3>Raw HTML:</h3>
+  <pre id="output" style="background:#f4f4f4;padding:16px;white-space:pre-wrap;word-break:break-all;border-radius:8px;max-height:600px;overflow:auto"></pre>
+  <script>
+    document.getElementById('target').addEventListener('paste', function(e) {
+      e.preventDefault();
+      var html = e.clipboardData.getData('text/html');
+      var text = e.clipboardData.getData('text/plain');
+      document.getElementById('output').textContent =
+        '=== text/html ===\n' + (html || '(empty)') +
+        '\n\n=== text/plain ===\n' + (text || '(empty)');
+    });
+  </script>
+</body>
+</html>
