@@ -897,10 +897,14 @@ const STATUS_LABELS = Object.keys(STATUS_BADGES).sort((a, b) => b.length - a.len
 
 /** Split TL;DR text into body and an optional status line (detected by **Status:** pattern) */
 function splitTldrStatus(tldr: string): { body: string; statusLabel: string | null; statusText: string | null } {
-  const match = tldr.match(/\n\n\*\*Status:\*\*\s*(.*?)$/s);
+  // Accept both \n and \n\n before **Status:** (LLMs sometimes use a single newline)
+  const match = tldr.match(/\n\n?\*\*Status:\*\*\s*(.*?)$/s);
   if (!match) return { body: tldr, statusLabel: null, statusText: null };
 
   let rest = match[1].trim();
+  // Strip markdown bold/italic wrapping from label: "**Needs attention** — text" → "Needs attention — text"
+  rest = rest.replace(/^\*{1,2}(.+?)\*{1,2}(?=\s*[—–\-:]|\s*$)/, '$1').trim();
+
   // Try to extract a known status label from the beginning
   const lower = rest.toLowerCase();
   for (const label of STATUS_LABELS) {
