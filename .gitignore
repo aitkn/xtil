@@ -7,4 +7,5 @@ node_modules/
 .playwright-user-data/
 demo-output/
 *.zip
-website/
+website/verify-*.png
+website/check-*.png

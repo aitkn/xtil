@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>xTil Mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    [data-theme="dark"] {
+      --md-sys-color-primary: #b4c5ff;
+      --md-sys-color-on-primary: #0a2463;
+      --md-sys-color-primary-container: #1a3a8a;
+      --md-sys-color-on-primary-container: #dbe4ff;
+      --md-sys-color-secondary-container: #3a3d52;
+      --md-sys-color-on-secondary-container: #e0e1f5;
+      --md-sys-color-surface: #1a1c1e;
+      --md-sys-color-surface-container: #212326;
+      --md-sys-color-surface-container-low: #1e2023;
+      --md-sys-color-surface-container-high: #2b2d31;
+      --md-sys-color-surface-container-highest: #363840;
+      --md-sys-color-on-surface: #e3e2e6;
+      --md-sys-color-on-surface-variant: #c4c6d0;
+      --md-sys-color-outline: #8e9099;
+      --md-sys-color-outline-variant: #44474e;
+      --md-sys-color-error: #ffb4ab;
+      --md-sys-color-error-container: #93000a;
+      --md-sys-color-on-error-container: #ffdad6;
+      --md-sys-color-success: #4ade80;
+      --md-sys-color-success-container: #052e16;
+      --md-sys-color-on-success-container: #dcfce7;
+      --md-sys-color-warning: #fbbf24;
+      --md-sys-color-warning-container: #78350f;
+      --md-sys-color-on-warning-container: #fef3c7;
+      --md-sys-color-info-container: #1a3a8a;
+      --md-sys-color-on-info-container: #dbe4ff;
+      --md-sys-color-inverse-surface: #e3e2e6;
+      --md-sys-color-inverse-on-surface: #2f3033;
+      --md-sys-color-scrim: rgba(0,0,0,0.6);
+    }
+
+    [data-theme="light"] {
+      --md-sys-color-primary: #1a56db;
+      --md-sys-color-on-primary: #ffffff;
+      --md-sys-color-primary-container: #dbe4ff;
+      --md-sys-color-on-primary-container: #0a2463;
+      --md-sys-color-secondary-container: #e8eaf6;
+      --md-sys-color-on-secondary-container: #1a1c2e;
+      --md-sys-color-surface: #ffffff;
+      --md-sys-color-surface-container: #f3f4f6;
+      --md-sys-color-surface-container-low: #f9fafb;
+      --md-sys-color-surface-container-high: #eef0f4;
+      --md-sys-color-surface-container-highest: #e5e7eb;
+      --md-sys-color-on-surface: #1a1c1e;
+      --md-sys-color-on-surface-variant: #44474e;
+      --md-sys-color-outline: #74777f;
+      --md-sys-color-outline-variant: #c4c6d0;
+      --md-sys-color-error: #ba1a1a;
+      --md-sys-color-error-container: #ffdad6;
+      --md-sys-color-on-error-container: #410002;
+      --md-sys-color-success: #16a34a;
+      --md-sys-color-success-container: #dcfce7;
+      --md-sys-color-on-success-container: #052e16;
+      --md-sys-color-warning: #b45309;
+      --md-sys-color-warning-container: #fef3c7;
+      --md-sys-color-on-warning-container: #78350f;
+      --md-sys-color-info-container: #dbe4ff;
+      --md-sys-color-on-info-container: #0a2463;
+    }
+
+    :root {
+      --md-sys-shape-corner-small: 8px;
+      --md-sys-shape-corner-medium: 12px;
+      --font-stack: 'Inter', system-ui, sans-serif;
+      --md-sys-typescale-title-small: 600 13px/18px var(--font-stack);
+      --md-sys-typescale-body-large: 400 15px/22px var(--font-stack);
+      --md-sys-typescale-body-medium: 400 13px/20px var(--font-stack);
+      --md-sys-typescale-body-small: 400 12px/16px var(--font-stack);
+      --md-sys-typescale-label-medium: 500 12px/16px var(--font-stack);
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #0b0918;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 60px;
+    }
+
+    /* Each mockup is a "phone" frame */
+    .mockup-frame {
+      width: 480px;
+      background: var(--md-sys-color-surface);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+    .mockup-label {
+      color: #8577ff;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      letter-spacing: 0.05em;
+    }
+
+    /* Extension header bar */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--md-sys-color-outline-variant);
+      background: var(--md-sys-color-surface);
+    }
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font: var(--md-sys-typescale-title-small);
+      color: var(--md-sys-color-on-surface);
+    }
+    .header-title img { width: 20px; height: 20px; }
+    .header-actions { display: flex; gap: 4px; }
+    .header-actions button {
+      background: none;
+      border: none;
+      color: var(--md-sys-color-on-surface-variant);
+      padding: 6px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    /* Sections */
+    .content-area { padding: 0; overflow: hidden; }
+    .summary-section { margin-bottom: 0; position: relative; }
+    .section-toggle {
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: left;
+      padding: 10px 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font: var(--md-sys-typescale-title-small);
+      color: var(--md-sys-color-on-surface);
+      user-select: text;
+    }
+    .section-toggle .arrow {
+      font-size: 10px;
+      color: var(--md-sys-color-on-surface-variant);
+      transition: transform 0.15s;
+    }
+    .section-toggle .arrow.open { transform: rotate(90deg); }
+    .section-content { padding: 0 14px 12px; }
+
+    /* Summary callout */
+    .summary-callout {
+      background: var(--md-sys-color-info-container);
+      color: var(--md-sys-color-on-info-container);
+      border-left: 3px solid var(--md-sys-color-primary);
+      border-radius: var(--md-sys-shape-corner-small);
+      padding: 10px 12px;
+      margin: 2px 0;
+      font: var(--md-sys-typescale-body-large);
+      line-height: 1.5;
+    }
+    .summary-callout-conclusion {
+      background: var(--md-sys-color-surface-container);
+      border-left: 3px solid var(--md-sys-color-outline);
+      border-radius: var(--md-sys-shape-corner-small);
+      padding: 10px 12px;
+      margin: 2px 0;
+      font: var(--md-sys-typescale-body-medium);
+      line-height: 1.5;
+      color: var(--md-sys-color-on-surface);
+    }
+
+    /* Key Takeaways */
+    ol.takeaways {
+      padding-left: 24px;
+      font: var(--md-sys-typescale-body-medium);
+      line-height: 1.6;
+      color: var(--md-sys-color-on-surface);
+    }
+    ol.takeaways li { margin-bottom: 4px; padding-left: 4px; }
+    ol.takeaways strong { font-weight: 600; }
+
+    /* Summary body markdown */
+    .summary-md {
+      font: var(--md-sys-typescale-body-medium);
+      line-height: 1.6;
+      color: var(--md-sys-color-on-surface);
+    }
+    .summary-md p { margin: 6px 0; }
+    .summary-md strong { font-weight: 600; }
+    .summary-md a { color: var(--md-sys-color-primary); text-decoration: none; }
+
+    /* Notable Quotes */
+    blockquote.quote {
+      border-left: 3px solid var(--md-sys-color-outline-variant);
+      padding-left: 12px;
+      margin: 8px 0;
+      color: var(--md-sys-color-on-surface-variant);
+      font: var(--md-sys-typescale-body-medium);
+      font-style: italic;
+    }
+
+    /* Fact Check */
+    .fact-md {
+      font: var(--md-sys-typescale-body-medium);
+      line-height: 1.5;
+      color: var(--md-sys-color-on-surface);
+    }
+    .fact-md p { margin: 4px 0; }
+
+    /* Pros & Cons */
+    .pros-cons-grid { display: flex; gap: 8px; font: var(--md-sys-typescale-body-medium); }
+    .pros-card {
+      flex: 1;
+      background: var(--md-sys-color-success-container);
+      color: var(--md-sys-color-on-success-container);
+      border-radius: var(--md-sys-shape-corner-small);
+      padding: 8px 10px;
+    }
+    .cons-card {
+      flex: 1;
+      background: var(--md-sys-color-error-container);
+      color: var(--md-sys-color-on-error-container);
+      border-radius: var(--md-sys-shape-corner-small);
+      padding: 8px 10px;
+    }
+    .pros-card strong, .cons-card strong { display: block; margin-bottom: 4px; }
+    .pros-card ul, .cons-card ul { padding-left: 16px; margin-top: 4px; }
+    .pros-card li, .cons-card li { margin: 2px 0; }
+
+    /* Related Topics */
+    .related-chip {
+      display: inline-block;
+      background: #e8edf8;
+      color: #1a3c8a;
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      text-decoration: none;
+      cursor: pointer;
+      margin: 0 6px 6px 0;
+    }
+    [data-theme="dark"] .related-chip {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+    }
+
+    /* Status badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font: var(--md-sys-typescale-label-medium);
+      font-weight: 600;
+    }
+    .status-badge.open {
+      background: var(--md-sys-color-success-container);
+      color: var(--md-sys-color-success);
+    }
+    .status-badge.merged {
+      background: rgba(167, 139, 250, 0.15);
+      color: #a78bfa;
+    }
+    .status-line {
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: var(--md-sys-shape-corner-medium);
+      background: var(--md-sys-color-surface-container);
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font: var(--md-sys-typescale-body-medium);
+      line-height: 1.4;
+    }
+
+    /* Chat area — matches real extension exactly */
+    .chat-area {
+      padding: 8px 16px 16px;
+    }
+    .chat-label {
+      font: var(--md-sys-typescale-label-medium);
+      color: var(--md-sys-color-on-surface-variant);
+      padding: 8px 0;
+      margin-bottom: 4px;
+      border-top: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .chat-msg {
+      position: relative;
+      margin-bottom: 8px;
+      max-width: 90%;
+    }
+    .chat-msg .bubble {
+      padding: 10px 14px;
+      border-radius: var(--md-sys-shape-corner-medium);
+      font: var(--md-sys-typescale-body-medium);
+      line-height: 1.5;
+    }
+    .chat-msg-user {
+      margin-left: auto;
+      margin-right: 0;
+      width: fit-content;
+    }
+    .chat-msg-user .bubble {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
+    .chat-msg-ai {
+      margin-left: 0;
+      margin-right: auto;
+    }
+    .chat-msg-ai .bubble {
+      background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface);
+    }
+    .chat-msg-ai .bubble strong { font-weight: 600; }
+    .revert-btn {
+      position: absolute;
+      top: -6px;
+      left: -6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      background: var(--md-sys-color-surface-container-highest);
+      color: var(--md-sys-color-on-surface);
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      padding: 0;
+      line-height: 1;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .update-dot {
+      position: absolute;
+      bottom: -3px;
+      left: -3px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--md-sys-color-primary);
+    }
+    .chat-input-bar {
+      padding: 8px 16px;
+      background: var(--md-sys-color-surface-container-low);
+      border-top: 1px solid var(--md-sys-color-outline-variant);
+      box-shadow: 0 -1px 3px rgba(0,0,0,0.08);
+    }
+    .chat-input-wrap {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      background: var(--md-sys-color-surface-container);
+      border-radius: 16px;
+      padding: 4px 4px 4px 16px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .chat-input {
+      flex: 1;
+      height: 36px;
+      padding: 8px 0;
+      border: none;
+      background: transparent;
+      font: var(--md-sys-typescale-body-medium);
+      color: var(--md-sys-color-on-surface);
+      resize: none;
+      outline: none;
+      overflow: hidden;
+      line-height: 20px;
+    }
+    .chat-send {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--md-sys-color-primary);
+      border: none;
+      color: var(--md-sys-color-on-primary);
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Mermaid diagram placeholder */
+    .mermaid-container {
+      background: var(--md-sys-color-surface-container);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-medium);
+      padding: 16px 12px;
+      margin: 8px 0;
+      text-align: center;
+    }
+    .mermaid-container svg { max-width: 100%; }
+
+    /* Version pills */
+    .version-bar {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      padding: 8px 14px;
+      font: var(--md-sys-typescale-body-small);
+      color: var(--md-sys-color-on-surface-variant);
+      border-top: 1px solid var(--md-sys-color-outline-variant);
+    }
+    .version-pill {
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: var(--md-sys-color-surface-container-high);
+      cursor: pointer;
+      font: var(--md-sys-typescale-label-medium);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    .version-pill.active {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ MOCKUP 1: Full summary (article) ═══ -->
+<div>
+  <div class="mockup-label">SCENE 1 — Article Summary (Dark)</div>
+  <div class="mockup-frame" id="scene-summary">
+    <div class="header-bar">
+      <div class="header-title">
+        <img src="public/icon.svg" alt="xTil"> xTil
+      </div>
+      <div class="header-actions">
+        <button title="Copy">&#128203;</button>
+        <button title="Export">&#8599;</button>
+        <button title="Settings">&#9881;</button>
+      </div>
+    </div>
+    <div class="content-area">
+      <!-- TL;DR -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> TL;DR
+        </button>
+        <div class="section-content">
+          <div class="summary-callout">
+            Quantum computing uses <strong>qubits in superposition</strong> to perform calculations exponentially faster than classical bits. Current systems have exceeded 1,000 qubits, but practical <strong>error correction</strong> remains the key challenge before real-world applications become viable.
+          </div>
+        </div>
+      </div>
+
+      <!-- Key Takeaways -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Key Takeaways
+        </button>
+        <div class="section-content">
+          <ol class="takeaways">
+            <li><strong>Superposition advantage</strong> — qubits exist as 0 and 1 simultaneously, enabling parallel computation across exponentially many states</li>
+            <li><strong>Error correction bottleneck</strong> — IBM's 1,121-qubit Condor and Google's Sycamore have surpassed milestones, but noisy intermediate-scale quantum (NISQ) devices remain impractical</li>
+            <li><strong>Near-term impact areas</strong> — cryptography (Shor's algorithm vs RSA), drug discovery, materials science, and combinatorial optimization</li>
+            <li><strong>Market trajectory</strong> — the global quantum computing market is projected to reach $65 billion by 2030</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Summary
+        </button>
+        <div class="section-content">
+          <div class="summary-md">
+            <p>Quantum mechanics enables a fundamentally different approach to computation. Unlike <strong>classical bits</strong> that exist as 0 or 1, <strong>qubits</strong> exploit superposition to represent both states simultaneously, allowing quantum computers to explore many solutions in parallel.</p>
+            <p>Current hardware from <strong>IBM</strong> (Condor, 1,121 qubits) and <strong>Google</strong> (Sycamore) has surpassed major milestones. However, the real bottleneck is <strong>error correction</strong> — NISQ devices still produce too many errors for most practical applications.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notable Quotes -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Notable Quotes
+        </button>
+        <div class="section-content">
+          <blockquote class="quote">"We are now at the stage where quantum computers can do things that classical computers cannot."<br><span style="font-style:normal;font-size:12px;color:var(--md-sys-color-outline);">— Dr. John Preskill, Caltech</span></blockquote>
+          <blockquote class="quote">"Error correction is the bridge between quantum toys and quantum tools."<br><span style="font-style:normal;font-size:12px;color:var(--md-sys-color-outline);">— IBM Research</span></blockquote>
+        </div>
+      </div>
+
+      <!-- Fact Check -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Fact Check
+        </button>
+        <div class="section-content">
+          <div class="fact-md">
+            <p>&#9989; <strong>Verified</strong> — IBM's Condor processor reached 1,121 qubits in December 2023</p>
+            <p>&#9888;&#65039; <strong>Contested</strong> — Google's "quantum supremacy" claim is disputed; classical simulation techniques have narrowed the gap significantly</p>
+            <p>&#9989; <strong>Verified</strong> — Shor's algorithm can theoretically break RSA encryption given a sufficiently large, fault-tolerant quantum computer</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pros & Cons -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Pros &amp; Cons
+        </button>
+        <div class="section-content">
+          <div class="pros-cons-grid">
+            <div class="pros-card">
+              <strong>Pros</strong>
+              <ul>
+                <li>Exponential speedup for optimization problems</li>
+                <li>Drug discovery and materials science breakthroughs</li>
+                <li>Quantum key distribution for unbreakable encryption</li>
+              </ul>
+            </div>
+            <div class="cons-card">
+              <strong>Cons</strong>
+              <ul>
+                <li>Error rates still too high for practical use</li>
+                <li>Requires cooling to near absolute zero</li>
+                <li>Very limited real-world applications today</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conclusion -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Conclusion
+        </button>
+        <div class="section-content">
+          <div class="summary-callout-conclusion">
+            Quantum computing has moved from theoretical curiosity to engineering challenge. While today's machines cannot yet replace classical computers for most tasks, the trajectory suggests practical quantum advantage within the next decade — particularly in materials science, cryptography, and combinatorial optimization.
+          </div>
+        </div>
+      </div>
+
+      <!-- Related Topics -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Related Topics
+        </button>
+        <div class="section-content">
+          <span class="related-chip">Quantum Error Correction</span>
+          <span class="related-chip">Shor's Algorithm</span>
+          <span class="related-chip">Post-Quantum Cryptography</span>
+          <span class="related-chip">IBM Quantum</span>
+          <span class="related-chip">Qubit Decoherence</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MOCKUP 2: YouTube summary ═══ -->
+<div>
+  <div class="mockup-label">SCENE 2 — YouTube Video (Dark)</div>
+  <div class="mockup-frame" id="scene-youtube">
+    <div class="header-bar">
+      <div class="header-title">
+        <img src="public/icon.svg" alt="xTil"> xTil
+      </div>
+      <div class="header-actions">
+        <button>&#128203;</button>
+        <button>&#8599;</button>
+        <button>&#9881;</button>
+      </div>
+    </div>
+    <div class="content-area">
+      <!-- YouTube metadata header -->
+      <div style="padding:10px 14px;">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+          <span style="font:500 10px/14px var(--font-stack);text-transform:uppercase;letter-spacing:0.05em;padding:2px 8px;border-radius:6px;background:var(--md-sys-color-error-container);color:var(--md-sys-color-on-error-container);">YOUTUBE</span>
+        </div>
+        <img src="https://i.ytimg.com/vi/KKNCiRWd_j0/hqdefault.jpg" alt="thumbnail" style="width:100%;border-radius:var(--md-sys-shape-corner-medium);margin-bottom:8px;display:block;aspect-ratio:16/9;object-fit:cover;background:#2b2d31;">
+        <div style="font:600 16px/1.3 var(--font-stack);color:var(--md-sys-color-on-surface);margin:4px 0;">AI Is Turning Into Something Totally New</div>
+        <div style="font:400 12px/16px var(--font-stack);color:var(--md-sys-color-on-surface-variant);display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
+          <span>By TED</span>
+          <span>&#183;</span>
+          <span>14:31</span>
+          <span>&#183;</span>
+          <span>3,842,109 views</span>
+          <span>&#183;</span>
+          <span>Oct 8, 2024</span>
+        </div>
+      </div>
+      <!-- TL;DR -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> TL;DR
+        </button>
+        <div class="section-content">
+          <div class="summary-callout">
+            AI agents are evolving from simple chatbot assistants to <strong>autonomous multi-step systems</strong> capable of browsing the web, writing and executing code, and orchestrating complex workflows. The key challenges are <strong>reliability</strong> (agents fail silently) and <strong>safety</strong> (unrestricted tool access).
+          </div>
+        </div>
+      </div>
+      <!-- Key Takeaways -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Key Takeaways
+        </button>
+        <div class="section-content">
+          <ol class="takeaways">
+            <li><strong>Three waves of AI</strong> — chatbots (2023), copilots (2024), and fully autonomous agents (2025+) (<a href="#" style="color:var(--md-sys-color-primary);">2:14</a>)</li>
+            <li><strong>Tool use is the differentiator</strong> — agents that can browse, code, and call APIs vastly outperform text-only models (<a href="#" style="color:var(--md-sys-color-primary);">7:42</a>)</li>
+            <li><strong>Reliability gap</strong> — current agents succeed ~60-70% of the time on complex tasks; human-in-the-loop is still essential (<a href="#" style="color:var(--md-sys-color-primary);">12:30</a>)</li>
+            <li><strong>Memory is the bottleneck</strong> — long-running agents lose context; RAG and summarization help but don't fully solve it (<a href="#" style="color:var(--md-sys-color-primary);">16:55</a>)</li>
+            <li><strong>Safety frameworks</strong> — sandboxing, permission systems, and human approval gates are becoming standard (<a href="#" style="color:var(--md-sys-color-primary);">20:08</a>)</li>
+          </ol>
+        </div>
+      </div>
+      <!-- Summary -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Summary
+        </button>
+        <div class="section-content">
+          <div class="summary-md">
+            <p>The video traces the evolution of AI systems from simple <strong>chatbots</strong> (prompt in, text out) through <strong>copilots</strong> (integrated into workflows like coding and writing) to the emerging paradigm of <strong>autonomous agents</strong> that can plan, execute multi-step tasks, and recover from errors.</p>
+            <p>Key technical advances include <strong>function calling</strong> (letting models invoke tools), <strong>chain-of-thought reasoning</strong> for complex planning, and <strong>multi-agent architectures</strong> where specialized agents collaborate on subtasks.</p>
+            <p>The presenter argues that the biggest unsolved problem is <strong>reliability at scale</strong> — while agents can handle 90% of individual steps correctly, a 10-step workflow has only a 35% chance of end-to-end success. This makes <strong>human oversight</strong> and graceful failure handling critical.</p>
+          </div>
+        </div>
+      </div>
+      <!-- Notable Quotes -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Notable Quotes
+        </button>
+        <div class="section-content">
+          <blockquote class="quote">"The real breakthrough isn't making AI smarter — it's making AI reliable enough that you can trust it to run while you sleep." (<a href="#" style="color:var(--md-sys-color-primary);">14:22</a>)</blockquote>
+          <blockquote class="quote">"We're moving from AI that answers questions to AI that gets things done." (<a href="#" style="color:var(--md-sys-color-primary);">3:45</a>)</blockquote>
+        </div>
+      </div>
+      <!-- Fact Check -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Fact Check
+        </button>
+        <div class="section-content">
+          <div class="fact-md">
+            <p>&#9989; <strong>Verified</strong> — GPT-4 with function calling was released March 2023, enabling the first wave of tool-using agents</p>
+            <p>&#9989; <strong>Verified</strong> — SWE-bench evaluations show current agents resolve ~40-50% of real GitHub issues autonomously</p>
+            <p>&#9888;&#65039; <strong>Contested</strong> — The "35% end-to-end success" figure varies widely depending on task complexity and evaluation methodology</p>
+          </div>
+        </div>
+      </div>
+      <!-- Conclusion -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Conclusion
+        </button>
+        <div class="section-content">
+          <div class="summary-callout-conclusion">
+            AI agents represent the next major paradigm shift after chatbots. While reliability and safety challenges remain, the trajectory is clear: within 2-3 years, autonomous agents will handle routine knowledge work end-to-end. The winners will be systems that combine autonomy with transparent human oversight.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MOCKUP 3: GitHub PR with class diagram ═══ -->
+<div>
+  <div class="mockup-label">SCENE 3 — GitHub PR + Diagram (Dark)</div>
+  <div class="mockup-frame" id="scene-github">
+    <div class="header-bar">
+      <div class="header-title">
+        <img src="public/icon.svg" alt="xTil"> xTil
+      </div>
+      <div class="header-actions">
+        <button>&#128203;</button>
+        <button>&#8599;</button>
+        <button>&#9881;</button>
+      </div>
+    </div>
+    <div class="content-area">
+      <div style="padding:10px 14px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="font:500 10px/14px var(--font-stack);text-transform:uppercase;letter-spacing:0.05em;padding:2px 8px;border-radius:6px;background:rgba(167,139,250,0.15);color:#a78bfa;">GITHUB PR</span>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> TL;DR
+        </button>
+        <div class="section-content">
+          <div class="summary-callout">
+            This PR adds <strong>OAuth2 login flow</strong> with Google and GitHub providers, replacing the existing email/password authentication. Includes token refresh, session management, and a new <code style="background:rgba(255,255,255,0.1);padding:1px 4px;border-radius:3px;font-size:12px;">/auth/callback</code> endpoint.
+            <div class="status-line">
+              <span class="status-badge open">&#9679; Open</span>
+              <span style="color:var(--md-sys-color-on-surface);">Ready to merge — all checks pass, 2 approvals</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Key Takeaways
+        </button>
+        <div class="section-content">
+          <ol class="takeaways">
+            <li><strong>New OAuth2 flow</strong> — authorization code grant with PKCE for Google and GitHub</li>
+            <li><strong>Token refresh</strong> — automatic refresh with exponential backoff, encrypted session storage</li>
+            <li><strong>Breaking change</strong> — removes <code style="background:var(--md-sys-color-surface-container-highest);padding:1px 4px;border-radius:3px;font-size:12px;">/api/login</code>; all clients must migrate to <code style="background:var(--md-sys-color-surface-container-highest);padding:1px 4px;border-radius:3px;font-size:12px;">/auth/oauth</code></li>
+          </ol>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Summary
+        </button>
+        <div class="section-content">
+          <div class="summary-md">
+            <p>The PR introduces a complete <strong>OAuth2 authorization code flow</strong> with PKCE. The architecture involves three new classes:</p>
+          </div>
+          <!-- Class diagram SVG -->
+          <div class="mermaid-container">
+            <svg viewBox="0 0 440 250" xmlns="http://www.w3.org/2000/svg" style="font-family:Inter,system-ui,sans-serif;">
+              <!-- AuthService class -->
+              <rect x="10" y="10" width="140" height="100" rx="4" fill="#2b2d31" stroke="#44474e" stroke-width="1"/>
+              <rect x="10" y="10" width="140" height="24" rx="4" fill="#1a3a8a" stroke="#4a6cc9" stroke-width="1"/>
+              <text x="80" y="27" text-anchor="middle" fill="#dbe4ff" font-size="11" font-weight="600">AuthService</text>
+              <line x1="10" y1="34" x2="150" y2="34" stroke="#44474e" stroke-width="0.5"/>
+              <text x="18" y="50" fill="#c4c6d0" font-size="9">- tokenStore: TokenStore</text>
+              <text x="18" y="62" fill="#c4c6d0" font-size="9">- providers: Map</text>
+              <line x1="10" y1="68" x2="150" y2="68" stroke="#44474e" stroke-width="0.5"/>
+              <text x="18" y="82" fill="#c4c6d0" font-size="9">+ login(provider): Token</text>
+              <text x="18" y="94" fill="#c4c6d0" font-size="9">+ refresh(): Token</text>
+              <text x="18" y="106" fill="#c4c6d0" font-size="9">+ logout(): void</text>
+
+              <!-- TokenStore class -->
+              <rect x="180" y="10" width="130" height="80" rx="4" fill="#2b2d31" stroke="#44474e" stroke-width="1"/>
+              <rect x="180" y="10" width="130" height="24" rx="4" fill="#052e16" stroke="#4ade80" stroke-width="1"/>
+              <text x="245" y="27" text-anchor="middle" fill="#dcfce7" font-size="11" font-weight="600">TokenStore</text>
+              <line x1="180" y1="34" x2="310" y2="34" stroke="#44474e" stroke-width="0.5"/>
+              <text x="188" y="50" fill="#c4c6d0" font-size="9">- encryptionKey: Key</text>
+              <line x1="180" y1="56" x2="310" y2="56" stroke="#44474e" stroke-width="0.5"/>
+              <text x="188" y="70" fill="#c4c6d0" font-size="9">+ save(token): void</text>
+              <text x="188" y="82" fill="#c4c6d0" font-size="9">+ get(): Token | null</text>
+
+              <!-- OAuthProvider interface -->
+              <rect x="180" y="120" width="130" height="70" rx="4" fill="#2b2d31" stroke="#44474e" stroke-width="1" stroke-dasharray="4"/>
+              <rect x="180" y="120" width="130" height="24" rx="4" fill="#78350f" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4"/>
+              <text x="245" y="137" text-anchor="middle" fill="#fef3c7" font-size="10" font-weight="600">&laquo;interface&raquo;</text>
+              <text x="245" y="150" text-anchor="middle" fill="#fef3c7" font-size="11" font-weight="600">OAuthProvider</text>
+              <line x1="180" y1="156" x2="310" y2="156" stroke="#44474e" stroke-width="0.5"/>
+              <text x="188" y="172" fill="#c4c6d0" font-size="9">+ authorize(): string</text>
+              <text x="188" y="184" fill="#c4c6d0" font-size="9">+ exchange(code): Token</text>
+
+              <!-- GoogleProvider -->
+              <rect x="340" y="110" width="90" height="34" rx="4" fill="#2b2d31" stroke="#44474e" stroke-width="1"/>
+              <text x="385" y="132" text-anchor="middle" fill="#e3e2e6" font-size="10" font-weight="500">GoogleAuth</text>
+
+              <!-- GitHubProvider -->
+              <rect x="340" y="155" width="90" height="34" rx="4" fill="#2b2d31" stroke="#44474e" stroke-width="1"/>
+              <text x="385" y="177" text-anchor="middle" fill="#e3e2e6" font-size="10" font-weight="500">GitHubAuth</text>
+
+              <!-- Arrows -->
+              <line x1="150" y1="40" x2="180" y2="40" stroke="#8e9099" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+              <line x1="80" y1="110" x2="80" y2="155" stroke="#8e9099" stroke-width="1.5"/>
+              <line x1="80" y1="155" x2="180" y2="155" stroke="#8e9099" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#arrowOpen)"/>
+              <line x1="310" y1="127" x2="340" y2="127" stroke="#8e9099" stroke-width="1" stroke-dasharray="4" marker-end="url(#arrowOpen)"/>
+              <line x1="310" y1="172" x2="340" y2="172" stroke="#8e9099" stroke-width="1" stroke-dasharray="4" marker-end="url(#arrowOpen)"/>
+
+              <defs>
+                <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#8e9099"/></marker>
+                <marker id="arrowOpen" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polyline points="0 0, 8 3, 0 6" fill="none" stroke="#8e9099" stroke-width="1"/></marker>
+              </defs>
+            </svg>
+          </div>
+          <div class="summary-md" style="margin-top:8px;">
+            <p><strong>AuthService</strong> orchestrates the flow, <strong>TokenStore</strong> handles encrypted persistence, and the <strong>OAuthProvider</strong> interface is implemented by GoogleAuth and GitHubAuth for provider-specific logic.</p>
+          </div>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Fact Check
+        </button>
+        <div class="section-content">
+          <div class="fact-md">
+            <p>&#9888;&#65039; <strong>Potential issue</strong> — <a href="#" style="color:var(--md-sys-color-primary);">auth.ts:47</a> — Missing error handler for token refresh failure</p>
+            <p>&#9888;&#65039; <strong>Potential issue</strong> — <a href="#" style="color:var(--md-sys-color-primary);">middleware.ts:23</a> — CORS allows wildcard origin in production</p>
+            <p>&#9989; <strong>Good practice</strong> — PKCE follows RFC 7636 correctly</p>
+          </div>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Conclusion
+        </button>
+        <div class="section-content">
+          <div class="summary-callout-conclusion">
+            Well-structured OAuth2 migration with proper PKCE. The two flagged issues should be addressed before merge. Consider adding integration tests for token refresh.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MOCKUP 4: Chat refinement (accurate revert buttons) ═══ -->
+<div>
+  <div class="mockup-label">SCENE 4 — Chat Refinement (Dark)</div>
+  <div class="mockup-frame" id="scene-chat">
+    <div class="header-bar">
+      <div class="header-title">
+        <img src="public/icon.svg" alt="xTil"> xTil
+      </div>
+      <div class="header-actions">
+        <button>&#128203;</button>
+        <button>&#8599;</button>
+        <button>&#9881;</button>
+      </div>
+    </div>
+    <div class="content-area" style="max-height: none;">
+      <!-- TL;DR — expanded, showing Spanish translation -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> TL;DR
+        </button>
+        <div class="section-content">
+          <div class="summary-callout">
+            La computación cuántica utiliza <strong>qubits en superposición</strong> para realizar cálculos exponencialmente más rápidos que los bits clásicos. Los sistemas actuales han superado los 1.000 qubits, pero la <strong>corrección de errores</strong> sigue siendo el principal desafío.
+          </div>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle"><span class="arrow">&#9654;</span> Puntos Clave</button>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle"><span class="arrow">&#9654;</span> Resumen</button>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle"><span class="arrow">&#9654;</span> Citas Destacadas</button>
+      </div>
+      <!-- Cronología — expanded, showing the NEW section -->
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Cronología <span style="font-size:10px;font-weight:400;color:var(--md-sys-color-primary);margin-left:4px;">NEW</span>
+        </button>
+        <div class="section-content">
+          <div class="summary-md">
+            <p><strong>2019</strong> — Google anuncia la "supremacía cuántica" con Sycamore (53 qubits)</p>
+            <p><strong>2021</strong> — IBM presenta Eagle, el primer procesador de más de 100 qubits</p>
+            <p><strong>2023</strong> — IBM lanza Condor (1.121 qubits)</p>
+            <p><strong>2024</strong> — Microsoft y Quantinuum demuestran corrección de errores fiable</p>
+          </div>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle"><span class="arrow">&#9654;</span> Verificación de Hechos</button>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle"><span class="arrow">&#9654;</span> Conclusión</button>
+      </div>
+    </div>
+    <div class="chat-area">
+      <div class="chat-label">Chat</div>
+      <!-- User message 1 — full width, revert + update dot -->
+      <div class="chat-msg chat-msg-user">
+        <div class="bubble">Still summarize</div>
+        <button class="revert-btn" title="Revert summary to before this message">&#8617;</button>
+        <div class="update-dot" title="This message updated the summary"></div>
+      </div>
+      <!-- AI response 1 — full width -->
+      <div class="chat-msg chat-msg-ai">
+        <div class="bubble">Here's a summary of the Sedo.com domain sales page for xtil.com, as requested.</div>
+      </div>
+      <!-- User message 2 — revert + update dot -->
+      <div class="chat-msg chat-msg-user">
+        <div class="bubble">Translate everything to Spanish and add a Timeline section</div>
+        <button class="revert-btn" title="Revert summary to before this message">&#8617;</button>
+        <div class="update-dot" title="This message updated the summary"></div>
+      </div>
+      <!-- AI response 2 -->
+      <div class="chat-msg chat-msg-ai">
+        <div class="bubble">Done! I've translated all sections to Spanish and added a new <strong>Cronología</strong> section with 5 key dates covering 2019–2024. Sections modified: TL;DR, Puntos Clave, Resumen, Citas Destacadas, Conclusión.</div>
+      </div>
+    </div>
+    <div class="chat-input-bar">
+      <div class="chat-input-wrap">
+        <textarea class="chat-input" placeholder="Ask about the summary..." readonly rows="1"></textarea>
+        <button class="chat-send">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MOCKUP 4: Diagram section ═══ -->
+<div>
+  <div class="mockup-label">SCENE 4 — Mermaid Diagram (Dark)</div>
+  <div class="mockup-frame" id="scene-diagram">
+    <div class="header-bar">
+      <div class="header-title">
+        <img src="public/icon.svg" alt="xTil"> xTil
+      </div>
+      <div class="header-actions">
+        <button>&#128203;</button>
+        <button>&#8599;</button>
+        <button>&#9881;</button>
+      </div>
+    </div>
+    <div class="content-area">
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> TL;DR
+        </button>
+        <div class="section-content">
+          <div class="summary-callout">
+            This article explains a production-grade <strong>CI/CD pipeline</strong> using trunk-based development with feature flags. The pipeline automates linting, testing, Docker image building, and deployment with automatic rollback on failure.
+          </div>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Key Takeaways
+        </button>
+        <div class="section-content">
+          <ol class="takeaways">
+            <li><strong>Trunk-based flow</strong> — all developers push to main; feature branches are short-lived (&lt;24h)</li>
+            <li><strong>Automated quality gates</strong> — lint + unit tests + integration tests must pass before deployment</li>
+            <li><strong>Zero-downtime deploys</strong> — blue-green deployment with automatic health checks and rollback</li>
+            <li><strong>Feature flags</strong> — new features are merged but gated behind LaunchDarkly toggles</li>
+          </ol>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Summary
+        </button>
+        <div class="section-content">
+          <div class="summary-md">
+            <p>The CI/CD pipeline follows a <strong>trunk-based development</strong> model with feature flags. Every push to <code style="background:var(--md-sys-color-surface-container-highest);padding:1px 4px;border-radius:3px;font-size:12px;">main</code> triggers the full pipeline:</p>
+          </div>
+          <div class="mermaid-container">
+            <svg viewBox="0 0 340 180" xmlns="http://www.w3.org/2000/svg" style="font-family:Inter,system-ui,sans-serif;">
+              <!-- Nodes -->
+              <rect x="10" y="10" width="90" height="34" rx="8" fill="#1a3a8a" stroke="#4a6cc9" stroke-width="1"/>
+              <text x="55" y="32" text-anchor="middle" fill="#dbe4ff" font-size="11" font-weight="500">Push to main</text>
+
+              <rect x="125" y="10" width="90" height="34" rx="8" fill="#2b2d31" stroke="#44474e" stroke-width="1"/>
+              <text x="170" y="32" text-anchor="middle" fill="#e3e2e6" font-size="11" font-weight="500">Lint &amp; Test</text>
+
+              <rect x="240" y="10" width="90" height="34" rx="8" fill="#2b2d31" stroke="#44474e" stroke-width="1"/>
+              <text x="285" y="32" text-anchor="middle" fill="#e3e2e6" font-size="11" font-weight="500">Build Image</text>
+
+              <!-- Decision -->
+              <polygon points="170,75 210,100 170,125 130,100" fill="#78350f" stroke="#fbbf24" stroke-width="1"/>
+              <text x="170" y="104" text-anchor="middle" fill="#fef3c7" font-size="10" font-weight="500">Tests OK?</text>
+
+              <!-- Bottom nodes -->
+              <rect x="10" y="140" width="90" height="34" rx="8" fill="#052e16" stroke="#4ade80" stroke-width="1"/>
+              <text x="55" y="162" text-anchor="middle" fill="#dcfce7" font-size="11" font-weight="500">Deploy Prod</text>
+
+              <rect x="240" y="140" width="90" height="34" rx="8" fill="#93000a" stroke="#ffb4ab" stroke-width="1"/>
+              <text x="285" y="162" text-anchor="middle" fill="#ffdad6" font-size="11" font-weight="500">Notify &amp; Block</text>
+
+              <!-- Arrows -->
+              <line x1="100" y1="27" x2="125" y2="27" stroke="#8e9099" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+              <line x1="215" y1="27" x2="240" y2="27" stroke="#8e9099" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+              <line x1="285" y1="44" x2="285" y2="70" stroke="#8e9099" stroke-width="1.5"/>
+              <line x1="285" y1="70" x2="210" y2="100" stroke="#8e9099" stroke-width="1.5"/>
+              <line x1="130" y1="100" x2="55" y2="100" stroke="#8e9099" stroke-width="1.5"/>
+              <line x1="55" y1="100" x2="55" y2="140" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arrowG)"/>
+              <line x1="210" y1="100" x2="285" y2="100" stroke="#8e9099" stroke-width="1.5"/>
+              <line x1="285" y1="100" x2="285" y2="140" stroke="#ffb4ab" stroke-width="1.5" marker-end="url(#arrowR)"/>
+
+              <!-- Labels -->
+              <text x="75" y="95" fill="#4ade80" font-size="9" font-weight="600">yes</text>
+              <text x="240" y="95" fill="#ffb4ab" font-size="9" font-weight="600">no</text>
+
+              <defs>
+                <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#8e9099"/></marker>
+                <marker id="arrowG" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4ade80"/></marker>
+                <marker id="arrowR" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ffb4ab"/></marker>
+              </defs>
+            </svg>
+          </div>
+          <div class="summary-md" style="margin-top:8px;">
+            <p>The pipeline includes <strong>automatic rollback</strong> if the health check fails within 5 minutes of deployment. Notifications are sent via Slack to the <code style="background:var(--md-sys-color-surface-container-highest);padding:1px 4px;border-radius:3px;font-size:12px;">#deploys</code> channel with commit details and deployment status.</p>
+          </div>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Fact Check
+        </button>
+        <div class="section-content">
+          <div class="fact-md">
+            <p>&#9989; <strong>Verified</strong> — Trunk-based development is recommended by DORA/Google's State of DevOps research</p>
+            <p>&#9989; <strong>Verified</strong> — Blue-green deployment reduces downtime to near-zero during releases</p>
+            <p>&#9888;&#65039; <strong>Contested</strong> — Feature flags add operational complexity; some teams report "flag debt" as a significant maintenance burden</p>
+          </div>
+        </div>
+      </div>
+      <div class="summary-section">
+        <button class="section-toggle">
+          <span class="arrow open">&#9654;</span> Related Topics
+        </button>
+        <div class="section-content">
+          <span class="related-chip">GitOps</span>
+          <span class="related-chip">Canary Deployments</span>
+          <span class="related-chip">Feature Flags</span>
+          <span class="related-chip">DORA Metrics</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
