@@ -62,7 +62,7 @@ export class NotionAdapter implements ExportAdapter {
     let databaseName = this.config.databaseName;
     if (!databaseId) {
       databaseId = await this.createDatabase();
-      databaseName = 'TL;DR Summaries';
+      databaseName = 'xTil Summaries';
     }
 
     // Ensure new columns exist on older databases
@@ -115,74 +115,70 @@ export class NotionAdapter implements ExportAdapter {
     return { url: page.url, databaseId, databaseName };
   }
 
+  private static readonly DB_PROPERTIES = {
+    Title: { title: {} },
+    URL: { url: {} },
+    Author: { rich_text: {} },
+    'Source Type': {
+      select: {
+        options: [
+          { name: 'YouTube Video', color: 'red' },
+          { name: 'Article', color: 'green' },
+          { name: 'Facebook Post', color: 'blue' },
+          { name: 'Reddit Discussion', color: 'orange' },
+          { name: 'X Thread', color: 'default' },
+          { name: 'GitHub', color: 'purple' },
+          { name: 'Web Page', color: 'gray' },
+        ],
+      },
+    },
+    'Publish Date': { date: {} },
+    'Captured At': { date: {} },
+    Duration: { rich_text: {} },
+    Language: {
+      select: {
+        options: [
+          { name: 'en', color: 'blue' },
+          { name: 'es', color: 'yellow' },
+          { name: 'fr', color: 'purple' },
+          { name: 'de', color: 'orange' },
+        ],
+      },
+    },
+    Tags: { multi_select: {} },
+    'Reading Time': { number: {} },
+    'LLM Provider': { rich_text: {} },
+    'LLM Model': { rich_text: {} },
+    Status: {
+      select: {
+        options: [
+          { name: 'New', color: 'blue' },
+          { name: 'Read', color: 'green' },
+          { name: 'Archived', color: 'gray' },
+        ],
+      },
+    },
+  };
+
   async createDatabase(): Promise<string> {
-    // First, find a page to use as parent (search for pages the integration has access to)
-    const searchResponse = await this.notionFetch('/search', {
-      method: 'POST',
-      body: JSON.stringify({
-        filter: { value: 'page', property: 'object' },
-        page_size: 1,
-      }),
-    });
+    const dbPayload = {
+      title: [{ type: 'text', text: { content: 'xTil Summaries' } }],
+      properties: NotionAdapter.DB_PROPERTIES,
+    };
 
-    if (!searchResponse.ok) throw new Error('Failed to search for parent page');
-
-    const searchData = await searchResponse.json();
-    const parentPage = searchData.results?.[0];
-    if (!parentPage) {
-      throw new Error('No pages shared with your Notion integration. Open Notion, go to a page (or create one, e.g. "TL;DR"), click "..." (top-right) → "Connections" → add your integration. Then retry.');
+    // Find a standalone page (not a database row) to host the new database.
+    // Sort ascending so older pages (likely the user's root page) come first.
+    const parentId = await this.findStandalonePage();
+    if (!parentId) {
+      throw new Error(
+        'No suitable parent page found. Open Notion, create a top-level page named "xTil", ' +
+        'click "..." (top-right) → "Connections" → add your integration. Then retry.',
+      );
     }
 
     const response = await this.notionFetch('/databases', {
       method: 'POST',
-      body: JSON.stringify({
-        parent: { page_id: parentPage.id },
-        title: [{ type: 'text', text: { content: 'TL;DR Summaries' } }],
-        properties: {
-          Title: { title: {} },
-          URL: { url: {} },
-          Author: { rich_text: {} },
-          'Source Type': {
-            select: {
-              options: [
-                { name: 'YouTube Video', color: 'red' },
-                { name: 'Article', color: 'green' },
-                { name: 'Facebook Post', color: 'blue' },
-                { name: 'Reddit Discussion', color: 'orange' },
-                { name: 'X Thread', color: 'default' },
-                { name: 'GitHub', color: 'purple' },
-                { name: 'Web Page', color: 'gray' },
-              ],
-            },
-          },
-          'Publish Date': { date: {} },
-          'Captured At': { date: {} },
-          Duration: { rich_text: {} },
-          Language: {
-            select: {
-              options: [
-                { name: 'en', color: 'blue' },
-                { name: 'es', color: 'yellow' },
-                { name: 'fr', color: 'purple' },
-                { name: 'de', color: 'orange' },
-              ],
-            },
-          },
-          Tags: { multi_select: {} },
-          'Reading Time': { number: {} },
-          'LLM Provider': { rich_text: {} },
-          'LLM Model': { rich_text: {} },
-          Status: {
-            select: {
-              options: [
-                { name: 'New', color: 'blue' },
-                { name: 'Read', color: 'green' },
-                { name: 'Archived', color: 'gray' },
-              ],
-            },
-          },
-        },
-      }),
+      body: JSON.stringify({ parent: { page_id: parentId }, ...dbPayload }),
     });
 
     if (!response.ok) {
@@ -392,7 +388,7 @@ export class NotionAdapter implements ExportAdapter {
             { type: 'text', text: { content: 'Created with ' } },
             {
               type: 'text',
-              text: { content: 'TL;DR', link: { url: CHROME_STORE_URL } },
+              text: { content: 'xTil', link: { url: CHROME_STORE_URL } },
               annotations: { bold: true },
             },
             { type: 'text', text: { content: ' — AI-powered summaries for Chrome' } },
@@ -403,6 +399,61 @@ export class NotionAdapter implements ExportAdapter {
 
     // Notion API limits children to 100 blocks per request
     return blocks.slice(0, 100);
+  }
+
+  /**
+   * Find a standalone page (not a database row) to use as parent for a new database.
+   * 1. Fast path: search for a page named "xTil" (single API call).
+   * 2. Fallback: paginated search through all pages, oldest-edited first.
+   */
+  private async findStandalonePage(): Promise<string | null> {
+    // Fast path — search by name (Notion full-text matches title)
+    const named = await this.searchStandalonePage('xTil');
+    if (named) return named;
+
+    // Fallback — scan all pages, oldest-edited first
+    let cursor: string | undefined;
+    const MAX_BATCHES = 5; // 5 × 100 = 500 results max
+    for (let i = 0; i < MAX_BATCHES; i++) {
+      const body: Record<string, unknown> = {
+        filter: { value: 'page', property: 'object' },
+        sort: { direction: 'ascending', timestamp: 'last_edited_time' },
+        page_size: 100,
+      };
+      if (cursor) body.start_cursor = cursor;
+
+      const resp = await this.notionFetch('/search', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) break;
+
+      const data = await resp.json();
+      const results = (data.results ?? []) as Array<{ id: string; parent?: { type: string } }>;
+      const match = results.find((p) => p.parent?.type !== 'database_id');
+      if (match) return match.id;
+
+      if (!data.has_more) break;
+      cursor = data.next_cursor;
+    }
+    return null;
+  }
+
+  /** Search for a standalone page matching a query string. */
+  private async searchStandalonePage(query: string): Promise<string | null> {
+    const resp = await this.notionFetch('/search', {
+      method: 'POST',
+      body: JSON.stringify({
+        query,
+        filter: { value: 'page', property: 'object' },
+        page_size: 20,
+      }),
+    });
+    if (!resp.ok) return null;
+
+    const data = await resp.json();
+    const results = (data.results ?? []) as Array<{ id: string; parent?: { type: string } }>;
+    return results.find((p) => p.parent?.type !== 'database_id')?.id ?? null;
   }
 
   private async notionFetch(path: string, init?: RequestInit): Promise<Response> {

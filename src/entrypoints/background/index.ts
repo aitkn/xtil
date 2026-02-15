@@ -49,7 +49,7 @@ export default defineBackground(() => {
       handleMessage(message as Message)
         .then(sendResponse)
         .catch((err) => {
-          console.warn(`[TLDR] ${(message as Message).type} failed:`, err);
+          console.warn(`[xTil] ${(message as Message).type} failed:`, err);
           sendResponse({ type: (message as Message).type, success: false, error: String(err) });
         });
       return true; // keep channel open for async response
@@ -717,32 +717,11 @@ async function handleTestNotionConnection(): Promise<ConnectionTestResultMessage
 
     // If no database is selected (auto-create mode), try to set one up
     if (!settings.notion.databaseId) {
-      // Check if pages are shared with the integration
-      const searchResp = await fetch('https://api.notion.com/v1/search', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          filter: { value: 'page', property: 'object' },
-          page_size: 1,
-        }),
-      });
-      if (searchResp.ok) {
-        const data = await searchResp.json();
-        if (!data.results?.length) {
-          return {
-            type: 'CONNECTION_TEST_RESULT',
-            success: true,
-            warning: 'No pages shared with integration. Open Notion, go to a page (or create one, e.g. "TL;DR"), click "..." → "Connections" → add your integration.',
-          };
-        }
-      }
-
-      // Pages are shared — create the database now
       try {
         const { NotionAdapter } = await import('@/lib/export/notion');
         const adapter = new NotionAdapter(settings.notion);
         const databaseId = await adapter.createDatabase();
-        const databaseName = 'TL;DR Summaries';
+        const databaseName = 'xTil Summaries';
         await saveSettings({
           notion: { ...settings.notion, databaseId, databaseName },
         });
@@ -931,7 +910,7 @@ async function fetchRedditJson(redditUrl: string): Promise<unknown[]> {
   try {
     const response = await fetch(jsonUrl, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'web:tldr-extension:v1.0' },
+      headers: { 'User-Agent': 'web:xtil-extension:v1.0' },
     });
     if (response.status === 403) {
       throw new Error('Reddit returned 403 — the subreddit may be private or quarantined.');

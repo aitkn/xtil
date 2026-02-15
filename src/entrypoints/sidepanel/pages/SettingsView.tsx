@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import type { Settings, ThemeMode, ProviderConfig } from '@/lib/storage/types';
 import type { ModelInfo, VisionSupport } from '@/lib/llm/types';
 import { PROVIDER_DEFINITIONS } from '@/lib/llm/registry';
+import { filterChatModels } from '@/lib/llm/models';
 import { Button } from '@/components/Button';
 
 const LANGUAGES = [
@@ -23,15 +24,15 @@ const ONBOARDING_STEPS: Exclude<OnboardingStep, null>[] = ['provider', 'apiKey',
 const STEP_HELPERS: Record<Exclude<OnboardingStep, null>, { title: string; subtitle: string }> = {
   provider: {
     title: 'Step 1: Choose your LLM provider',
-    subtitle: 'TL;DR uses an AI model to summarize pages for you. Pick a provider below — they differ in price, speed, and output quality. You can always change this later.',
+    subtitle: 'xTil uses an AI model to summarize pages for you. Pick a provider below — they differ in price, speed, and output quality. You can always change this later.',
   },
   apiKey: {
     title: 'Step 2: Connect with your API key',
-    subtitle: "Paste your API key below so TL;DR can talk to the provider. Don't have one yet? Click \"Get key\" to create an account and generate a key — it only takes a minute.",
+    subtitle: "Paste your API key below so xTil can talk to the provider. Don't have one yet? Click \"Get key\" to create an account and generate a key — it only takes a minute.",
   },
   endpoint: {
     title: 'Step 3a: Set the endpoint URL',
-    subtitle: 'Enter the URL of your self-hosted LLM server (e.g. Ollama, LM Studio, vLLM). TL;DR will send requests to this address using the OpenAI-compatible API format.',
+    subtitle: 'Enter the URL of your self-hosted LLM server (e.g. Ollama, LM Studio, vLLM). xTil will send requests to this address using the OpenAI-compatible API format.',
   },
   model: {
     title: 'Step 3: Pick a model',
@@ -39,11 +40,11 @@ const STEP_HELPERS: Record<Exclude<OnboardingStep, null>, { title: string; subti
   },
   contextWindow: {
     title: 'Step 3c: Context window size',
-    subtitle: 'How many tokens can the model process at once? This determines how much page content TL;DR sends in a single request. Check your model\'s documentation for the exact value.',
+    subtitle: 'How many tokens can the model process at once? This determines how much page content xTil sends in a single request. Check your model\'s documentation for the exact value.',
   },
   test: {
     title: 'Step 4: Image analysis & connection test',
-    subtitle: 'Image analysis lets TL;DR read images on the page and include them in summaries. Uncheck it to save tokens. If your model doesn\'t support vision, this setting is ignored. Press "Test Connection" to verify everything works.',
+    subtitle: 'Image analysis lets xTil read images on the page and include them in summaries. Uncheck it to save tokens. If your model doesn\'t support vision, this setting is ignored. Press "Test Connection" to verify everything works.',
   },
   notionKey: {
     title: 'Step 5: Save summaries to Notion (optional)',
@@ -51,11 +52,11 @@ const STEP_HELPERS: Record<Exclude<OnboardingStep, null>, { title: string; subti
   },
   notionDb: {
     title: 'Step 6: Select a Notion database',
-    subtitle: 'Pick an existing compatible database or create a new one. Compatible databases have all the columns TL;DR needs (Title, URL, Tags, etc.).',
+    subtitle: 'Pick an existing compatible database or create a new one. Compatible databases have all the columns xTil needs (Title, URL, Tags, etc.).',
   },
   theme: {
     title: 'Step 7: Pick your look',
-    subtitle: 'Choose light, dark, or let TL;DR follow your system setting. You can also keep the default and click Next.',
+    subtitle: 'Choose light, dark, or let xTil follow your system setting. You can also keep the default and click Next.',
   },
   language: {
     title: 'Step 8: Translation preferences',
@@ -120,7 +121,12 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   useEffect(() => {
     setLocal(settings);
     if (settings.cachedModels) {
-      setFetchedModels(settings.cachedModels);
+      // Re-filter cached models (they may predate filter changes)
+      const filtered: Record<string, ModelInfo[]> = {};
+      for (const [pid, models] of Object.entries(settings.cachedModels)) {
+        filtered[pid] = filterChatModels(models);
+      }
+      setFetchedModels(filtered);
     }
     lastSavedJson.current = JSON.stringify(settings);
 
@@ -391,6 +397,11 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           ...prev,
           notion: { ...prev.notion, databaseId: result.databaseId!, databaseName: result.databaseName },
         }));
+        // Add the newly created database to the dropdown so it's immediately visible
+        setNotionDatabases((prev) => {
+          if (prev.some((d) => d.id === result.databaseId)) return prev;
+          return [...prev, { id: result.databaseId!, title: result.databaseName || 'xTil Summaries' }];
+        });
       }
       if (result.warning) {
         setNotionStatus('warning');
@@ -528,14 +539,14 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             maxWidth: '280px',
             margin: '0 auto 24px',
           }}>
-            Close settings and navigate to any page — then click the TL;DR icon to get your first summary.
+            Close settings and navigate to any page — then click the xTil icon to get your first summary.
           </div>
           <Button
             onClick={handleFinishOnboarding}
             size="sm"
             variant="primary"
           >
-            Start using TL;DR
+            Start using xTil
           </Button>
         </div>
       </div>
@@ -757,6 +768,20 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           </div>
         )}
 
+        {/* Deprecated model warning */}
+        {currentConfig.model && currentModels.length > 0 && !currentModels.some((m) => m.id === currentConfig.model) && (
+          <div style={{
+            font: 'var(--md-sys-typescale-body-small)',
+            color: 'var(--md-sys-color-on-warning-container)',
+            backgroundColor: 'var(--md-sys-color-warning-container)',
+            padding: '8px 10px',
+            borderRadius: 'var(--md-sys-shape-corner-small)',
+            marginTop: '4px',
+          }}>
+            Model <strong>{currentConfig.model}</strong> is no longer available. Please select a different model.
+          </div>
+        )}
+
         {/* Vision capability badge */}
         {currentConfig.model && (
           <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -884,7 +909,35 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           style={inputStyle}
         />
 
-        <StepHint step="notionKey" currentStep={onboardingStep} />
+        <StepHint step="notionKey" currentStep={onboardingStep} details={
+          <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-primary-container)', lineHeight: '1.6' }}>
+            <div style={{ fontWeight: 600, marginBottom: '4px' }}>How to set up Notion integration:</div>
+
+            <div style={{ marginBottom: '6px' }}>
+              <strong>1.</strong> Click <strong>"Create integration"</strong> above to open Notion's integration page.
+              Click <strong>New integration</strong>. Name it something memorable
+              (e.g. <strong>xTil</strong>) — you'll need to find it by name in step 4.
+              Choose <strong>Internal</strong> type and select your workspace.
+              Click <strong>Create</strong>. Then click <strong>Show</strong> next to
+              "Internal Integration Secret" and click <strong>Copy</strong>. Paste it into the field above.
+            </div>
+
+            <div style={{ marginBottom: '6px' }}>
+              <strong>2.</strong> Go to Notion and create a new page (e.g. <strong>xTil</strong>)
+              in your <strong>Private</strong> section.
+            </div>
+
+            <div style={{ marginBottom: '6px' }}>
+              <strong>3.</strong> On that page, click the <strong>...</strong> menu in the upper-right corner
+              and select <strong>Connections</strong>. Click <strong>Confirm</strong>.
+            </div>
+
+            <div>
+              <strong>4.</strong> Find and select the integration you created in step 1.
+              This gives xTil access to create a database inside that page.
+            </div>
+          </div>
+        } />
 
         {/* Continue / Skip buttons during onboarding */}
         {isOnboarding && onboardingStep === 'notionKey' && (
@@ -955,7 +1008,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             loading={testingNotion}
             size="sm"
             variant="secondary"
-            title="Create a new Notion database for TL;DR"
+            title="Create a new Notion database for xTil"
             disabled={!!local.notion.databaseId}
           >
             Create Notion Database
@@ -1189,16 +1242,34 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         textAlign: 'center',
         lineHeight: 1.6,
       }}>
-        <div>TL;DR v1.0.0</div>
+        <div>xTil v1.0.0</div>
         <div>&copy; 2026 AI Tech Knowledge LLC</div>
-        <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', font: 'var(--md-sys-typescale-label-small)', opacity: 0.7 }}>
+        <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', flexWrap: 'wrap', font: 'var(--md-sys-typescale-label-small)', opacity: 0.7 }}>
           <a
-            href="https://github.com/aitkn/tldr/issues"
+            href="https://xtil.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--md-sys-color-on-surface-variant)', textDecoration: 'none' }}
+          >
+            xtil.ai
+          </a>
+          <span style={{ color: 'var(--md-sys-color-outline-variant)' }}>&middot;</span>
+          <a
+            href="https://github.com/aitkn/xtil/issues"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: 'var(--md-sys-color-on-surface-variant)', textDecoration: 'none' }}
           >
             Help &amp; Feedback
+          </a>
+          <span style={{ color: 'var(--md-sys-color-outline-variant)' }}>&middot;</span>
+          <a
+            href="https://buymeacoffee.com/aitkn"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--md-sys-color-on-surface-variant)', textDecoration: 'none' }}
+          >
+            Support development
           </a>
           {!isOnboarding && (
             <>
@@ -1340,7 +1411,8 @@ function StepDots({ current, total }: { current: number; total: number }) {
   );
 }
 
-function StepHint({ step, currentStep, title, subtitle }: { step: Exclude<OnboardingStep, null>; currentStep: OnboardingStep; title?: string; subtitle?: string }) {
+function StepHint({ step, currentStep, title, subtitle, details }: { step: Exclude<OnboardingStep, null>; currentStep: OnboardingStep; title?: string; subtitle?: string; details?: preact.ComponentChildren }) {
+  const [expanded, setExpanded] = useState(false);
   if (currentStep !== step) return null;
   const helper = STEP_HELPERS[step];
   return (
@@ -1366,7 +1438,36 @@ function StepHint({ step, currentStep, title, subtitle }: { step: Exclude<Onboar
         opacity: 0.85,
       }}>
         {subtitle || helper.subtitle}
+        {details && !expanded && (
+          <button
+            onClick={() => setExpanded(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              font: 'var(--md-sys-typescale-body-small)',
+              color: 'var(--md-sys-color-primary)',
+              cursor: 'pointer',
+              padding: '0 0 0 4px',
+              textDecoration: 'underline',
+              textDecorationStyle: 'dotted',
+              opacity: 1,
+            }}
+          >
+            ...more
+          </button>
+        )}
       </div>
+      {details && expanded && (
+        <div style={{
+          animation: 'fadeIn 0.3s ease',
+          marginTop: '8px',
+          paddingTop: '8px',
+          borderTop: '1px solid var(--md-sys-color-primary)',
+          opacity: 0.7,
+        }}>
+          {details}
+        </div>
+      )}
     </div>
   );
 }
