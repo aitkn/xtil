@@ -1,5 +1,71 @@
 import type { ModelInfo } from './types';
 import { getProviderDefinition } from './registry';
+import catalogData from './model-catalog.json';
+
+interface CatalogEntry {
+  name?: string;
+  contextWindow?: number;
+  maxOutput?: number;
+  inputPrice?: number;
+  outputPrice?: number;
+  vision?: boolean;
+  textGeneration?: boolean;
+}
+
+interface CatalogProvider {
+  models: Record<string, CatalogEntry>;
+}
+
+interface Catalog {
+  _generated: string;
+  providers: Record<string, CatalogProvider>;
+}
+
+const catalog = catalogData as Catalog;
+
+function getCatalogEntry(providerId: string, modelId: string): CatalogEntry | undefined {
+  return catalog.providers?.[providerId]?.models?.[modelId];
+}
+
+/** Patterns matching non-chat model IDs to exclude */
+const NON_CHAT_PATTERNS = [
+  /embedding/,
+  /\btts\b/,
+  /\brealtime\b/,
+  /^gpt-audio/,
+  /transcribe/,
+  /^gpt-image/,
+  /^chatgpt-image/,
+  /\bimage\b/,
+  /\bimagin/,
+  /codex/,
+  /instruct/,
+];
+
+/** Date suffix like -2024-05-13 or -0709 (MMDD) */
+const DATE_SUFFIX_RE = /^(.+)-(\d{4}-\d{2}-\d{2}|\d{4})$/;
+
+export function filterChatModels(models: ModelInfo[]): ModelInfo[] {
+  // Collect all model IDs for dedup lookup
+  const idSet = new Set(models.map((m) => m.id));
+
+  return models.filter((m) => {
+    // a) Catalog says not text-capable
+    if (m.textGeneration === false) return false;
+
+    // b) Pattern-based exclusion
+    if (NON_CHAT_PATTERNS.some((re) => re.test(m.id))) return false;
+
+    // c) Dated snapshot dedup: hide if the base model (without date) also exists
+    const match = DATE_SUFFIX_RE.exec(m.id);
+    if (match) {
+      const base = match[1];
+      if (idSet.has(base)) return false;
+    }
+
+    return true;
+  });
+}
 
 export async function fetchModels(
   providerId: string,
@@ -9,29 +75,40 @@ export async function fetchModels(
   const def = getProviderDefinition(providerId);
   const defaultCtx = def?.defaultContextWindow ?? 100000;
 
+  let models: ModelInfo[];
   switch (providerId) {
     case 'openai':
-      return fetchOpenAIModels(apiKey, endpoint || def?.defaultEndpoint || '', defaultCtx, [
+      models = await fetchOpenAIModels('openai', apiKey, endpoint || def?.defaultEndpoint || '', defaultCtx, [
         /^gpt-/,
         /^o[134]-/,
         /^chatgpt-/,
       ]);
+      break;
     case 'xai':
-      return fetchOpenAIModels(apiKey, endpoint || def?.defaultEndpoint || '', defaultCtx);
+      models = await fetchOpenAIModels('xai', apiKey, endpoint || def?.defaultEndpoint || '', defaultCtx);
+      break;
     case 'deepseek':
-      return fetchOpenAIModels(apiKey, endpoint || def?.defaultEndpoint || '', defaultCtx);
+      models = await fetchOpenAIModels('deepseek', apiKey, endpoint || def?.defaultEndpoint || '', defaultCtx);
+      break;
     case 'anthropic':
-      return fetchAnthropicModels(apiKey, endpoint || def?.defaultEndpoint || '', defaultCtx);
+      models = await fetchAnthropicModels(apiKey, endpoint || def?.defaultEndpoint || '', defaultCtx);
+      break;
     case 'google':
-      return fetchGoogleModels(apiKey, endpoint || def?.defaultEndpoint || '', defaultCtx);
+      models = await fetchGoogleModels(apiKey, endpoint || def?.defaultEndpoint || '', defaultCtx);
+      break;
     case 'self-hosted':
-      return fetchSelfHostedModels(endpoint || def?.defaultEndpoint || '', defaultCtx);
+      models = await fetchSelfHostedModels(endpoint || def?.defaultEndpoint || '', defaultCtx);
+      break;
     default:
-      return fetchOpenAIModels(apiKey, endpoint || '', defaultCtx);
+      models = await fetchOpenAIModels(providerId, apiKey, endpoint || '', defaultCtx);
+      break;
   }
+
+  return filterChatModels(models);
 }
 
 async function fetchOpenAIModels(
+  providerId: string,
   apiKey: string,
   baseUrl: string,
   defaultCtx: number,
@@ -58,11 +135,19 @@ async function fetchOpenAIModels(
   // Sort by created descending (most recent first)
   models.sort((a, b) => (b.created ?? 0) - (a.created ?? 0));
 
-  return models.map((m) => ({
-    id: m.id,
-    name: m.id,
-    contextWindow: defaultCtx,
-  }));
+  return models.map((m) => {
+    const entry = getCatalogEntry(providerId, m.id);
+    return {
+      id: m.id,
+      name: entry?.name || m.id,
+      contextWindow: entry?.contextWindow || defaultCtx,
+      maxOutput: entry?.maxOutput,
+      inputPrice: entry?.inputPrice,
+      outputPrice: entry?.outputPrice,
+      vision: entry?.vision,
+      textGeneration: entry?.textGeneration,
+    };
+  });
 }
 
 async function fetchAnthropicModels(
@@ -87,11 +172,19 @@ async function fetchAnthropicModels(
   const data = await response.json();
   const models: Array<{ id: string; display_name?: string; created_at?: string }> = data.data ?? [];
 
-  return models.map((m) => ({
-    id: m.id,
-    name: m.display_name || m.id,
-    contextWindow: defaultCtx,
-  }));
+  return models.map((m) => {
+    const entry = getCatalogEntry('anthropic', m.id);
+    return {
+      id: m.id,
+      name: entry?.name || m.display_name || m.id,
+      contextWindow: entry?.contextWindow || defaultCtx,
+      maxOutput: entry?.maxOutput,
+      inputPrice: entry?.inputPrice,
+      outputPrice: entry?.outputPrice,
+      vision: entry?.vision,
+      textGeneration: entry?.textGeneration,
+    };
+  });
 }
 
 async function fetchGoogleModels(
@@ -113,16 +206,28 @@ async function fetchGoogleModels(
     name: string;
     displayName?: string;
     inputTokenLimit?: number;
+    outputTokenLimit?: number;
     supportedGenerationMethods?: string[];
   }> = data.models ?? [];
 
   return models
     .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
-    .map((m) => ({
-      id: m.name.replace(/^models\//, ''),
-      name: m.displayName || m.name.replace(/^models\//, ''),
-      contextWindow: m.inputTokenLimit ?? defaultCtx,
-    }));
+    .map((m) => {
+      const id = m.name.replace(/^models\//, '');
+      const entry = getCatalogEntry('google', id);
+      // Google API's inputTokenLimit takes priority over catalog
+      const contextWindow = m.inputTokenLimit ?? entry?.contextWindow ?? defaultCtx;
+      return {
+        id,
+        name: entry?.name || m.displayName || id,
+        contextWindow,
+        maxOutput: m.outputTokenLimit ?? entry?.maxOutput,
+        inputPrice: entry?.inputPrice,
+        outputPrice: entry?.outputPrice,
+        vision: entry?.vision,
+        textGeneration: entry?.textGeneration,
+      };
+    });
 }
 
 async function fetchSelfHostedModels(

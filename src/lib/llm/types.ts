@@ -47,6 +47,12 @@ export interface ModelInfo {
   id: string;
   name: string;
   contextWindow: number;
+  maxOutput?: number;
+  inputPrice?: number;    // per 1M tokens USD
+  outputPrice?: number;   // per 1M tokens USD
+  vision?: boolean;
+  /** false for image/video-only models that can't do text chat */
+  textGeneration?: boolean;
 }
 
 export interface ProviderDefinition {
