@@ -1,5 +1,5 @@
 {
-  "name": "tldr",
+  "name": "xtil",
   "version": "1.0.0",
   "description": "Summarize any page or YouTube video with AI, refine via chat, and save to Notion",
   "private": true,
@@ -11,7 +11,8 @@
     "build:firefox": "wxt build --browser firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip --browser firefox",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "update-models": "node scripts/update-model-catalog.mjs"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

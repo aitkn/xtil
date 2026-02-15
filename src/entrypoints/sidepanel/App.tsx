@@ -923,6 +923,13 @@ export function App() {
     return () => { clearInterval(id); clearTimeout(initial); };
   }, [extractEpoch, activeTabId]); // re-run on every new extraction or tab switch
 
+  // Clean up temporary scroll padding added by tall-image onLoad once summary provides enough content
+  useEffect(() => {
+    if (summary && scrollAreaRef.current) {
+      scrollAreaRef.current.style.paddingBottom = '';
+    }
+  }, [summary]);
+
   // Scroll to bottom only when a new *visible assistant* message arrives (skip internal/user)
   const prevVisibleAssistantCountRef = useRef(0);
   useEffect(() => {
@@ -1559,7 +1566,7 @@ export function App() {
       />
 
       {/* Scrollable content area */}
-      <div ref={scrollAreaRef} class="print-content" style={{ flex: 1, overflow: 'auto' }}>
+      <div ref={scrollAreaRef} class="print-content" style={{ flex: 1, overflow: 'auto', scrollSnapType: 'y proximity' }}>
         {/* Extracting state */}
         {extracting && !content && (
           <div style={{ padding: '48px 24px', textAlign: 'center' }}>
@@ -1575,7 +1582,7 @@ export function App() {
               color: 'var(--md-sys-color-on-surface)',
               marginBottom: '8px',
             }}>
-              <span title="Too Long; Didn't Read">TL;DR</span>
+              xTil
             </div>
             <p style={{
               font: 'var(--md-sys-typescale-body-medium)',
@@ -1629,7 +1636,7 @@ export function App() {
               color: 'var(--md-sys-color-on-surface)',
               marginBottom: '8px',
             }}>
-              Welcome to <span title="Too Long; Didn't Read">TL;DR</span>!
+              Welcome to xTil!
             </div>
             <p style={{
               font: 'var(--md-sys-typescale-body-medium)',
@@ -2174,7 +2181,7 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport,
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
   return (
-    <div class="no-print header-bar" style={{
+    <div class="no-print header-bar" onClick={handleTitleClick} style={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -2187,13 +2194,6 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport,
       boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-        <span
-          title="Too Long; Didn't Read"
-          onClick={handleTitleClick}
-          style={{ font: 'var(--md-sys-typescale-title-large)', color: 'var(--md-sys-color-on-surface)', userSelect: 'none' }}
-        >
-          TL;DR
-        </span>
         <IconButton onClick={() => window.open('https://buymeacoffee.com/aitkn', '_blank', 'noopener,noreferrer')} label="Support">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
         </IconButton>

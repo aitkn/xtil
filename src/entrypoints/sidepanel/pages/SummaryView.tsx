@@ -349,83 +349,132 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
   };
   const badge = badgeColors[content.type] || badgeColors.generic;
 
-  return (
-    <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid var(--md-sys-color-outline-variant)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+  const hasThumbnail = !!(content.thumbnailUrl || (content.thumbnailUrls && content.thumbnailUrls.length >= 2));
+
+  const badgeRow = (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '8px',
+      marginBottom: '4px',
+      ...(hasThumbnail ? {
+        position: 'sticky' as const, top: 0, zIndex: 2,
+        backgroundColor: 'var(--md-sys-color-surface)',
+        padding: '4px 0',
+      } : {}),
+    }}>
+      <span style={{
+        backgroundColor: badge.bg,
+        color: badge.text,
+        padding: '2px 10px',
+        borderRadius: 'var(--md-sys-shape-corner-small)',
+        font: 'var(--md-sys-typescale-label-small)',
+        fontWeight: 600,
+        textTransform: 'uppercase',
+      }}>
+        {content.type === 'youtube' ? 'YouTube' : content.type === 'facebook' ? 'Facebook' : content.type === 'reddit' ? 'Reddit' : content.type === 'twitter' ? 'X' : content.type === 'github' ? 'GitHub' : content.type}
+      </span>
+      {content.type !== 'github' && content.estimatedReadingTime > 0 && (
+        <span style={{ color: 'var(--md-sys-color-on-surface-variant)', font: 'var(--md-sys-typescale-label-small)' }}>
+          {content.estimatedReadingTime} min read
+        </span>
+      )}
+      {summary?.sourceLanguage && summary?.summaryLanguage && summary.sourceLanguage !== summary.summaryLanguage && (
         <span style={{
-          backgroundColor: badge.bg,
-          color: badge.text,
+          backgroundColor: 'var(--md-sys-color-tertiary-container)',
+          color: 'var(--md-sys-color-on-tertiary-container)',
           padding: '2px 10px',
           borderRadius: 'var(--md-sys-shape-corner-small)',
           font: 'var(--md-sys-typescale-label-small)',
           fontWeight: 600,
-          textTransform: 'uppercase',
         }}>
-          {content.type === 'youtube' ? 'YouTube' : content.type === 'facebook' ? 'Facebook' : content.type === 'reddit' ? 'Reddit' : content.type === 'twitter' ? 'X' : content.type === 'github' ? 'GitHub' : content.type}
+          {(LANG_LABELS[summary.sourceLanguage] || summary.sourceLanguage.toUpperCase())} → {(LANG_LABELS[summary.summaryLanguage] || summary.summaryLanguage.toUpperCase())}
         </span>
-        {content.type !== 'github' && content.estimatedReadingTime > 0 && (
-          <span style={{ color: 'var(--md-sys-color-on-surface-variant)', font: 'var(--md-sys-typescale-label-small)' }}>
-            {content.estimatedReadingTime} min read
+      )}
+      {(() => {
+        const label = summary?.llmProvider || providerName;
+        const tooltip = summary?.llmModel || modelName || '';
+        const configured = !!label;
+        return (
+          <span
+            title={configured ? tooltip : 'Click to configure LLM provider'}
+            onClick={onProviderClick}
+            style={{
+              backgroundColor: configured ? 'var(--md-sys-color-secondary-container)' : '#fef3c7',
+              color: configured ? 'var(--md-sys-color-on-secondary-container)' : '#92400e',
+              padding: '2px 10px',
+              borderRadius: 'var(--md-sys-shape-corner-small)',
+              font: 'var(--md-sys-typescale-label-small)',
+              fontWeight: 600,
+              cursor: onProviderClick ? 'pointer' : 'default',
+            }}
+          >
+            {configured ? label : 'Configure LLM'}
           </span>
-        )}
-        {summary?.sourceLanguage && summary?.summaryLanguage && summary.sourceLanguage !== summary.summaryLanguage && (
-          <span style={{
-            backgroundColor: 'var(--md-sys-color-tertiary-container)',
-            color: 'var(--md-sys-color-on-tertiary-container)',
-            padding: '2px 10px',
-            borderRadius: 'var(--md-sys-shape-corner-small)',
-            font: 'var(--md-sys-typescale-label-small)',
-            fontWeight: 600,
-          }}>
-            {(LANG_LABELS[summary.sourceLanguage] || summary.sourceLanguage.toUpperCase())} → {(LANG_LABELS[summary.summaryLanguage] || summary.summaryLanguage.toUpperCase())}
-          </span>
-        )}
-        {(() => {
-          const label = summary?.llmProvider || providerName;
-          const tooltip = summary?.llmModel || modelName || '';
-          const configured = !!label;
-          return (
-            <span
-              title={configured ? tooltip : 'Click to configure LLM provider'}
-              onClick={onProviderClick}
-              style={{
-                backgroundColor: configured ? 'var(--md-sys-color-secondary-container)' : '#fef3c7',
-                color: configured ? 'var(--md-sys-color-on-secondary-container)' : '#92400e',
-                padding: '2px 10px',
-                borderRadius: 'var(--md-sys-shape-corner-small)',
-                font: 'var(--md-sys-typescale-label-small)',
-                fontWeight: 600,
-                cursor: onProviderClick ? 'pointer' : 'default',
-              }}
-            >
-              {configured ? label : 'Configure LLM'}
-            </span>
-          );
-        })()}
-      </div>
+        );
+      })()}
+    </div>
+  );
 
-      {content.thumbnailUrls && content.thumbnailUrls.length >= 2 ? (
-        <ThumbnailCollage urls={content.thumbnailUrls} title={content.title} fallbackUrl={content.thumbnailUrl} />
-      ) : content.thumbnailUrl ? (
-        <img
-          src={content.thumbnailUrl}
-          alt={content.title}
-          style={{ width: '100%', borderRadius: 'var(--md-sys-shape-corner-medium)', marginBottom: '8px' }}
-          onError={(e) => {
-            const img = e.currentTarget as HTMLImageElement;
-            if (content.type === 'youtube') {
-              const hqFallback = content.thumbnailUrl!.replace(/\/[^/]+\.jpg$/, '/hqdefault.jpg');
-              if (img.src !== hqFallback) {
-                img.src = hqFallback;
-                return;
+  const thumbnailImg = content.thumbnailUrls && content.thumbnailUrls.length >= 2 ? (
+    <ThumbnailCollage urls={content.thumbnailUrls} title={content.title} fallbackUrl={content.thumbnailUrl} />
+  ) : content.thumbnailUrl ? (
+    <img
+      src={content.thumbnailUrl}
+      alt={content.title}
+      style={{ width: '100%', borderRadius: 'var(--md-sys-shape-corner-medium)', marginBottom: '8px', display: 'block' }}
+      onLoad={(e) => {
+        const img = e.currentTarget as HTMLImageElement;
+        const scrollContainer = img.closest('.print-content') as HTMLElement;
+        if (!scrollContainer || scrollContainer.scrollTop !== 0) return;
+        const imgQuarter = Math.round(window.innerHeight * 0.25);
+        if (img.offsetHeight > imgQuarter) {
+          const titleEl = scrollContainer.querySelector<HTMLElement>('[data-title-snap]');
+          const badgeRow = img.previousElementSibling as HTMLElement;
+          if (titleEl) {
+            // snap margin = sticky badges height + 25% image peek
+            const snapMargin = (badgeRow ? badgeRow.offsetHeight : 0) + imgQuarter;
+            titleEl.style.scrollMarginTop = `${snapMargin}px`;
+            const titleTop = titleEl.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top;
+            const targetScroll = titleTop - snapMargin;
+            if (targetScroll > 0) {
+              // Ensure enough scrollable space before summary loads
+              const deficit = targetScroll + scrollContainer.clientHeight - scrollContainer.scrollHeight;
+              if (deficit > 0) {
+                scrollContainer.style.paddingBottom = `${deficit}px`;
               }
+              scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
             }
-            img.style.display = 'none';
-          }}
-        />
-      ) : null}
+          }
+        }
+      }}
+      onError={(e) => {
+        const img = e.currentTarget as HTMLImageElement;
+        if (content.type === 'youtube') {
+          const hqFallback = content.thumbnailUrl!.replace(/\/[^/]+\.jpg$/, '/hqdefault.jpg');
+          if (img.src !== hqFallback) {
+            img.src = hqFallback;
+            return;
+          }
+        }
+        img.style.display = 'none';
+      }}
+    />
+  ) : null;
 
-      <h2 style={{ font: 'var(--md-sys-typescale-title-medium)', lineHeight: 1.3, margin: '4px 0', color: 'var(--md-sys-color-on-surface)' }}>
+  return (
+    <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid var(--md-sys-color-outline-variant)' }}>
+      {hasThumbnail ? (
+        // Wrapper scopes sticky badges to the image area only
+        <div>
+          {badgeRow}
+          {thumbnailImg}
+        </div>
+      ) : (
+        <>
+          {badgeRow}
+        </>
+      )}
+
+      <h2 data-title-snap style={{ font: 'var(--md-sys-typescale-title-medium)', lineHeight: 1.3, margin: '4px 0', color: 'var(--md-sys-color-on-surface)', scrollSnapAlign: 'start' }}>
         {summary?.translatedTitle || content.title || summary?.inferredTitle || ''}
       </h2>
 
@@ -655,7 +704,7 @@ function summaryToMarkdown(summary: SummaryDocument, content: ExtractedContent |
     lines.push('---', '', `[Original source](${content.url})`, '');
   }
 
-  lines.push(`*Generated with [TL;DR](https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon)*`);
+  lines.push(`*Generated with [xTil](https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon)*`);
 
   return fixMermaidSyntax(lines.join('\n'));
 }
@@ -864,7 +913,7 @@ export async function copyToClipboard(summary: SummaryDocument, content: Extract
     if (content?.url) {
       footer += `<p><a href="${content.url}">Original source</a></p>\n`;
     }
-    footer += `<p style="color:#999;font-size:12px;"><em>Generated with <a href="${STORE_URL}">TL;DR</a></em></p>`;
+    footer += `<p style="color:#999;font-size:12px;"><em>Generated with <a href="${STORE_URL}">xTil</a></em></p>`;
 
     html = header + clone.innerHTML + footer;
   }

@@ -25,4 +25,4 @@ execSync(cmd, { shell: true });
 
 console.log(`Chrome launched (${dark ? 'dark' : 'light'} mode)`);
 console.log(`URL: ${url}`);
-console.log('Now open the TL;DR side panel.');
+console.log('Now open the xTil side panel.');

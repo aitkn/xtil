@@ -1,4 +1,4 @@
-TL;DR Chrome Extension — Third-Party Notices
+xTil Chrome Extension — Third-Party Notices
 
 This extension includes the following open source packages:
 

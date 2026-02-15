@@ -3,7 +3,8 @@ node_modules/
 .wxt/
 .claude/
 *.log
+.env
 .playwright-user-data/
 demo-output/
-tldr-extension.zip
-tldr-chrome-mv3.zip
+*.zip
+website/

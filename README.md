@@ -1,4 +1,4 @@
-# TL;DR — AI Page Summarizer
+# xTil — Extract Content, Distill Knowledge
 
 Chrome extension that summarizes any web page or YouTube video using AI, lets you refine the summary via chat, and saves everything to Notion or Markdown. Opens in Chrome's side panel for a seamless reading experience.
 
@@ -23,12 +23,12 @@ Chrome extension that summarizes any web page or YouTube video using AI, lets yo
 ## Install
 
 ### From Chrome Web Store
-[Install TL;DR](https://chromewebstore.google.com/detail/tldr/pikdhogjjbaakcpedmahckhmajdgdeon)
+[Install xTil](https://chromewebstore.google.com/detail/xtil/pikdhogjjbaakcpedmahckhmajdgdeon)
 
 ### From Source
 ```bash
-git clone https://github.com/aitkn/tldr.git
-cd tldr
+git clone https://github.com/aitkn/xtil.git
+cd xtil
 pnpm install
 pnpm wxt build
 ```
@@ -37,7 +37,7 @@ Then load `.output/chrome-mv3/` as an unpacked extension in `chrome://extensions
 ## Usage
 
 1. Navigate to any web page or YouTube video
-2. Click the TL;DR icon in your toolbar to open the side panel
+2. Click the xTil icon in your toolbar to open the side panel
 3. Press **Summarize** to generate a structured summary
 4. Use the chat input to ask follow-up questions, request diagrams, or refine the summary
 5. Export to Notion or download as Markdown
@@ -53,18 +53,18 @@ Open the Settings drawer (gear icon) to:
 ## Notion Integration Setup
 
 1. Go to [notion.so/my-integrations](https://www.notion.so/my-integrations) and click **New integration**
-2. Name it (e.g. "TL;DR") and click **Submit**
+2. Name it (e.g. "xTil") and click **Submit**
 3. Copy the **Internal Integration Secret** (starts with `ntn_`)
-4. Paste it into TL;DR Settings > Notion API Key
+4. Paste it into xTil Settings > Notion API Key
 5. Click **Test Connection** to verify
 
-On your first export, TL;DR will automatically create a "TL;DR Summaries" database in your Notion workspace. Subsequent exports will add pages to the same database.
+On your first export, xTil will automatically create an "xTil Summaries" database in your Notion workspace. Subsequent exports will add pages to the same database.
 
 Each exported page includes the summary, key takeaways, notable quotes, tags, source URL, and content metadata.
 
 ## Privacy
 
-TL;DR has no backend server, no analytics, and no data collection. Your API keys are stored locally on your device. Page content is sent directly to the AI provider you choose.
+xTil has no backend server, no analytics, and no data collection. Your API keys are stored locally on your device. Page content is sent directly to the AI provider you choose.
 
 See the full [Privacy Policy](PRIVACY_POLICY.md).
 

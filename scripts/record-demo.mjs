@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Full CWS Screenshot Recording Script for TL;DR Chrome Extension.
+ * Full CWS Screenshot Recording Script for xTil Chrome Extension.
  *
  * Automates the entire capture process across light and dark modes.
  * The only manual step: opening the side panel after Chrome launches.
@@ -310,7 +310,7 @@ async function navigateAndSummarize(panelPage, webPage, url, label) {
     return;
   }
 
-  // Wait for summary to load (look for TL;DR section or collapsible headings)
+  // Wait for summary to load (look for section headings)
   console.log('  ⏳ Waiting for summary (this may take a while)...');
   try {
     await panelPage.waitForFunction(
@@ -333,7 +333,7 @@ async function main() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
   console.log('╔══════════════════════════════════════════╗');
-  console.log('║  TL;DR CWS Screenshot Recording Script  ║');
+  console.log('║  xTil CWS Screenshot Recording Script    ║');
   console.log('╚══════════════════════════════════════════╝\n');
 
   // ── Session 1: Light Mode ──────────────────────────────────────
@@ -358,7 +358,7 @@ async function main() {
   await webPage.goto(DEMOS.article.url, { waitUntil: 'domcontentloaded' });
   await sleep(2000);
 
-  await ask('👉 Open the TL;DR side panel, then press Enter...');
+  await ask('👉 Open the xTil side panel, then press Enter...');
 
   // Reconnect to pick up the newly opened side panel page
   await browser.close();
@@ -440,7 +440,7 @@ async function main() {
   await webPage.goto(DEMOS.article.url, { waitUntil: 'domcontentloaded' });
   await sleep(2000);
 
-  await ask('👉 Open the TL;DR side panel, then press Enter...');
+  await ask('👉 Open the xTil side panel, then press Enter...');
 
   // Reconnect to pick up the newly opened side panel page
   await browser.close();

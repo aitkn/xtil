@@ -1,14 +1,14 @@
-# Privacy Policy for TL;DR Chrome Extension
+# Privacy Policy for xTil Chrome Extension
 
 **Last updated:** February 6, 2026
 
 ## Overview
 
-TL;DR is a browser extension that summarizes web pages and YouTube videos using AI. This policy describes how the extension handles your data.
+xTil is a browser extension that summarizes web pages and YouTube videos using AI. This policy describes how the extension handles your data.
 
 ## Data We Handle
 
-TL;DR has no backend server, no analytics, and no telemetry. We do not collect or store any user data on our servers.
+xTil has no backend server, no analytics, and no telemetry. We do not collect or store any user data on our servers.
 
 However, the extension does handle the following data locally on your device:
 
@@ -66,4 +66,4 @@ Updates to this policy will be reflected in the extension's store listing. The "
 
 ## Contact
 
-If you have questions about this privacy policy, please open an issue at [github.com/aitkn/tldr/issues](https://github.com/aitkn/tldr/issues).
+If you have questions about this privacy policy, please open an issue at [github.com/aitkn/xtil/issues](https://github.com/aitkn/xtil/issues).

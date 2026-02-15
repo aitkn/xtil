@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * PoC: Connect Playwright to a running Chrome instance and interact
- * with the TL;DR side panel.
+ * with the xTil side panel.
  *
  * Usage:
  *   1. Start Chrome with remote debugging:
@@ -38,8 +38,8 @@ for (const p of pages) {
 // Find the side panel page
 const panelPage = pages.find((p) => p.url().includes('sidepanel'));
 if (!panelPage) {
-  console.error('\nSide panel not found. Make sure the TL;DR side panel is open in Chrome.');
-  console.error('Click the TL;DR icon in the toolbar to open it.');
+  console.error('\nSide panel not found. Make sure the xTil side panel is open in Chrome.');
+  console.error('Click the xTil icon in the toolbar to open it.');
   await browser.close();
   process.exit(1);
 }

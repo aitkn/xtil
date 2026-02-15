@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="manifest.default_title" content="TL;DR" />
-    <title>TL;DR</title>
+    <meta name="manifest.default_title" content="xTil" />
+    <title>xTil</title>
     <style>
       /* Inter font — bundled locally to avoid external network requests.
          Each subset uses unicode-range so the browser only downloads what's needed. */
@@ -361,7 +361,7 @@
         .no-print { display: none !important; }
 
         /* Scrollable area: remove scroll, show all */
-        .print-content { overflow: visible !important; flex: none !important; }
+        .print-content { overflow: visible !important; flex: none !important; scroll-snap-type: none !important; }
 
         /* Force all collapsible sections open */
         .section-content { display: block !important; }

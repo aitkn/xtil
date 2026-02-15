@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Generate PNG icons for the TLDR Chrome extension.
- * 
+ * Generate PNG icons for the xTil Chrome extension.
+ *
  * Produces minimal valid PNG files at 16, 32, 48, and 128 pixel sizes.
  * Uses raw binary PNG construction — no external dependencies.
- * 
- * Design: white "TL" text on a #2563eb blue rounded-rectangle background.
+ *
+ * NOTE: This is a legacy script. Use scripts/svg-to-png.mjs instead.
  */
 
 const fs = require('fs');
