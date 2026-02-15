@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <!-- Star gradient — top-left light to bottom-right darker for 3D -->
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#d4d0f8"/>
+    </linearGradient>
+    <!-- Wand gradient — slight 3D cylinder effect -->
+    <linearGradient id="wandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e0ddf7"/>
+      <stop offset="50%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#d4d0f8"/>
+    </linearGradient>
+    <!-- Sphere gradient for dots -->
+    <radialGradient id="dotGrad" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#c7c2f0"/>
+    </radialGradient>
+    <!-- Soft glow behind star -->
+    <filter id="starGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Star: glow + drop shadow combined -->
+    <filter id="starGlowShadow" x="-40%" y="-40%" width="200%" height="200%">
+      <!-- Shadow offset -->
+      <feOffset in="SourceGraphic" dx="1" dy="2" result="offset"/>
+      <feGaussianBlur in="offset" stdDeviation="1.5" result="shadow"/>
+      <feFlood flood-color="rgba(0,0,0,0.2)" result="shadowColor"/>
+      <feComposite in="shadowColor" in2="shadow" operator="in" result="shadowFinal"/>
+      <!-- Glow -->
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="glow"/>
+      <!-- Merge: shadow behind, glow, then original -->
+      <feMerge>
+        <feMergeNode in="shadowFinal"/>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Subtle drop shadow for dots -->
+    <filter id="dropShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.25)"/>
+    </filter>
+    <!-- Wand shadow — userSpaceOnUse to avoid zero-width bbox on vertical line -->
+    <filter id="wandShadow" filterUnits="userSpaceOnUse" x="50" y="30" width="30" height="100">
+      <feDropShadow dx="1" dy="2" stdDeviation="1.5" flood-color="rgba(0,0,0,0.2)"/>
+    </filter>
+    <!-- Inner shadow on background for depth -->
+    <filter id="innerShadow">
+      <feComponentTransfer in="SourceAlpha">
+        <feFuncA type="table" tableValues="1 0"/>
+      </feComponentTransfer>
+      <feGaussianBlur stdDeviation="4"/>
+      <feOffset dx="2" dy="3" result="offsetblur"/>
+      <feFlood flood-color="rgba(0,0,0,0.2)" result="color"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feComposite in2="SourceGraphic" operator="over"/>
+    </filter>
+  </defs>
+  <g transform="translate(16,16) scale(0.75)">
+    <!-- Background with inner shadow for depth -->
+    <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+    <!-- Subtle highlight along top edge -->
+    <rect width="128" height="64" rx="28" fill="url(#bg)" opacity="0"/>
+    <path d="M28,0 L100,0 Q128,0 128,28 L128,12 Q128,0 100,0 Z" fill="rgba(255,255,255,0.08)"/>
+    <path d="M0,28 Q0,0 28,0 L12,0 Q0,0 0,28 Z" fill="rgba(255,255,255,0.06)"/>
+    <!-- Text lines — left side -->
+    <line x1="12" y1="44" x2="48" y2="44" stroke="rgba(255,255,255,0.25)" stroke-width="6" stroke-linecap="round"/>
+    <line x1="12" y1="60" x2="44" y2="60" stroke="rgba(255,255,255,0.22)" stroke-width="6" stroke-linecap="round"/>
+    <line x1="12" y1="76" x2="48" y2="76" stroke="rgba(255,255,255,0.22)" stroke-width="6" stroke-linecap="round"/>
+    <line x1="12" y1="92" x2="42" y2="92" stroke="rgba(255,255,255,0.22)" stroke-width="6" stroke-linecap="round"/>
+    <line x1="12" y1="108" x2="46" y2="108" stroke="rgba(255,255,255,0.25)" stroke-width="6" stroke-linecap="round"/>
+    <!-- Vertical wand with shadow -->
+    <line x1="64" y1="118" x2="64" y2="40" stroke="white" stroke-width="7" stroke-linecap="round" filter="url(#wandShadow)"/>
+    <!-- Star with glow + gradient -->
+    <!-- Star with combined glow + shadow -->
+    <path d="M64,2 L68.7,15.5 L83,15.8 L71.6,24.5 L75.8,38.2 L64,30 L52.2,38.2 L56.4,24.5 L45,15.8 L59.3,15.5 Z" fill="url(#starGrad)" filter="url(#starGlowShadow)"/>
+    <!-- Bullet dots with 3D sphere gradient + shadow -->
+    <circle cx="88" cy="44" r="7" fill="url(#dotGrad)" filter="url(#dropShadow)"/>
+    <circle cx="88" cy="62" r="7" fill="url(#dotGrad)" filter="url(#dropShadow)"/>
+    <circle cx="88" cy="80" r="7" fill="url(#dotGrad)" filter="url(#dropShadow)"/>
+    <circle cx="88" cy="98" r="7" fill="url(#dotGrad)" filter="url(#dropShadow)"/>
+    <!-- Bullet text lines — right side -->
+    <line x1="99" y1="44" x2="116" y2="44" stroke="rgba(255,255,255,0.5)" stroke-width="4" stroke-linecap="round"/>
+    <line x1="99" y1="62" x2="114" y2="62" stroke="rgba(255,255,255,0.5)" stroke-width="4" stroke-linecap="round"/>
+    <line x1="99" y1="80" x2="116" y2="80" stroke="rgba(255,255,255,0.5)" stroke-width="4" stroke-linecap="round"/>
+    <line x1="99" y1="98" x2="112" y2="98" stroke="rgba(255,255,255,0.5)" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<body>
+<script>
+async function convertAll() {
+  const sizes = [16, 24, 32, 48, 128];
+  const results = {};
+  for (const size of sizes) {
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = `icon-${size}.svg`;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, size, size);
+    results[size] = canvas.toDataURL('image/png');
+  }
+  window._pngResults = results;
+  document.title = 'done';
+}
+convertAll();
+</script>
+</body>
+</html>
