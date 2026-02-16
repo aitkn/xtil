@@ -1,9 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="0%" stop-color="#3730a3"/>
+      <stop offset="40%" stop-color="#6366f1"/>
       <stop offset="100%" stop-color="#7c3aed"/>
     </linearGradient>
+    <radialGradient id="bgHL" cx="30%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
     <!-- Star gradient — top-left light to bottom-right darker for 3D -->
     <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#ffffff"/>
@@ -67,6 +72,7 @@
   <g transform="translate(16,16) scale(0.75)">
     <!-- Background with inner shadow for depth -->
     <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+    <rect width="128" height="128" rx="28" fill="url(#bgHL)"/>
     <!-- Subtle highlight along top edge -->
     <rect width="128" height="64" rx="28" fill="url(#bg)" opacity="0"/>
     <path d="M28,0 L100,0 Q128,0 128,28 L128,12 Q128,0 100,0 Z" fill="rgba(255,255,255,0.08)"/>

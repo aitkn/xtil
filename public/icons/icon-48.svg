@@ -1,9 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="0%" stop-color="#3730a3"/>
+      <stop offset="40%" stop-color="#6366f1"/>
       <stop offset="100%" stop-color="#7c3aed"/>
     </linearGradient>
+    <radialGradient id="bgHL" cx="30%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
     <!-- Star gradient -->
     <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#ffffff"/>
@@ -28,6 +33,7 @@
     </filter>
   </defs>
   <rect width="48" height="48" rx="10" fill="url(#bg)"/>
+  <rect width="48" height="48" rx="10" fill="url(#bgHL)"/>
   <!-- 5-pointed star: cx=16 cy=14 R=12 r=4.8 — exact trig -->
   <path d="M16,2 L19.16,11.17 L28.78,11.28 L21.12,16.83 L23.84,26.08 L16,20.68 L8.16,26.08 L10.88,16.83 L3.22,11.28 L12.84,11.17 Z" fill="url(#starGrad)" filter="url(#starGlow)"/>
   <!-- Wand down from star -->

@@ -1,9 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="0%" stop-color="#3730a3"/>
+      <stop offset="40%" stop-color="#6366f1"/>
       <stop offset="100%" stop-color="#7c3aed"/>
     </linearGradient>
+    <radialGradient id="bgHL" cx="30%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
     <!-- Sphere gradient for dots -->
     <radialGradient id="dotGrad" cx="35%" cy="35%" r="65%">
       <stop offset="0%" stop-color="#ffffff"/>
@@ -11,6 +16,7 @@
     </radialGradient>
   </defs>
   <rect width="16" height="16" rx="3" fill="url(#bg)"/>
+  <rect width="16" height="16" rx="3" fill="url(#bgHL)"/>
   <!-- 5-pointed star: cx=5.5 cy=5 R=4 r=1.6 — exact trig, upper left -->
   <path d="M5.5,1 L6.44,3.71 L9.3,3.76 L7.02,5.49 L7.85,8.24 L5.5,6.6 L3.15,8.24 L3.98,5.49 L1.7,3.76 L4.56,3.71 Z" fill="white"/>
   <!-- Short wand down from star -->
