@@ -16,7 +16,7 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
   if (language === 'auto') {
     langInstruction = 'Respond in the same language as the source content. Match the content language exactly.';
   } else if (exceptLangs.length > 0) {
-    langInstruction = `LANGUAGE RULE (MANDATORY — no exceptions): If the source content is written in ${exceptLangs.join(' or ')}, you MUST respond in that same language — do NOT translate it. For ALL other source languages, you MUST translate and write the ENTIRE summary in ${targetLang}. This applies unconditionally — even if a previous summary exists in another language, you must produce ${targetLang} output. Never inherit the source language into your response unless it is ${exceptLangs.join(' or ')}.`;
+    langInstruction = `CRITICAL! LANGUAGE RULE (MANDATORY — no exceptions): If the source content is written in ${exceptLangs.join(' or ')}, you MUST respond in that same language — do NOT translate it. For ALL other source languages, you MUST translate and write the ENTIRE summary in ${targetLang}. This applies unconditionally — even if a previous summary exists in another language, you must produce ${targetLang} output. Never inherit the source language into your response unless it is ${exceptLangs.join(' or ')}.`;
   } else {
     langInstruction = `Respond in ${targetLang}.`;
   }
