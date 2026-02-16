@@ -1,4 +1,4 @@
-import type { ExtractedContent } from '../extractors/types';
+import type { ExtractedContent, ExtractedComment } from '../extractors/types';
 import type { SummaryDocument } from '../summarizer/types';
 import type { ChatMessage, ModelInfo, VisionSupport } from '../llm/types';
 import type { Settings } from '../storage/types';
@@ -36,7 +36,8 @@ export type MessageType =
   | 'OPEN_TAB'
   | 'OPEN_TAB_RESULT'
   | 'CLOSE_ONBOARDING_TABS'
-  | 'CLOSE_ONBOARDING_TABS_RESULT';
+  | 'CLOSE_ONBOARDING_TABS_RESULT'
+  | 'IFRAME_COMMENTS';
 
 export interface ExtractContentMessage {
   type: 'EXTRACT_CONTENT';
@@ -250,6 +251,12 @@ export interface CloseOnboardingTabsResultMessage {
   debug?: string;
 }
 
+export interface IframeCommentsMessage {
+  type: 'IFRAME_COMMENTS';
+  source: 'disqus' | 'giscus' | 'utterances';
+  comments: ExtractedComment[];
+}
+
 export type Message =
   | ExtractContentMessage
   | ExtractResultMessage
@@ -283,4 +290,5 @@ export type Message =
   | OpenTabMessage
   | OpenTabResultMessage
   | CloseOnboardingTabsMessage
-  | CloseOnboardingTabsResultMessage;
+  | CloseOnboardingTabsResultMessage
+  | IframeCommentsMessage;

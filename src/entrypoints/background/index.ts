@@ -10,7 +10,8 @@ import type { FetchedImage } from '@/lib/images/fetcher';
 import type { Message, ExtractResultMessage, SummaryResultMessage, ChatResponseMessage, ConnectionTestResultMessage, SettingsResultMessage, SaveSettingsResultMessage, NotionDatabasesResultMessage, ExportResultMessage, FetchModelsResultMessage } from '@/lib/messaging/types';
 import type { ChatMessage, ImageContent, VisionSupport, LLMProvider } from '@/lib/llm/types';
 import type { SummaryDocument } from '@/lib/summarizer/types';
-import type { ExtractedContent } from '@/lib/extractors/types';
+import type { ExtractedContent, ExtractedComment } from '@/lib/extractors/types';
+import type { IframeCommentsMessage } from '@/lib/messaging/types';
 import { parseRedditJson, buildRedditMarkdown } from '@/lib/extractors/reddit';
 import { getPersistedTabState, deletePersistedTabState, pruneStaleTabStates } from '@/lib/storage/tab-state';
 
@@ -32,6 +33,9 @@ async function getCachedImages(): Promise<{ images: ImageContent[]; urls: { url:
 // Per-tab AbortController registry for in-flight summarizations
 const activeSummarizations = new Map<number, AbortController>();
 
+// Per-tab iframe comment storage (Disqus, Giscus, Utterances)
+const iframeComments = new Map<number, ExtractedComment[]>();
+
 export default defineBackground(() => {
   const chromeObj = (globalThis as unknown as { chrome: typeof chrome }).chrome;
 
@@ -46,6 +50,19 @@ export default defineBackground(() => {
         sendResponse({ success: false, error: 'Unauthorized sender' });
         return;
       }
+
+      // Fire-and-forget: iframe content scripts push comments here
+      const msg = message as Record<string, unknown>;
+      if (msg.type === 'IFRAME_COMMENTS') {
+        const iframeMsg = message as IframeCommentsMessage;
+        const tabId = sender.tab?.id;
+        if (tabId != null && iframeMsg.comments?.length) {
+          iframeComments.set(tabId, iframeMsg.comments);
+        }
+        // No response needed — fire-and-forget
+        return;
+      }
+
       handleMessage(message as Message)
         .then(sendResponse)
         .catch((err) => {
@@ -62,6 +79,7 @@ export default defineBackground(() => {
   // Clean up persisted tab state when a tab is closed
   chromeObj.tabs.onRemoved.addListener((tabId: number) => {
     deletePersistedTabState(tabId).catch(() => {});
+    iframeComments.delete(tabId);
   });
 
   // Clean up persisted tab state when a tab navigates to a different URL
@@ -72,6 +90,7 @@ export default defineBackground(() => {
       // Different URL → invalidate
       if (persisted.url !== changeInfo.url) {
         deletePersistedTabState(tabId).catch(() => {});
+        iframeComments.delete(tabId);
       }
     }).catch(() => {});
   });
@@ -185,9 +204,145 @@ function sendToTab(tabId: number, message: unknown): Promise<unknown> {
   });
 }
 
+/**
+ * On-demand extraction of comments from cross-origin iframes (Disqus, Giscus, Utterances).
+ * Uses chrome.scripting.executeScript with allFrames to run extraction in every frame,
+ * then filters to iframe-sourced results. This is reliable regardless of service worker
+ * lifecycle — no dependency on the fire-and-forget messages from content scripts.
+ */
+async function extractIframeComments(tabId: number): Promise<ExtractedComment[]> {
+  const chromeScripting = (globalThis as unknown as { chrome: { scripting: typeof chrome.scripting } }).chrome.scripting;
+  try {
+    const results = await chromeScripting.executeScript({
+      target: { tabId, allFrames: true },
+      func: () => {
+        const host = window.location.hostname;
+
+        // --- Disqus ---
+        if (host === 'disqus.com' && window.location.pathname.startsWith('/embed/comments')) {
+          const comments: { author?: string; text: string; likes?: number }[] = [];
+          for (const post of document.querySelectorAll('#post-list li.post')) {
+            const text = post.querySelector('.post-message')?.textContent?.trim() || '';
+            if (text.length < 5) continue;
+            const author = post.querySelector('.author a')?.textContent?.trim() || undefined;
+            const likesRaw = post.querySelector('span[data-role="likes"]')?.textContent?.trim() || '';
+            const likes = likesRaw && /^\d+$/.test(likesRaw) ? parseInt(likesRaw, 10) : undefined;
+            comments.push({ author, text, likes });
+          }
+          return comments.length > 0 ? comments : null;
+        }
+
+        // --- Giscus ---
+        if (host === 'giscus.app') {
+          const comments: { author?: string; text: string; likes?: number }[] = [];
+          for (const el of document.querySelectorAll('.gsc-comment')) {
+            const text = el.querySelector('.gsc-comment-content')?.textContent?.trim() || '';
+            if (text.length < 5) continue;
+            const author = (el.querySelector('a.font-semibold') || el.querySelector('.gsc-comment-author a'))?.textContent?.trim() || undefined;
+            const reactRaw = el.querySelector('.gsc-social-reaction-summary-item-count')?.textContent?.trim() || '';
+            const likes = reactRaw && /^\d+$/.test(reactRaw) ? parseInt(reactRaw, 10) : undefined;
+            comments.push({ author, text, likes });
+          }
+          return comments.length > 0 ? comments : null;
+        }
+
+        // --- Utterances ---
+        if (host === 'utteranc.es') {
+          const comments: { author?: string; text: string; likes?: number }[] = [];
+          for (const article of document.querySelectorAll('article.timeline-comment')) {
+            const text = article.querySelector('div.markdown-body')?.textContent?.trim() || '';
+            if (text.length < 5) continue;
+            const author = (article.querySelector('.comment-meta a strong') || article.querySelector('.comment-header strong'))?.textContent?.trim() || undefined;
+            const footer = article.querySelector('div.comment-footer[reaction-count]');
+            const reactRaw = footer?.getAttribute('reaction-count') || '';
+            const likes = reactRaw && /^\d+$/.test(reactRaw) ? parseInt(reactRaw, 10) : undefined;
+            comments.push({ author, text, likes });
+          }
+          return comments.length > 0 ? comments : null;
+        }
+
+        // --- Generic iframe comment detection ---
+        // Only run in sub-frames (not the main page) to avoid double-counting
+        if (window.self === window.top) return null;
+
+        // Try common comment selectors
+        const commentSelectors = [
+          '.comment-content', '.comment-body', '.comment-text', '.post-message',
+          '.wpd-comment-text', '.commento-body', '.comment__text', '.isso-text',
+          '[class*="comment-content"]', '[class*="comment-body"]', '[class*="comment-text"]',
+        ];
+        for (const sel of commentSelectors) {
+          const els = document.querySelectorAll(sel);
+          if (els.length < 2) continue; // need at least 2 to be a comment section
+
+          const comments: { author?: string; text: string; likes?: number }[] = [];
+          for (const el of els) {
+            const text = el.textContent?.trim() || '';
+            if (text.length < 5) continue;
+
+            const parent = el.parentElement?.closest('[class*="comment"]') || el.closest('li') || el.parentElement;
+            const authorEl = parent?.querySelector('[class*="author"] a') || parent?.querySelector('[class*="author"]')
+              || parent?.querySelector('[class*="username"]') || parent?.querySelector('cite');
+            const author = authorEl?.textContent?.trim() || undefined;
+
+            const voteEl = parent?.querySelector('[class*="vote-count"]') || parent?.querySelector('[class*="likes"]')
+              || parent?.querySelector('[class*="upvote"]');
+            const voteRaw = voteEl?.textContent?.trim()?.replace(/[,\s]/g, '') || '';
+            const likes = /^[+-]?\d+$/.test(voteRaw) ? parseInt(voteRaw, 10) : undefined;
+
+            comments.push({ author, text, likes });
+          }
+          if (comments.length > 0) return comments;
+        }
+
+        return null;
+      },
+    });
+
+    // Collect non-null results from all frames
+    const all: ExtractedComment[] = [];
+    for (const r of results) {
+      if (r.result) all.push(...(r.result as ExtractedComment[]));
+    }
+    return all;
+  } catch {
+    // scripting.executeScript can fail if the tab is closed or a special page
+    return [];
+  }
+}
+
+/** Merge iframe-sourced comments into a main-frame comments array, deduplicating by text */
+function mergeIframeComments(mainComments: ExtractedComment[], iframeExtra: ExtractedComment[]): ExtractedComment[] {
+  if (!iframeExtra.length) return mainComments;
+
+  const seen = new Set(mainComments.map(c => c.text));
+  const merged = [...mainComments];
+  for (const c of iframeExtra) {
+    if (!seen.has(c.text)) {
+      seen.add(c.text);
+      merged.push(c);
+    }
+  }
+  return merged;
+}
+
+/** Chrome blocks content scripts on these domains. */
+function isRestrictedUrl(url?: string): boolean {
+  if (!url) return false;
+  try {
+    const { hostname } = new URL(url);
+    return hostname === 'chromewebstore.google.com'
+      || hostname === 'chrome.google.com';
+  } catch { return false; }
+}
+
 async function handleExtractContent(): Promise<ExtractResultMessage> {
   try {
     const tab = await resolveTargetTab();
+
+    if (isRestrictedUrl(tab.url)) {
+      return { type: 'EXTRACT_RESULT', success: false, error: 'restricted', tabId: tab.id } as ExtractResultMessage;
+    }
 
     let response: unknown;
     try {
@@ -256,6 +411,15 @@ async function handleExtractContent(): Promise<ExtractResultMessage> {
       }
     }
 
+    // Merge comments from cross-origin iframes (Disqus, Giscus, Utterances)
+    if (result.success && result.data && tab.id) {
+      const iframeExtra = await extractIframeComments(tab.id);
+      // Also check fire-and-forget cache
+      const cached = iframeComments.get(tab.id) || [];
+      const combined = [...iframeExtra, ...cached];
+      result.data.comments = mergeIframeComments(result.data.comments || [], combined);
+    }
+
     return result;
   } catch (err) {
     return {
@@ -281,7 +445,17 @@ async function handleExtractComments(): Promise<Message> {
       });
       response = await sendToTab(tab.id, { type: 'EXTRACT_COMMENTS' });
     }
-    return response as Message;
+
+    // Merge iframe comments (Disqus, Giscus, Utterances) — on-demand + cached
+    const resp = response as { success: boolean; comments?: ExtractedComment[] };
+    if (resp.success && tab.id) {
+      const iframeExtra = await extractIframeComments(tab.id);
+      const cached = iframeComments.get(tab.id) || [];
+      const combined = [...iframeExtra, ...cached];
+      resp.comments = mergeIframeComments(resp.comments || [], combined);
+    }
+
+    return resp as Message;
   } catch (err) {
     return { type: 'EXTRACT_COMMENTS', success: false, error: err instanceof Error ? err.message : String(err) } as Message;
   }
