@@ -1999,18 +1999,14 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
     const parsed = parseJsonSafe(cleaned) as Record<string, unknown> | null;
     if (parsed && typeof parsed === 'object' && 'text' in parsed) {
       const text = typeof parsed.text === 'string' ? parsed.text : '';
-      // New format: partial "updates" field; fallback: legacy full "summary"
-      const source = parsed.updates ?? parsed.summary;
+      // "summary" = full replacement (takes priority); "updates" = partial merge
       let updates: Partial<SummaryDocument> | null = null;
-      if (source && typeof source === 'object') {
-        if (parsed.updates) {
-          // Partial update — only changed fields
-          updates = sanitizePartialUpdate(source as Record<string, unknown>);
-        } else {
-          // Legacy full summary — all fields present → full replacement
-          const s = source as Record<string, unknown>;
-          if (s.tldr && s.summary) updates = normalizeSummary(s);
-        }
+      const fullSummary = parsed.summary;
+      if (fullSummary && typeof fullSummary === 'object') {
+        const s = fullSummary as Record<string, unknown>;
+        if (s.tldr && s.summary) updates = normalizeSummary(s);
+      } else if (parsed.updates && typeof parsed.updates === 'object') {
+        updates = sanitizePartialUpdate(parsed.updates as Record<string, unknown>);
       }
       return { updates, text };
     }

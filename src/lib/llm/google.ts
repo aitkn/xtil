@@ -149,13 +149,25 @@ export class GoogleProvider implements LLMProvider {
 /**
  * Convert a standard JSON Schema to Gemini's schema format:
  * - `anyOf: [{type: X}, {type: "null"}]` → `type: X, nullable: true`
- * - Strip `additionalProperties` (unsupported by Gemini)
+ * - Strip `additionalProperties`, `oneOf` (unsupported by Gemini)
+ * - Make properties with `oneOf`-based optionality `nullable: true`
  */
 function convertToGeminiSchema(schema: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
+  // Collect property names that oneOf makes optional (required in a branch, not globally)
+  const oneOfOptionalProps = new Set<string>();
+  if (Array.isArray(schema.oneOf)) {
+    for (const branch of schema.oneOf as Record<string, unknown>[]) {
+      const branchRequired = branch.required as string[] | undefined;
+      if (branchRequired) {
+        for (const prop of branchRequired) oneOfOptionalProps.add(prop);
+      }
+    }
+  }
+
   for (const [key, value] of Object.entries(schema)) {
-    if (key === 'additionalProperties') continue;
+    if (key === 'additionalProperties' || key === 'oneOf') continue;
 
     if (key === 'anyOf' && Array.isArray(value)) {
       const nonNull = value.filter((v: Record<string, unknown>) => v.type !== 'null');
@@ -170,7 +182,10 @@ function convertToGeminiSchema(schema: Record<string, unknown>): Record<string, 
     if (key === 'properties' && typeof value === 'object' && value !== null) {
       const converted: Record<string, unknown> = {};
       for (const [propKey, propValue] of Object.entries(value as Record<string, unknown>)) {
-        converted[propKey] = convertToGeminiSchema(propValue as Record<string, unknown>);
+        const prop = convertToGeminiSchema(propValue as Record<string, unknown>);
+        // Properties that are optional via oneOf become nullable for Gemini
+        if (oneOfOptionalProps.has(propKey)) prop.nullable = true;
+        converted[propKey] = prop;
       }
       result[key] = converted;
       continue;

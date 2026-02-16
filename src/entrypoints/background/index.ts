@@ -683,18 +683,19 @@ async function handleChatMessage(
 
     const chatFormatInstructions = schemaEnforced
       ? `Chat response rules:
-- "text": your conversational response. Markdown supported. Use "" if only updating.
-- "updates": include ONLY the summary fields you want to change. Omit unchanged fields. Set to null if no changes.
-- To remove an optional field, set its value to "__DELETE__".
-- "extraSections" is DEEP-MERGED by key. Only include keys you're changing. "__DELETE__" removes a section.`
+- "updates" vs "summary": use ONE or NEITHER, set the other to null.
+  - "updates": partial — only changed fields. extraSections is deep-merged by key. "__DELETE__" removes a field or section.
+  - "summary": full rewrite — complete summary with all fields. Use when the user asks to redo/regenerate the summary or when most fields change.
+- "text": your conversational response. Markdown supported. Use "" if only updating.`
       : `Chat response format:
-- You MUST respond with a JSON object: {"text": "your message", "updates": <changed fields or null>}
+- You MUST respond with a JSON object: {"text": "...", "updates": ... or null, "summary": ... or null}
 - "text": your conversational response to the user. Markdown supported. Use "" if you have nothing to say beyond the update.
-- "updates": an object with ONLY the summary fields you want to change. Omit fields that stay the same. Set to null if no changes needed (e.g. just answering a question).
-- Each field you include is replaced entirely (exception: "extraSections" — see below). Always provide the complete value for any field you want to change.
-- To remove an optional field, set its value to the string "__DELETE__" (e.g. "factCheck": "__DELETE__").
-- IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.
-- "extraSections" is DEEP-MERGED — only include the keys you are changing. To add or update a section: {"extraSections": {"New Title": "content"}}. To delete one: {"extraSections": {"Old Title": "__DELETE__"}}. Do NOT resend unchanged sections. Keys are plain-text titles (no markdown). Content supports full markdown and mermaid diagrams.`;
+- "updates" vs "summary": use ONE or NEITHER, set the other to null.
+  - "updates": partial changes — only include fields you want to change. Set to null if no changes or using "summary".
+  - "summary": full rewrite — complete summary with all fields. Use when the user asks to redo/regenerate the summary or when most fields change. Set to null if no changes or using "updates".
+- In "updates", each field replaces the existing value. To remove an optional field, set it to "__DELETE__".
+- In "updates", "extraSections" is DEEP-MERGED — only include keys you're changing. {"extraSections": {"New Title": "content"}} adds/updates. {"extraSections": {"Old Title": "__DELETE__"}} removes. Do NOT resend unchanged sections.
+- IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.`;
 
     const rulesSystem = `${summarizationPrompt}
 
