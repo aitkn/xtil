@@ -338,15 +338,21 @@ function isRestrictedUrl(url?: string): boolean {
 
 async function handleExtractContent(): Promise<ExtractResultMessage> {
   try {
-    const tab = await resolveTargetTab();
+    const [tab, settings] = await Promise.all([resolveTargetTab(), getSettings()]);
 
     if (isRestrictedUrl(tab.url)) {
       return { type: 'EXTRACT_RESULT', success: false, error: 'restricted', tabId: tab.id } as ExtractResultMessage;
     }
 
+    const extractMsg = {
+      type: 'EXTRACT_CONTENT' as const,
+      langPrefs: settings.summaryLanguageExcept,
+      summaryLang: settings.summaryLanguage,
+    };
+
     let response: unknown;
     try {
-      response = await sendToTab(tab.id, { type: 'EXTRACT_CONTENT' });
+      response = await sendToTab(tab.id, extractMsg);
     } catch {
       // Content script not injected yet (page was open before extension loaded).
       // Inject it programmatically and retry.
@@ -355,7 +361,7 @@ async function handleExtractContent(): Promise<ExtractResultMessage> {
         target: { tabId: tab.id },
         files: ['content-scripts/content.js'],
       });
-      response = await sendToTab(tab.id, { type: 'EXTRACT_CONTENT' });
+      response = await sendToTab(tab.id, extractMsg);
     }
     const result = response as ExtractResultMessage;
     result.tabId = tab.id;

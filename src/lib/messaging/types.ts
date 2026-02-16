@@ -41,6 +41,8 @@ export type MessageType =
 
 export interface ExtractContentMessage {
   type: 'EXTRACT_CONTENT';
+  langPrefs?: string[];
+  summaryLang?: string;
 }
 
 export interface ExtractResultMessage {
