@@ -90,6 +90,12 @@ export async function summarize(
 
   onSystemPrompt?.(systemPrompt);
 
+  // Build thumbnail URL set so the LLM knows not to embed them (they're shown separately in the UI)
+  const thumbUrls = new Set<string>();
+  if (content.thumbnailUrl) thumbUrls.add(content.thumbnailUrl);
+  if (content.thumbnailUrls) content.thumbnailUrls.forEach(u => thumbUrls.add(u));
+  const thumbnailSet = thumbUrls.size > 0 ? thumbUrls : undefined;
+
   const chunkOptions: ChunkOptions = { contextWindow };
   const chunks = chunkContent(content.content, chunkOptions);
 
@@ -99,9 +105,9 @@ export async function summarize(
     if (signal?.aborted) throw new Error('Summarization cancelled');
     try {
       if (chunks.length === 1) {
-        return await oneShotSummarize(provider, content, systemPrompt, detailLevel, imageContents, imageUrlList, signal, onRawResponse, onConversation);
+        return await oneShotSummarize(provider, content, systemPrompt, detailLevel, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation);
       } else {
-        return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, imageContents, imageUrlList, signal, onRawResponse, onConversation, onRollingSummary);
+        return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRollingSummary);
       }
     } catch (err) {
       // Don't retry cancellation, text responses, no-content, or image requests
@@ -125,13 +131,14 @@ async function oneShotSummarize(
   detailLevel: 'brief' | 'standard' | 'detailed',
   images?: ImageContent[],
   imageUrlList?: { url: string; alt: string }[],
+  thumbnailUrls?: Set<string>,
   signal?: AbortSignal,
   onRawResponse?: (response: string) => void,
   onConversation?: (messages: ChatMessage[]) => void,
 ): Promise<SummaryDocument> {
   let userPrompt = getSummarizationPrompt(content, detailLevel);
   if (images?.length && imageUrlList?.length) {
-    userPrompt += formatImageUrlListing(imageUrlList);
+    userPrompt += formatImageUrlListing(imageUrlList, thumbnailUrls);
   }
 
   const messages: ChatMessage[] = [
@@ -153,6 +160,7 @@ async function rollingContextSummarize(
   detailLevel: 'brief' | 'standard' | 'detailed',
   images?: ImageContent[],
   imageUrlList?: { url: string; alt: string }[],
+  thumbnailUrls?: Set<string>,
   signal?: AbortSignal,
   onRawResponse?: (response: string) => void,
   onConversation?: (messages: ChatMessage[]) => void,
@@ -177,7 +185,7 @@ async function rollingContextSummarize(
     if (i === 0) {
       userPrompt = getSummarizationPrompt(chunkContent, detailLevel);
       if (images?.length && imageUrlList?.length) {
-        userPrompt += formatImageUrlListing(imageUrlList);
+        userPrompt += formatImageUrlListing(imageUrlList, thumbnailUrls);
       }
     } else {
       userPrompt = getRollingContextPrompt(rollingSummary) + '\n\n';
@@ -277,10 +285,11 @@ function parseSummaryResponse(response: string, imageAnalysisEnabled = false): S
   };
 }
 
-function formatImageUrlListing(imageUrlList: { url: string; alt: string }[]): string {
-  const lines = imageUrlList.map((img, i) =>
-    `${i + 1}. {{IMG_${i + 1}}}${img.alt ? ` — "${img.alt}"` : ''}`,
-  );
+function formatImageUrlListing(imageUrlList: { url: string; alt: string }[], thumbnailUrls?: Set<string>): string {
+  const lines = imageUrlList.map((img, i) => {
+    const isThumbnail = thumbnailUrls?.has(img.url);
+    return `${i + 1}. {{IMG_${i + 1}}}${img.alt ? ` — "${img.alt}"` : ''}${isThumbnail ? ' [THUMBNAIL]' : ''}`;
+  });
   return `\n\n**Attached images (use placeholder IDs for embeds, e.g. ![alt]({{IMG_1}})):**\n${lines.join('\n')}`;
 }
 

@@ -349,8 +349,9 @@ ${guidelines.join('\n')}`
 
 Image Analysis Instructions:
 - You have been provided with images from the page. Analyze them as part of the content.
-- ${d.images}` + (detailLevel !== 'brief' ? `
-- For each image, decide the best approach: embed as \`![description](url)\` in the summary (subject to the limit above), describe it in text, or discard if not informative.
+- ${d.images}
+- Images marked [THUMBNAIL] in the attached list are already displayed as the page header image in the UI. You MUST analyze their content, but do NOT embed them with \`![](url)\` in the summary — they would appear twice.` + (detailLevel !== 'brief' ? `
+- For each non-thumbnail image, decide the best approach: embed as \`![description](url)\` in the summary (subject to the limit above), describe it in text, or discard if not informative.
 - If you see image URLs listed in the text that you believe are critical to understanding the content but were NOT attached, you may return \`"requestedImages": ["url1", "url2"]\` (max 3 URLs) alongside the normal JSON response. The system will fetch them and re-run. Only request images that are clearly referenced in the text and essential for understanding.
 - Do NOT request images if the attached images already cover the key visuals.` : '') : '');
 }
