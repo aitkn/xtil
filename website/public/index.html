@@ -9,7 +9,7 @@
   <meta property="og:description" content="Extract content, distill knowledge. AI-powered summaries of any page or video with image analysis, diagrams, chat, and export.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://xtil.ai">
-  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -104,10 +104,10 @@
       gap: 10px;
       font-family: 'DM Sans', sans-serif;
       font-weight: 700;
-      font-size: 1.3rem;
+      font-size: 1.7rem;
       color: var(--text);
     }
-    .nav-brand img { width: 30px; height: 30px; }
+    .nav-brand img { width: 48px; height: 48px; }
     .nav-links { display: flex; gap: 32px; align-items: center; }
     .nav-links a {
       color: var(--text-muted);
@@ -281,97 +281,527 @@
     .btn-ghost:hover { border-color: var(--text-muted); color: var(--text); text-decoration: none; }
     .btn-ghost svg { width: 18px; height: 18px; }
 
-    /* ─── Hero side-by-side demo ─── */
-    .hero-demo {
-      display: grid;
-      grid-template-columns: 1.3fr 1fr;
-      gap: 24px;
-      align-items: start;
+    /* ─── Browser mockup ─── */
+    .browser-mockup {
       max-width: 1100px;
       margin: 0 auto;
-    }
-    .hero-demo-page {
-      border-radius: 14px;
+      border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 0 1px var(--border);
-      background: #1a1a2e;
+      box-shadow: 0 8px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06), 8px 0 40px rgba(109,95,245,0.12);
+      background: #1a1c1e;
     }
-    .hero-demo-bar {
+    .browser-bar {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
+      gap: 10px;
+      padding: 8px 14px;
+      background: #212326;
+      border-bottom: 1px solid #44474e;
     }
-    .hero-demo-dots {
+    .browser-dots { display: flex; gap: 6px; flex-shrink: 0; }
+    .browser-dots span { width: 10px; height: 10px; border-radius: 50%; }
+    .browser-dots span:nth-child(1) { background: #ff5f57; }
+    .browser-dots span:nth-child(2) { background: #ffbd2e; }
+    .browser-dots span:nth-child(3) { background: #28c840; }
+    .browser-tab {
       display: flex;
+      align-items: center;
       gap: 6px;
+      background: #2b2d31;
+      padding: 5px 14px 5px 10px;
+      border-radius: 8px 8px 0 0;
+      font-size: 0.65rem;
+      color: #c4c6d0;
+      white-space: nowrap;
     }
-    .hero-demo-dots span {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--border);
-    }
-    .hero-demo-url {
+    .browser-url {
       flex: 1;
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      background: var(--surface-light);
-      padding: 4px 12px;
-      border-radius: 6px;
+      font-size: 0.65rem;
+      color: #8e9099;
+      background: #1a1c1e;
+      padding: 5px 12px;
+      border-radius: 20px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
-    .hero-demo-article {
-      padding: 28px 32px;
-      max-height: 520px;
+    .browser-url svg { width: 10px; height: 10px; color: #28c840; flex-shrink: 0; }
+    .browser-content {
+      display: flex;
+      height: 820px;
       overflow: hidden;
-      mask-image: linear-gradient(to bottom, black 75%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to bottom, black 75%, transparent 100%);
     }
-    .hero-demo-article h2 {
+    /* Left: Article (dimmed) */
+    .mock-article {
+      flex: 0 0 55%;
+      padding: 24px 28px;
+      opacity: 0.6;
+      overflow: hidden;
+      position: relative;
+      background: #1a1c1e;
+      border-right: 6px solid #44474e;
+    }
+    .mock-article::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 120px;
+      background: linear-gradient(to bottom, transparent, #1a1c1e);
+      pointer-events: none;
+    }
+    .mock-article-img {
+      width: 100%;
+      height: 90px;
+      border-radius: 6px;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, #0d47a1 0%, #1a237e 30%, #4a148c 60%, #1565c0 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .mock-article-img::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 25% 50%, rgba(66,165,245,0.4) 0%, transparent 50%),
+        radial-gradient(circle at 75% 40%, rgba(156,39,176,0.3) 0%, transparent 45%);
+    }
+    .mock-article h2 {
       font-family: Georgia, 'Times New Roman', serif;
-      font-size: 1.35rem;
+      font-size: 1.25rem;
       font-weight: 700;
-      color: var(--text);
-      margin-bottom: 6px;
+      color: #e3e2e6;
+      margin-bottom: 5px;
       line-height: 1.3;
     }
-    .hero-demo-article .article-meta {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      margin-bottom: 16px;
+    .mock-article .art-meta {
+      font-size: 0.62rem;
+      color: #8e9099;
+      margin-bottom: 12px;
       display: flex;
-      gap: 12px;
+      gap: 10px;
     }
-    .hero-demo-article p {
+    .mock-article p {
       font-family: Georgia, 'Times New Roman', serif;
-      font-size: 0.82rem;
+      font-size: 0.75rem;
       line-height: 1.85;
-      color: rgba(232,229,245,0.65);
-      margin-bottom: 14px;
+      color: rgba(227,226,230,0.5);
+      margin-bottom: 11px;
     }
-    .hero-demo-article p strong {
-      color: rgba(232,229,245,0.85);
+    .mock-article p strong { color: rgba(227,226,230,0.7); }
+    .mock-article .hl {
+      background: rgba(109,95,245,0.0);
+      border-radius: 2px;
+      padding: 0 2px;
     }
-    .hero-demo-panel {
-      border-radius: 14px;
+    .browser-mockup.visible .mock-article .hl {
+      animation: phraseGlow 2s ease-in-out 2.5s both;
+    }
+    @keyframes phraseGlow {
+      0% { background: rgba(109,95,245,0.0); }
+      25% { background: rgba(109,95,245,0.2); }
+      100% { background: rgba(109,95,245,0.0); }
+    }
+    /* Right: xTil panel */
+    .mock-panel {
+      flex: 0 0 45%;
+      display: flex;
+      flex-direction: column;
+      background: #1a1c1e;
       overflow: hidden;
-      box-shadow: 0 8px 40px rgba(109, 95, 245, 0.25), 0 0 0 1px rgba(109,95,245,0.3);
-      max-height: 560px;
-      mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
     }
-    .hero-demo-panel img {
+    .mock-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 10px;
+      border-bottom: 1px solid #44474e;
+      flex-shrink: 0;
+      background: #1a1c1e;
+    }
+    .mock-panel-brand {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+    .mock-panel-brand img { width: 20px; height: 20px; }
+    .mock-panel-brand span {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #e3e2e6;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .mock-toolbar { display: flex; align-items: center; gap: 1px; }
+    .mock-tb {
+      width: 24px; height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      color: #c4c6d0;
+    }
+    .mock-tb svg { width: 14px; height: 14px; }
+    .mock-panel-scroll {
+      flex: 1;
+      overflow: hidden;
+      padding: 10px 12px;
+    }
+    /* Badges */
+    .mock-badges { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
+    .mock-badge {
+      font-size: 0.55rem;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.04em;
+    }
+    .mock-badge.type { background: rgba(74,222,128,0.15); color: #4ade80; }
+    .mock-badge.model { background: rgba(180,197,255,0.15); color: #b4c5ff; }
+    .mock-badge.meta-b { background: rgba(142,144,153,0.12); color: #8e9099; }
+    .mock-thumb {
       width: 100%;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      overflow: hidden;
+      line-height: 0;
+    }
+    .mock-thumb svg { width: 100%; display: block; }
+    .mock-ptitle {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #e3e2e6;
+      margin-bottom: 2px;
+      line-height: 1.3;
+    }
+    .mock-pmeta {
+      font-size: 0.55rem;
+      color: #8e9099;
+      margin-bottom: 4px;
+    }
+    .mock-vstats {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .mock-vstats-badge {
+      font-size: 0.5rem;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(74,222,128,0.1);
+      color: #4ade80;
+    }
+    /* Sections */
+    .mock-sec { margin-bottom: 6px; }
+    .mock-sec-head {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 0;
+    }
+    .mock-sec-arrow { font-size: 0.55rem; color: #8e9099; width: 12px; text-align: center; }
+    .mock-sec-label { font-size: 0.62rem; font-weight: 600; color: #e3e2e6; }
+    .mock-sec-cnt { font-size: 0.5rem; color: #8e9099; margin-left: auto; }
+    .mock-sec-btns { display: flex; gap: 3px; margin-left: auto; }
+    .mock-sec-btn {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #363840;
+      color: #c4c6d0;
+      font-size: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .mock-callout {
+      background: #1a3a8a;
+      border-left: 3px solid #b4c5ff;
+      border-radius: 6px;
+      padding: 7px 9px;
+      margin: 3px 0 0 16px;
+      font-size: 0.58rem;
+      line-height: 1.65;
+      color: #dbe4ff;
+    }
+    .mock-callout b { color: #fff; }
+    .mock-takeaway {
+      display: flex;
+      gap: 5px;
+      padding: 2px 0 2px 16px;
+      font-size: 0.58rem;
+      line-height: 1.55;
+      color: #c4c6d0;
+    }
+    .mock-tk-num {
+      flex-shrink: 0;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: rgba(180,197,255,0.12);
+      color: #b4c5ff;
+      font-size: 0.48rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+    .mock-takeaway b { color: #e3e2e6; }
+    .mock-sum-text {
+      font-size: 0.58rem;
+      line-height: 1.6;
+      color: #c4c6d0;
+      margin: 3px 0 4px 16px;
+    }
+    .mock-diagram {
+      background: #212326;
+      border: 1px solid #44474e;
+      border-radius: 8px;
+      padding: 10px 8px;
+      margin: 4px 0 0 16px;
+    }
+    .mock-diagram svg { width: 100%; display: block; }
+    .mock-collapsed { opacity: 0.55; }
+    /* Standalone panel card for feature screenshots */
+    .mock-panel-card {
+      background: #1a1c1e;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(109, 95, 245, 0.2), 0 0 0 1px rgba(255,255,255,0.08);
+      display: flex;
+      flex-direction: column;
+      max-width: 420px;
+      margin-left: auto;
+    }
+    .feature-row.reversed .mock-panel-card { margin-left: 0; margin-right: auto; }
+    .mock-tags { display: flex; gap: 5px; flex-wrap: wrap; margin: 4px 0 0 16px; }
+    .mock-tag {
+      font-size: 0.52rem;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: rgba(180,197,255,0.1);
+      color: #b4c5ff;
+      white-space: nowrap;
+    }
+    .mock-badge.video { background: rgba(239,68,68,0.15); color: #f87171; }
+    .mock-badge.pr { background: rgba(74,222,128,0.15); color: #4ade80; }
+    .mock-merge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.52rem;
+      font-weight: 600;
+      color: #4ade80;
+      margin-top: 4px;
+    }
+    .mock-merge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+    }
+    .mock-code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.52rem;
+      background: rgba(180,197,255,0.1);
+      color: #b4c5ff;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .mock-timeline-entry {
+      display: flex;
+      gap: 6px;
+      padding: 2px 0 2px 16px;
+      font-size: 0.58rem;
+      line-height: 1.55;
+      color: #c4c6d0;
+    }
+    .mock-timeline-year {
+      flex-shrink: 0;
+      font-weight: 700;
+      color: #b4c5ff;
+      font-size: 0.55rem;
+      min-width: 28px;
+    }
+    .mock-new-badge {
+      display: inline-block;
+      font-size: 0.42rem;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: rgba(74,222,128,0.2);
+      color: #4ade80;
+      letter-spacing: 0.05em;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    .mock-play-btn {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px; height: 20px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mock-play-btn::after {
+      content: '';
       display: block;
+      width: 0; height: 0;
+      border-style: solid;
+      border-width: 4px 0 4px 7px;
+      border-color: transparent transparent transparent #fff;
+      margin-left: 1px;
     }
-    .hero-demo-arrow {
-      display: none;
+    .mock-claim {
+      display: flex;
+      gap: 5px;
+      padding: 2px 0 2px 16px;
+      font-size: 0.58rem;
+      line-height: 1.55;
+      color: #c4c6d0;
     }
+    .mock-claim-icon { flex-shrink: 0; width: 12px; font-size: 0.55rem; }
+    .mock-claim-icon.ok { color: #4ade80; }
+    .mock-claim-icon.warn { color: #fbbf24; }
+    .mock-quote {
+      border-left: 2px solid #44474e;
+      padding: 3px 0 3px 10px;
+      margin: 3px 0 3px 16px;
+      font-size: 0.58rem;
+      font-style: italic;
+      line-height: 1.55;
+      color: #c4c6d0;
+    }
+    .mock-quote-attr {
+      font-size: 0.5rem;
+      color: #8e9099;
+      font-style: normal;
+      margin-top: 2px;
+    }
+    /* Chat */
+    .mock-chat {
+      border-top: 1px solid #44474e;
+      padding: 7px 10px;
+      flex-shrink: 0;
+      background: #1a1c1e;
+    }
+    .mock-chat-label {
+      font-size: 0.58rem;
+      font-weight: 500;
+      color: #8e9099;
+      margin-bottom: 6px;
+    }
+    .mock-chat-msg { display: flex; margin-bottom: 4px; }
+    .mock-chat-msg.user {
+      position: relative;
+      margin-left: 15%;
+    }
+    .mock-chat-bubble {
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 0.56rem;
+      line-height: 1.5;
+    }
+    .mock-chat-msg.user .mock-chat-bubble {
+      width: 100%;
+      background: #1a3a8a;
+      color: #dbe4ff;
+    }
+    .mock-chat-msg.assistant .mock-chat-bubble {
+      max-width: 88%;
+      background: #2b2d31;
+      color: #c4c6d0;
+    }
+    .mock-chat-rollback {
+      position: absolute;
+      top: -2px;
+      left: -4px;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #44474e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #c4c6d0;
+      z-index: 1;
+    }
+    .mock-chat-rollback svg { width: 6px; height: 6px; }
+    .mock-change-dot {
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: #b4c5ff;
+      margin: -4px 0 3px calc(15% - 1px);
+    }
+    .mock-chat-input {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #212326;
+      border: 1px solid #44474e;
+      border-radius: 20px;
+      padding: 4px 6px 4px 10px;
+      margin-top: 3px;
+    }
+    .mock-chat-ph { flex: 1; font-size: 0.55rem; color: #5a5c64; }
+    .mock-chat-send {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: #1a3a8a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .mock-chat-send svg { width: 10px; height: 10px; }
+    /* ─── Mockup animations ─── */
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes mockSlideRight {
+      from { opacity: 0; transform: translateX(16px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes mockSlideLeft {
+      from { opacity: 0; transform: translateX(-16px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes drawLine { to { stroke-dashoffset: 0; } }
+    @keyframes nodeAppear { from { opacity: 0; } to { opacity: 1; } }
+    .browser-mockup.visible .mock-badges,
+    .browser-mockup.visible .mock-thumb { animation: fadeSlideUp 0.35s ease-out 0.5s both; }
+    .browser-mockup.visible .mock-ptitle { animation: fadeSlideUp 0.3s ease-out 0.55s both; }
+    .browser-mockup.visible .mock-pmeta { animation: fadeSlideUp 0.3s ease-out 0.6s both; }
+    .browser-mockup.visible .mock-sec:nth-child(1) { animation: fadeSlideUp 0.35s ease-out 0.7s both; }
+    .browser-mockup.visible .mock-sec:nth-child(2) { animation: fadeSlideUp 0.35s ease-out 0.9s both; }
+    .browser-mockup.visible .mock-sec:nth-child(3) { animation: fadeSlideUp 0.35s ease-out 1.1s both; }
+    .browser-mockup.visible .mock-sec:nth-child(4) { animation: fadeSlideUp 0.35s ease-out 1.3s both; }
+    .browser-mockup.visible .mock-sec:nth-child(5) { animation: fadeSlideUp 0.35s ease-out 1.5s both; }
+    .browser-mockup.visible .mock-sec:nth-child(6) { animation: fadeSlideUp 0.35s ease-out 1.7s both; }
+    .browser-mockup.visible .mock-diagram .dg-node { animation: nodeAppear 0.3s ease-out both; }
+    .browser-mockup.visible .mock-diagram .dg-n1 { animation-delay: 1.3s; }
+    .browser-mockup.visible .mock-diagram .dg-n2 { animation-delay: 1.45s; }
+    .browser-mockup.visible .mock-diagram .dg-n3 { animation-delay: 1.6s; }
+    .browser-mockup.visible .mock-diagram .dg-n4 { animation-delay: 1.75s; }
+    .browser-mockup.visible .mock-diagram .dg-arrow {
+      stroke-dasharray: 40;
+      stroke-dashoffset: 40;
+      animation: drawLine 0.4s ease-out both;
+    }
+    .browser-mockup.visible .mock-diagram .dg-a1 { animation-delay: 1.4s; }
+    .browser-mockup.visible .mock-diagram .dg-a2 { animation-delay: 1.55s; }
+    .browser-mockup.visible .mock-diagram .dg-a3 { animation-delay: 1.7s; }
+    .browser-mockup.visible .mock-chat-msg.user { animation: mockSlideRight 0.3s ease-out 2.0s both; }
+    .browser-mockup.visible .mock-chat-msg.assistant { animation: mockSlideLeft 0.3s ease-out 2.5s both; }
+    .browser-mockup.visible .mock-chat-input { animation: fadeSlideUp 0.25s ease-out 2.7s both; }
 
     /* ─── Sticky scroll feature rows ─── */
     .feature-row {
@@ -416,14 +846,12 @@
       opacity: 0.85;
     }
 
-    .feature-shot {
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 8px 40px rgba(109, 95, 245, 0.2), 0 0 0 1px var(--border);
-    }
+    .feature-shot {}
     .feature-shot img {
       width: 100%;
       display: block;
+      border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(109, 95, 245, 0.2), 0 0 0 1px var(--border);
     }
 
     /* ─── Source ticker ─── */
@@ -760,11 +1188,10 @@
 
     /* ─── Responsive ─── */
     @media (max-width: 768px) {
-      .hero-demo {
-        grid-template-columns: 1fr;
-        max-width: 400px;
-      }
-      .hero-demo-page { display: none; }
+      .browser-mockup { margin: 0 12px; }
+      .mock-article { display: none; }
+      .mock-panel { flex: 0 0 100%; }
+      .browser-content { height: 680px; }
       .feature-row {
         grid-template-columns: 1fr;
         gap: 24px;
@@ -793,6 +1220,9 @@
       .hero h1 { font-size: 2.2rem; }
       .hero-actions { flex-direction: column; }
       .providers-grid { grid-template-columns: 1fr 1fr; }
+      .browser-content { height: 560px; }
+      .mock-tb { width: 20px; height: 20px; }
+      .mock-tb svg { width: 11px; height: 11px; }
     }
   </style>
 </head>
@@ -800,10 +1230,12 @@
 
 <nav id="nav">
   <div class="nav-inner">
-    <a class="nav-brand" href="/">
-      <img src="/icon.svg" alt="xTil">
-      xTil
-    </a>
+    <div style="display:flex;align-items:center;gap:0;">
+      <a class="nav-brand" href="/">
+        <img src="/icon.svg" alt="xTil">
+        xTil
+      </a><a href="https://buymeacoffee.com/xtil" target="_blank" rel="noopener" title="Support development" style="display:inline-flex;margin-left:30px;color:var(--text-muted);transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'"><svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></a>
+    </div>
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#how-it-works">How it works</a>
@@ -829,6 +1261,7 @@
         <span class="gradient">Extract</span> content,<br>
         <span class="gradient">distill</span> knowledge
       </h1>
+      <p style="font-size:0.85rem;opacity:0.5;margin-bottom:12px;letter-spacing:0.02em;">xTil &mdash; pronounced &ldquo;ex-til,&rdquo; from <span style="opacity:1;color:var(--primary-bright)">ex</span>tract + dis<span style="opacity:1;color:var(--primary-bright)">til</span>l</p>
       <p class="hero-sub">Turn any web page into a structured, multi-section analysis &mdash; overview, key takeaways, fact-checks, visual diagrams, and more. Then refine it with chat and export anywhere.</p>
       <div class="hero-actions">
         <a class="btn-primary" href="https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon" target="_blank" rel="noopener">
@@ -842,31 +1275,187 @@
       </div>
     </div>
 
-    <!-- Hero side-by-side demo -->
-    <div class="hero-demo reveal reveal-delay-2">
-      <!-- Left: original article -->
-      <div class="hero-demo-page">
-        <div class="hero-demo-bar">
-          <div class="hero-demo-dots"><span></span><span></span><span></span></div>
-          <div class="hero-demo-url">sciencedaily.com/quantum-computing-2024-breakthrough</div>
+    <!-- Browser mockup demo -->
+    <div class="browser-mockup reveal reveal-delay-2">
+      <div class="browser-bar">
+        <div class="browser-dots"><span></span><span></span><span></span></div>
+        <div class="browser-tab">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect width="16" height="16" rx="3" fill="#2b2d31"/><circle cx="8" cy="8" r="4" fill="#8e9099"/></svg>
+          Quantum Computing Crosses Critical...
         </div>
-        <div class="hero-demo-article">
+        <div class="browser-url">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
+          sciencedaily.com/quantum-computing-2024-breakthrough
+        </div>
+      </div>
+      <div class="browser-content">
+        <!-- Left: Article side (dimmed) -->
+        <div class="mock-article">
+          <div class="mock-article-img">
+            <img src="/screenshots/quantum-thumbnail.svg" alt="Quantum computing circuit diagram" style="width:100%;height:100%;display:block;object-fit:cover;">
+          </div>
           <h2>Quantum Computing Crosses Critical Error-Correction Threshold in 2024</h2>
-          <div class="article-meta">
+          <div class="art-meta">
             <span>Science Daily</span>
             <span>Dec 14, 2024</span>
             <span>12 min read</span>
           </div>
-          <p>Quantum computing uses <strong>qubits in superposition</strong> to perform calculations exponentially faster than classical bits. Unlike traditional binary bits that exist as either 0 or 1, qubits exploit the principles of quantum mechanics to represent both states simultaneously, enabling parallel computation across exponentially many states.</p>
-          <p>Current hardware from <strong>IBM</strong> (Condor, 1,121 qubits) and <strong>Google</strong> (Sycamore) has surpassed major milestones in demonstrating quantum advantage. However, the real bottleneck is <strong>error correction</strong> &mdash; noisy intermediate-scale quantum (NISQ) devices still produce too many errors for most practical applications in cryptography, drug discovery, and materials science.</p>
-          <p>The global quantum computing market is projected to reach <strong>$65 billion by 2030</strong>, driven by advances in superconducting circuits, trapped ions, and topological qubits. Major players including IBM, Google, Microsoft, and IonQ continue to invest heavily in making fault-tolerant quantum computers a reality.</p>
-          <p>Researchers at MIT and Caltech have recently demonstrated a novel approach to quantum error correction that reduces the overhead by an order of magnitude, bringing practical quantum advantage significantly closer. &ldquo;We are now at the stage where quantum computers can do things that classical computers cannot,&rdquo; said Dr. John Preskill of Caltech.</p>
+          <p>Quantum computing uses <strong><span class="hl">qubits in superposition</span></strong> to perform calculations exponentially faster than classical bits. Unlike traditional binary bits that exist as either 0 or 1, qubits exploit the principles of quantum mechanics to represent both states simultaneously.</p>
+          <p>Current hardware from <strong>IBM</strong> (Condor, 1,121 qubits) and <strong>Google</strong> (Sycamore) has surpassed major milestones. However, the real bottleneck is <strong><span class="hl">error correction</span></strong> &mdash; noisy intermediate-scale quantum (NISQ) devices still produce too many errors for most practical applications.</p>
+          <p>The global quantum computing market is projected to reach <strong>$65 billion by 2030</strong>, driven by advances in superconducting circuits, trapped ions, and topological qubits.</p>
+          <p>Researchers at MIT and Caltech have demonstrated a novel approach to <strong><span class="hl">quantum error correction</span></strong> that reduces overhead by an order of magnitude, bringing practical quantum advantage significantly closer.</p>
+          <p>&ldquo;We are now at the stage where quantum computers can do things that classical computers cannot,&rdquo; said <strong>Dr. John Preskill</strong> of Caltech. The new technique uses a syndrome decoding method that can identify and correct errors faster than they accumulate.</p>
+          <p>The implications extend beyond pure computation. Quantum-safe cryptography, pharmaceutical drug discovery, climate modeling, and optimization problems in logistics could all benefit from fault-tolerant quantum machines within the next decade.</p>
+          <p>Industry analysts note that the transition from NISQ to fault-tolerant systems represents the most significant inflection point since the field&rsquo;s inception. <strong>Microsoft</strong>&rsquo;s topological qubit approach and <strong>IonQ</strong>&rsquo;s trapped-ion systems offer alternative paths that may prove more scalable in the long run.</p>
         </div>
-      </div>
-
-      <!-- Right: xTil summary panel -->
-      <div class="hero-demo-panel">
-        <img src="/screenshots/summary-dark.png" alt="xTil summary of an article about quantum computing" loading="lazy">
+        <!-- Right: xTil panel -->
+        <div class="mock-panel">
+          <div class="mock-panel-header">
+            <div class="mock-panel-brand">
+              <img src="/icon.svg" alt="">
+              <span>xTil</span>
+            </div>
+            <div class="mock-toolbar">
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="6" width="16" height="2" rx="1"/><rect x="4" y="11" width="12" height="2" rx="1"/><rect x="4" y="16" width="8" height="2" rx="1"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.37 5.51A7.35 7.35 0 0 0 9.1 7.5c0 4.08 3.32 7.4 7.4 7.4.68 0 1.35-.09 1.99-.27A7.014 7.014 0 0 1 12 19c-3.86 0-7-3.14-7-7 0-2.93 1.81-5.45 4.37-6.49zM12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span>
+            </div>
+          </div>
+          <div class="mock-panel-scroll">
+            <div class="mock-badges">
+              <span class="mock-badge type">ARTICLE</span>
+              <span class="mock-badge model">GPT-4o</span>
+              <span class="mock-badge meta-b">12 min read</span>
+            </div>
+            <div class="mock-thumb">
+              <img src="/screenshots/quantum-thumbnail.svg" alt="Quantum computing circuit diagram" style="width:100%;height:100%;display:block;object-fit:cover;">
+            </div>
+            <div class="mock-ptitle">Quantum Computing Crosses Critical Error-Correction Threshold</div>
+            <div class="mock-pmeta">Science Daily &middot; Dec 14, 2024 &middot; 2,847 words &middot; 3 images</div>
+            <!-- TL;DR -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">TL;DR</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-callout">
+                Researchers have crossed the critical <b>error-correction threshold</b> for quantum computing, reducing overhead by <b>10x</b>. IBM&rsquo;s 1,121-qubit Condor and Google&rsquo;s Sycamore demonstrate <b>quantum advantage</b>, with the market projected to hit <b>$65B by 2030</b>.
+              </div>
+            </div>
+            <!-- Key Takeaways -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Key Takeaways</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-takeaway">
+                <span class="mock-tk-num">1</span>
+                <span><b>Error correction breakthrough</b> &mdash; MIT/Caltech reduced quantum error correction overhead by 10x, crossing a critical threshold.</span>
+              </div>
+              <div class="mock-takeaway">
+                <span class="mock-tk-num">2</span>
+                <span><b>Hardware milestones</b> &mdash; IBM Condor reaches 1,121 qubits; Google Sycamore demonstrates quantum advantage.</span>
+              </div>
+              <div class="mock-takeaway">
+                <span class="mock-tk-num">3</span>
+                <span><b>Market growth</b> &mdash; $65B projected by 2030 across superconducting, trapped-ion, and topological approaches.</span>
+              </div>
+            </div>
+            <!-- Summary -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Summary</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-sum-text">The quantum computing field reached a pivotal moment with a novel error-correction approach that dramatically reduces computational overhead.</div>
+              <div class="mock-diagram">
+                <svg viewBox="0 0 260 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs><marker id="ah" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><path d="M0,0 L6,2 L0,4" fill="#8e9099"/></marker></defs>
+                  <g class="dg-node dg-n1"><rect x="1" y="8" width="52" height="28" rx="6" fill="#2b2d31" stroke="#44474e"/><text x="27" y="26" text-anchor="middle" fill="#c4c6d0" font-size="7" font-family="sans-serif">Qubit Init</text></g>
+                  <line class="dg-arrow dg-a1" x1="53" y1="22" x2="71" y2="22" stroke="#8e9099" stroke-width="1.5" marker-end="url(#ah)"/>
+                  <g class="dg-node dg-n2"><rect x="71" y="8" width="56" height="28" rx="6" fill="#2b2d31" stroke="#44474e"/><text x="99" y="26" text-anchor="middle" fill="#c4c6d0" font-size="7" font-family="sans-serif">Error Detect</text></g>
+                  <line class="dg-arrow dg-a2" x1="127" y1="22" x2="145" y2="22" stroke="#8e9099" stroke-width="1.5" marker-end="url(#ah)"/>
+                  <g class="dg-node dg-n3"><rect x="145" y="8" width="52" height="28" rx="6" fill="#2b2d31" stroke="#44474e"/><text x="171" y="26" text-anchor="middle" fill="#c4c6d0" font-size="7" font-family="sans-serif">Syndrome</text></g>
+                  <line class="dg-arrow dg-a3" x1="197" y1="22" x2="215" y2="22" stroke="#8e9099" stroke-width="1.5" marker-end="url(#ah)"/>
+                  <g class="dg-node dg-n4"><rect x="215" y="8" width="44" height="28" rx="6" fill="#1a3a8a" stroke="#b4c5ff" stroke-opacity="0.3"/><text x="237" y="26" text-anchor="middle" fill="#b4c5ff" font-size="7" font-family="sans-serif">Fix</text></g>
+                </svg>
+              </div>
+            </div>
+            <!-- Fact Check (expanded) -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Fact Check</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-claim">
+                <span class="mock-claim-icon ok">&#10003;</span>
+                <span><b>IBM Condor has 1,121 qubits</b> &mdash; Verified. Announced Dec 2023.</span>
+              </div>
+              <div class="mock-claim">
+                <span class="mock-claim-icon ok">&#10003;</span>
+                <span><b>$65B market by 2030</b> &mdash; Verified. Matches McKinsey &amp; BCG estimates.</span>
+              </div>
+              <div class="mock-claim">
+                <span class="mock-claim-icon warn">&#9888;</span>
+                <span><b>10x overhead reduction</b> &mdash; Contested. Paper claims 8&ndash;12x depending on architecture.</span>
+              </div>
+              <div class="mock-claim">
+                <span class="mock-claim-icon ok">&#10003;</span>
+                <span><b>Google Sycamore quantum advantage</b> &mdash; Verified. Published in Nature 2019.</span>
+              </div>
+            </div>
+            <!-- Notable Quotes (expanded) -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Notable Quotes</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-quote">
+                &ldquo;We are now at the stage where quantum computers can do things that classical computers cannot.&rdquo;
+                <div class="mock-quote-attr">&mdash; Dr. John Preskill, Caltech</div>
+              </div>
+              <div class="mock-quote">
+                &ldquo;Error correction is the bridge between quantum toys and quantum tools.&rdquo;
+                <div class="mock-quote-attr">&mdash; Dr. Sarah Chen, MIT</div>
+              </div>
+            </div>
+            <!-- Conclusion (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9654;</span>
+                <span class="mock-sec-label">Conclusion</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+            </div>
+          </div>
+          <!-- Chat area -->
+          <div class="mock-chat">
+            <div class="mock-chat-label">Chat</div>
+            <div class="mock-chat-msg user">
+              <span class="mock-chat-rollback"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg></span>
+              <div class="mock-chat-bubble">Add a flowchart diagram</div>
+            </div>
+            <div class="mock-change-dot"></div>
+            <div class="mock-chat-msg assistant">
+              <div class="mock-chat-bubble">Done! I&rsquo;ve added a flowchart showing the quantum error correction pipeline.</div>
+            </div>
+            <div class="mock-chat-input">
+              <span class="mock-chat-ph">Ask anything about this page...</span>
+              <span class="mock-chat-send"><svg viewBox="0 0 24 24" fill="#b4c5ff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -911,7 +1500,110 @@
         <p style="margin-top:12px;">Choose between brief, standard, or detailed analysis &mdash; xTil automatically scales the depth to match the content length.</p>
       </div>
       <div class="feature-shot">
-        <img src="/screenshots/summary-dark.png" alt="Full multi-section article summary with TL;DR, key takeaways, quotes, fact check, pros & cons, and conclusion" loading="lazy">
+        <div class="mock-panel-card">
+          <div class="mock-panel-header">
+            <div class="mock-panel-brand"><img src="/icon.svg" alt=""><span>xTil</span></div>
+            <div class="mock-toolbar">
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="6" width="16" height="2" rx="1"/><rect x="4" y="11" width="12" height="2" rx="1"/><rect x="4" y="16" width="8" height="2" rx="1"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.37 5.51A7.35 7.35 0 0 0 9.1 7.5c0 4.08 3.32 7.4 7.4 7.4.68 0 1.35-.09 1.99-.27A7.014 7.014 0 0 1 12 19c-3.86 0-7-3.14-7-7 0-2.93 1.81-5.45 4.37-6.49zM12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span>
+            </div>
+          </div>
+          <div class="mock-panel-scroll">
+            <div class="mock-badges">
+              <span class="mock-badge type">ARTICLE</span>
+              <span class="mock-badge model">GPT-4o</span>
+            </div>
+            <div class="mock-vstats">
+              <span class="mock-vstats-badge">&#10003; 3,450 words</span>
+              <span class="mock-vstats-badge">&#128248; 2 images &mdash; will analyze</span>
+              <span class="mock-vstats-badge">&#128172; 47 comments</span>
+            </div>
+            <!-- TL;DR -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">TL;DR</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-callout">
+                Researchers have crossed the critical <b>error-correction threshold</b> for quantum computing, reducing overhead by <b>10x</b>. IBM&rsquo;s 1,121-qubit Condor and Google&rsquo;s Sycamore demonstrate <b>quantum advantage</b>, with the market projected to hit <b>$65B by 2030</b>.
+              </div>
+            </div>
+            <!-- Key Takeaways -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Key Takeaways</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-takeaway"><span class="mock-tk-num">1</span><span><b>Error correction breakthrough</b> &mdash; MIT/Caltech reduced quantum error correction overhead by 10x, crossing a critical threshold.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">2</span><span><b>Hardware milestones</b> &mdash; IBM Condor reaches <span style="color:#fbbf24">1,121 qubits</span>; Google Sycamore demonstrates quantum advantage.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">3</span><span><b>Market growth</b> &mdash; <span style="color:#4ade80">$65B projected by 2030</span> across superconducting, trapped-ion, and topological approaches.</span></div>
+            </div>
+            <!-- Summary -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Summary</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-sum-text">The quantum computing field reached a pivotal moment when MIT and Caltech researchers demonstrated a novel error-correction approach that reduces computational overhead by an order of magnitude. Combined with IBM&rsquo;s 1,121-qubit Condor chip and Google&rsquo;s quantum advantage demonstrations, the field is transitioning from laboratory curiosities to practical systems.</div>
+            </div>
+            <!-- Fact Check -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Fact Check</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-claim"><span class="mock-claim-icon ok">&#10003;</span><span><b>IBM Condor has 1,121 qubits</b> &mdash; Verified. Announced Dec 2023.</span></div>
+              <div class="mock-claim"><span class="mock-claim-icon ok">&#10003;</span><span><b>$65B market by 2030</b> &mdash; Verified. Matches McKinsey &amp; BCG estimates.</span></div>
+              <div class="mock-claim"><span class="mock-claim-icon warn">&#9888;</span><span><b>10x overhead reduction</b> &mdash; Contested. Paper claims 8&ndash;12x depending on architecture.</span></div>
+            </div>
+            <!-- Notable Quotes -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Notable Quotes</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-quote">
+                &ldquo;We are now at the stage where quantum computers can do things that classical computers cannot.&rdquo;
+                <div class="mock-quote-attr">&mdash; Dr. John Preskill, Caltech</div>
+              </div>
+              <div class="mock-quote">
+                &ldquo;Error correction is the bridge between quantum toys and quantum tools.&rdquo;
+                <div class="mock-quote-attr">&mdash; Dr. Sarah Chen, MIT</div>
+              </div>
+            </div>
+            <!-- Conclusion (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9654;</span>
+                <span class="mock-sec-label">Conclusion</span>
+              </div>
+            </div>
+            <!-- Related Topics -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Related Topics</span>
+              </div>
+              <div class="mock-tags">
+                <span class="mock-tag">Quantum Computing</span>
+                <span class="mock-tag">Error Correction</span>
+                <span class="mock-tag">Superconducting Qubits</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -924,11 +1616,376 @@
         <p style="margin-top:12px;">Works on any video with a transcript. Long lectures, podcasts, tutorials &mdash; distilled into sections you can skim in seconds.</p>
       </div>
       <div class="feature-shot">
-        <img src="/screenshots/youtube-dark-v3.png" alt="YouTube video summary with timestamp links, metadata, key takeaways, and fact check" loading="lazy">
+        <div class="mock-panel-card">
+          <div class="mock-panel-header">
+            <div class="mock-panel-brand"><img src="/icon.svg" alt=""><span>xTil</span></div>
+            <div class="mock-toolbar">
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="6" width="16" height="2" rx="1"/><rect x="4" y="11" width="12" height="2" rx="1"/><rect x="4" y="16" width="8" height="2" rx="1"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.37 5.51A7.35 7.35 0 0 0 9.1 7.5c0 4.08 3.32 7.4 7.4 7.4.68 0 1.35-.09 1.99-.27A7.014 7.014 0 0 1 12 19c-3.86 0-7-3.14-7-7 0-2.93 1.81-5.45 4.37-6.49zM12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span>
+            </div>
+          </div>
+          <div class="mock-panel-scroll">
+            <div class="mock-badges">
+              <span class="mock-badge video">YOUTUBE</span>
+              <span class="mock-badge model">GPT-4o</span>
+            </div>
+            <!-- YouTube thumbnail -->
+            <div class="mock-thumb"><svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="tbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1a1a2e"/><stop offset="40%" stop-color="#16213e"/><stop offset="100%" stop-color="#0f3460"/></linearGradient>
+                <radialGradient id="tspot" cx="65%" cy="50%" r="45%"><stop offset="0%" stop-color="#1a5276" stop-opacity="0.8"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+                <linearGradient id="tshirt" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2c3e50"/><stop offset="100%" stop-color="#1a252f"/></linearGradient>
+                <radialGradient id="tface" cx="45%" cy="35%" r="50%"><stop offset="0%" stop-color="#d4a574"/><stop offset="100%" stop-color="#b8895a"/></radialGradient>
+                <radialGradient id="thair" cx="50%" cy="60%" r="50%"><stop offset="0%" stop-color="#4a3728"/><stop offset="100%" stop-color="#2c1f14"/></radialGradient>
+                <filter id="tshadow"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.5"/></filter>
+                <filter id="ttextbg"><feMorphology operator="dilate" radius="2" in="SourceAlpha" result="expanded"/><feFlood flood-color="#000" flood-opacity="0.7" result="color"/><feComposite in="color" in2="expanded" operator="in" result="bg"/><feMerge><feMergeNode in="bg"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <!-- Background -->
+              <rect width="320" height="180" fill="url(#tbg)"/>
+              <rect width="320" height="180" fill="url(#tspot)"/>
+              <!-- Subtle bokeh circles (out-of-focus background) -->
+              <circle cx="40" cy="30" r="18" fill="#4f46e5" opacity="0.07"/>
+              <circle cx="280" cy="25" r="12" fill="#e74c3c" opacity="0.06"/>
+              <circle cx="60" cy="150" r="22" fill="#2980b9" opacity="0.05"/>
+              <circle cx="300" cy="140" r="15" fill="#8e44ad" opacity="0.06"/>
+              <circle cx="150" cy="20" r="10" fill="#f39c12" opacity="0.05"/>
+              <!-- Person (right side) — head, hair, shoulders -->
+              <g transform="translate(210, 0)">
+                <!-- Shoulders / hoodie -->
+                <path d="M30,120 Q30,105 55,98 Q80,92 110,98 Q135,105 135,120 L135,185 L30,185 Z" fill="url(#tshirt)"/>
+                <!-- Hoodie collar -->
+                <path d="M60,100 Q65,108 82,110 Q100,108 105,100" fill="none" stroke="#3d5068" stroke-width="1.5"/>
+                <!-- Neck -->
+                <rect x="70" y="88" width="24" height="14" rx="4" fill="#c4956a"/>
+                <!-- Head -->
+                <ellipse cx="82" cy="65" rx="28" ry="32" fill="url(#tface)"/>
+                <!-- Hair -->
+                <path d="M54,55 Q54,30 82,28 Q110,30 110,55 Q108,42 82,40 Q56,42 54,55 Z" fill="url(#thair)"/>
+                <!-- Hair sides -->
+                <path d="M54,55 Q52,65 54,75" fill="none" stroke="#3a2a1a" stroke-width="4" stroke-linecap="round"/>
+                <path d="M110,55 Q112,65 110,75" fill="none" stroke="#3a2a1a" stroke-width="4" stroke-linecap="round"/>
+                <!-- Ear -->
+                <ellipse cx="110" cy="65" rx="4" ry="6" fill="#c4956a"/>
+                <!-- Eyes -->
+                <ellipse cx="73" cy="62" rx="3.5" ry="2.5" fill="#1a1a2e"/>
+                <ellipse cx="93" cy="62" rx="3.5" ry="2.5" fill="#1a1a2e"/>
+                <circle cx="74" cy="61.5" r="1" fill="#fff" opacity="0.7"/>
+                <circle cx="94" cy="61.5" r="1" fill="#fff" opacity="0.7"/>
+                <!-- Eyebrows -->
+                <path d="M68,56 Q73,54 78,56" fill="none" stroke="#3a2a1a" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M88,56 Q93,54 98,56" fill="none" stroke="#3a2a1a" stroke-width="1.5" stroke-linecap="round"/>
+                <!-- Nose -->
+                <path d="M82,64 Q80,72 78,74 Q82,76 86,74 Q84,72 82,64" fill="#b8895a" opacity="0.5"/>
+                <!-- Mouth -->
+                <path d="M75,80 Q82,84 89,80" fill="none" stroke="#8a6040" stroke-width="1.2" stroke-linecap="round"/>
+              </g>
+              <!-- Bold text overlay (left side) — YouTube thumbnail style -->
+              <g filter="url(#tshadow)">
+                <text x="18" y="60" fill="#fff" font-size="30" font-weight="900" font-family="sans-serif" letter-spacing="-0.5">AI IS</text>
+                <text x="18" y="92" fill="#fff" font-size="30" font-weight="900" font-family="sans-serif" letter-spacing="-0.5">TURNING</text>
+                <text x="18" y="124" fill="#f59e0b" font-size="30" font-weight="900" font-family="sans-serif" letter-spacing="-0.5">INTO</text>
+                <text x="18" y="156" fill="#f59e0b" font-size="30" font-weight="900" font-family="sans-serif" letter-spacing="-0.5">SOMETHING</text>
+                <text x="18" y="178" fill="#f59e0b" font-size="18" font-weight="900" font-family="sans-serif" letter-spacing="-0.5">TOTALLY NEW</text>
+              </g>
+              <!-- Duration badge -->
+              <rect x="270" y="156" width="42" height="18" rx="3" fill="rgba(0,0,0,0.8)"/>
+              <text x="291" y="169" text-anchor="middle" fill="#fff" font-size="10.5" font-weight="600" font-family="sans-serif">11:42</text>
+            </svg></div>
+            <div class="mock-ptitle">AI Is Turning Into Something Totally New</div>
+            <div class="mock-pmeta">Fireship &middot; Jan 8, 2025 &middot; 11:42 &middot; 2.1M views</div>
+            <div class="mock-vstats">
+              <span class="mock-vstats-badge">&#10003; 4,812 words</span>
+              <span class="mock-vstats-badge">&#128172; 1.2K comments</span>
+            </div>
+            <!-- TL;DR -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">TL;DR</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-callout">
+                AI is shifting from single-prompt chatbots to <b>autonomous multi-step agents</b> that plan, execute, and self-correct. The new paradigm combines <b>chain-of-thought reasoning</b> with tool use and memory, turning LLMs from parlor tricks into <b>general-purpose problem solvers</b>.
+              </div>
+            </div>
+            <!-- Key Takeaways -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Key Takeaways</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-takeaway"><span class="mock-tk-num">1</span><span><b>Agentic AI</b> &mdash; The industry is moving from chatbots to agents that can browse, code, and execute multi-step workflows autonomously.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">2</span><span><b>Reasoning models</b> &mdash; Chain-of-thought and tree-of-thought approaches let models <span style="color:#fbbf24">self-verify</span> before answering.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">3</span><span><b>Tool use is key</b> &mdash; Models that call APIs, run code, and search the web outperform those that rely on training data alone.</span></div>
+            </div>
+            <!-- Summary -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Summary</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-sum-text">The AI paradigm is undergoing its most significant shift since the introduction of transformers. Rather than larger models trained on more data, the frontier has moved to systems that think step-by-step, use external tools, and maintain persistent memory across sessions.</div>
+            </div>
+            <!-- Fact Check (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Fact Check</span></div>
+            </div>
+            <!-- Notable Quotes (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Notable Quotes</span></div>
+            </div>
+            <!-- Conclusion (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Conclusion</span></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Row 3: GitHub — Description left, Screenshot right -->
+    <!-- Row 3: Chat Refinement — Description left, Screenshot right -->
+    <div class="feature-row reveal">
+      <div class="feature-description">
+        <div class="card-icon" style="background:rgba(251,191,36,0.12);color:#fbbf24;">&#128488;</div>
+        <h3>Chat Refinement</h3>
+        <p>Every summary is a starting point, not the final word. Ask xTil to expand a section, translate everything to another language, or add an entirely new section like &ldquo;Timeline&rdquo; or &ldquo;Key Statistics.&rdquo;</p>
+        <p style="margin-top:12px;">Made a wrong turn? Every message has a revert button &mdash; one click rolls the summary back to the state before that message was sent. You can even ask follow-up questions about the content itself.</p>
+      </div>
+      <div class="feature-shot">
+        <div class="mock-panel-card">
+          <div class="mock-panel-header">
+            <div class="mock-panel-brand"><img src="/icon.svg" alt=""><span>xTil</span></div>
+            <div class="mock-toolbar">
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="6" width="16" height="2" rx="1"/><rect x="4" y="11" width="12" height="2" rx="1"/><rect x="4" y="16" width="8" height="2" rx="1"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.37 5.51A7.35 7.35 0 0 0 9.1 7.5c0 4.08 3.32 7.4 7.4 7.4.68 0 1.35-.09 1.99-.27A7.014 7.014 0 0 1 12 19c-3.86 0-7-3.14-7-7 0-2.93 1.81-5.45 4.37-6.49zM12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span>
+            </div>
+          </div>
+          <div class="mock-panel-scroll">
+            <div class="mock-badges">
+              <span class="mock-badge type">ARTICLE</span>
+              <span class="mock-badge model">GPT-4o</span>
+            </div>
+            <div class="mock-vstats">
+              <span class="mock-vstats-badge">&#10003; 3,450 words</span>
+              <span class="mock-vstats-badge">&#128248; 2 images</span>
+            </div>
+            <!-- TL;DR (Spanish) -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">TL;DR</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-callout">
+                Los investigadores han cruzado el <b>umbral cr&iacute;tico de correcci&oacute;n de errores</b> para la computaci&oacute;n cu&aacute;ntica, reduciendo la sobrecarga en <b>10x</b>. El mercado se proyecta a <b>$65 mil millones para 2030</b>.
+              </div>
+            </div>
+            <!-- Puntos Clave (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Puntos Clave</span></div>
+            </div>
+            <!-- Resumen (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Resumen</span></div>
+            </div>
+            <!-- Citas Destacadas (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Citas Destacadas</span></div>
+            </div>
+            <!-- Cronolog&iacute;a (expanded, NEW badge) -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Cronolog&iacute;a<span class="mock-new-badge">NEW</span></span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-timeline-entry"><span class="mock-timeline-year">2019</span><span>Google demuestra la <b>ventaja cu&aacute;ntica</b> con Sycamore (53 qubits).</span></div>
+              <div class="mock-timeline-entry"><span class="mock-timeline-year">2021</span><span>IBM presenta el procesador Eagle con <b>127 qubits</b>.</span></div>
+              <div class="mock-timeline-entry"><span class="mock-timeline-year">2023</span><span>IBM Condor alcanza <b>1.121 qubits</b>; Microsoft anuncia qubits topol&oacute;gicos.</span></div>
+              <div class="mock-timeline-entry"><span class="mock-timeline-year">2024</span><span>MIT/Caltech logra <b>reducci&oacute;n de 10x</b> en sobrecarga de correcci&oacute;n de errores.</span></div>
+            </div>
+            <!-- Verificaci&oacute;n de Hechos (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Verificaci&oacute;n de Hechos</span></div>
+            </div>
+            <!-- Conclusi&oacute;n (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Conclusi&oacute;n</span></div>
+            </div>
+          </div>
+          <!-- Chat area -->
+          <div class="mock-chat">
+            <div class="mock-chat-label">Chat</div>
+            <div class="mock-chat-msg user">
+              <span class="mock-chat-rollback"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg></span>
+              <div class="mock-chat-bubble">Translate everything to Spanish</div>
+            </div>
+            <div class="mock-change-dot"></div>
+            <div class="mock-chat-msg assistant">
+              <div class="mock-chat-bubble">Done! I&rsquo;ve translated all sections to Spanish.</div>
+            </div>
+            <div class="mock-chat-msg user">
+              <span class="mock-chat-rollback"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg></span>
+              <div class="mock-chat-bubble">Add a Cronolog&iacute;a section</div>
+            </div>
+            <div class="mock-change-dot"></div>
+            <div class="mock-chat-msg assistant">
+              <div class="mock-chat-bubble">Added a new <b>Cronolog&iacute;a</b> section with key quantum computing milestones from 2019 to 2024.</div>
+            </div>
+            <div class="mock-chat-input">
+              <span class="mock-chat-ph">Ask anything about this page...</span>
+              <span class="mock-chat-send"><svg viewBox="0 0 24 24" fill="#b4c5ff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Auto Diagrams — Screenshot left, Description right -->
+    <div class="feature-row reversed reveal">
+      <div class="feature-description">
+        <div class="card-icon" style="background:rgba(167,139,250,0.12);color:var(--accent);">&#9878;</div>
+        <h3>Auto Diagrams</h3>
+        <p>xTil generates Mermaid diagrams when they genuinely help understanding &mdash; not just as decoration. Over 20 types: flowcharts, sequence diagrams, timelines, ER diagrams, pie charts, mind maps, Gantt charts, Sankey flows, and more.</p>
+        <p style="margin-top:12px;">If a diagram has a syntax error, xTil automatically fixes it (up to 5 attempts) without you lifting a finger.</p>
+      </div>
+      <div class="feature-shot">
+        <div class="mock-panel-card">
+          <div class="mock-panel-header">
+            <div class="mock-panel-brand"><img src="/icon.svg" alt=""><span>xTil</span></div>
+            <div class="mock-toolbar">
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="6" width="16" height="2" rx="1"/><rect x="4" y="11" width="12" height="2" rx="1"/><rect x="4" y="16" width="8" height="2" rx="1"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.37 5.51A7.35 7.35 0 0 0 9.1 7.5c0 4.08 3.32 7.4 7.4 7.4.68 0 1.35-.09 1.99-.27A7.014 7.014 0 0 1 12 19c-3.86 0-7-3.14-7-7 0-2.93 1.81-5.45 4.37-6.49zM12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span>
+            </div>
+          </div>
+          <div class="mock-panel-scroll">
+            <div class="mock-badges">
+              <span class="mock-badge type">ARTICLE</span>
+            </div>
+            <div class="mock-vstats">
+              <span class="mock-vstats-badge">&#10003; 4,100 words</span>
+              <span class="mock-vstats-badge">&#128248; 6 images &mdash; will analyze</span>
+            </div>
+            <!-- TL;DR -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">TL;DR</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-callout">
+                A practical guide to <b>trunk-based CI/CD pipelines</b> that ship every commit to production. Covers <b>quality gates</b>, automated rollbacks via feature flags, and how <b>DORA metrics</b> track deployment health.
+              </div>
+            </div>
+            <!-- Key Takeaways -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Key Takeaways</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-takeaway"><span class="mock-tk-num">1</span><span><b>Trunk-based flow</b> &mdash; Every push to main triggers lint, test, build, and deploy in a single linear pipeline.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">2</span><span><b>Quality gates</b> &mdash; Automated tests must pass before the build image is promoted; failures block the pipeline.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">3</span><span><b>Zero-downtime deploys</b> &mdash; Canary releases with automatic rollback if error rates exceed <span style="color:#f87171">0.1%</span> threshold.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">4</span><span><b>Feature flags</b> &mdash; Decouple deployment from release; ship dark features and toggle them independently.</span></div>
+            </div>
+            <!-- Summary + flowchart -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Summary</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-sum-text">Modern CI/CD pipelines replace manual gates with automated quality checks. The trunk-based model eliminates long-lived branches and ensures every commit is production-ready.</div>
+              <div class="mock-diagram">
+                <svg viewBox="0 0 280 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs><marker id="ah2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><path d="M0,0 L6,2 L0,4" fill="#8e9099"/></marker></defs>
+                  <!-- Push to main (blue) -->
+                  <rect x="2" y="6" width="62" height="24" rx="6" fill="#1a3a8a" stroke="#b4c5ff" stroke-opacity="0.3"/>
+                  <text x="33" y="22" text-anchor="middle" fill="#b4c5ff" font-size="6.5" font-family="sans-serif" font-weight="600">Push to main</text>
+                  <!-- Arrow -->
+                  <line x1="64" y1="18" x2="78" y2="18" stroke="#8e9099" stroke-width="1.2" marker-end="url(#ah2)"/>
+                  <!-- Lint & Test (gray) -->
+                  <rect x="78" y="6" width="56" height="24" rx="6" fill="#2b2d31" stroke="#44474e"/>
+                  <text x="106" y="22" text-anchor="middle" fill="#c4c6d0" font-size="6.5" font-family="sans-serif">Lint &amp; Test</text>
+                  <!-- Arrow -->
+                  <line x1="134" y1="18" x2="148" y2="18" stroke="#8e9099" stroke-width="1.2" marker-end="url(#ah2)"/>
+                  <!-- Build Image (gray) -->
+                  <rect x="148" y="6" width="58" height="24" rx="6" fill="#2b2d31" stroke="#44474e"/>
+                  <text x="177" y="22" text-anchor="middle" fill="#c4c6d0" font-size="6.5" font-family="sans-serif">Build Image</text>
+                  <!-- Arrow down -->
+                  <line x1="177" y1="30" x2="177" y2="48" stroke="#8e9099" stroke-width="1.2" marker-end="url(#ah2)"/>
+                  <!-- Diamond: Tests OK? -->
+                  <polygon points="177,48 202,64 177,80 152,64" fill="#332b00" stroke="#fbbf24" stroke-opacity="0.4" stroke-width="1"/>
+                  <text x="177" y="67" text-anchor="middle" fill="#fbbf24" font-size="6" font-family="sans-serif" font-weight="600">Tests OK?</text>
+                  <!-- Yes arrow right -->
+                  <line x1="202" y1="64" x2="222" y2="64" stroke="#4ade80" stroke-width="1.2" marker-end="url(#ah2)"/>
+                  <text x="212" y="59" text-anchor="middle" fill="#4ade80" font-size="5" font-family="sans-serif">Yes</text>
+                  <!-- Deploy Prod (blue) -->
+                  <rect x="222" y="52" width="56" height="24" rx="6" fill="#1a3a8a" stroke="#b4c5ff" stroke-opacity="0.3"/>
+                  <text x="250" y="68" text-anchor="middle" fill="#b4c5ff" font-size="6.5" font-family="sans-serif" font-weight="600">Deploy Prod</text>
+                  <!-- No arrow down -->
+                  <line x1="177" y1="80" x2="177" y2="98" stroke="#f87171" stroke-width="1.2" marker-end="url(#ah2)"/>
+                  <text x="185" y="92" fill="#f87171" font-size="5" font-family="sans-serif">No</text>
+                  <!-- Notify & Block (red) -->
+                  <rect x="143" y="98" width="68" height="24" rx="6" fill="rgba(239,68,68,0.15)" stroke="#f87171" stroke-opacity="0.3"/>
+                  <text x="177" y="114" text-anchor="middle" fill="#f87171" font-size="6.5" font-family="sans-serif" font-weight="600">Notify &amp; Block</text>
+                </svg>
+              </div>
+            </div>
+            <!-- Fact Check -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Fact Check</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-claim"><span class="mock-claim-icon ok">&#10003;</span><span><b>DORA metrics standard</b> &mdash; Verified. Used by Google&rsquo;s DevOps Research team.</span></div>
+              <div class="mock-claim"><span class="mock-claim-icon ok">&#10003;</span><span><b>Trunk-based reduces lead time</b> &mdash; Verified. Accelerate book data confirms.</span></div>
+              <div class="mock-claim"><span class="mock-claim-icon warn">&#9888;</span><span><b>0.1% error threshold</b> &mdash; Contested. Industry standard varies from 0.01% to 1%.</span></div>
+            </div>
+            <!-- Related Topics -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Related Topics</span>
+              </div>
+              <div class="mock-tags">
+                <span class="mock-tag">GitOps</span>
+                <span class="mock-tag">Canary Deployments</span>
+                <span class="mock-tag">Feature Flags</span>
+                <span class="mock-tag">DORA Metrics</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5: GitHub Deep Analysis — Description left, Screenshot right -->
     <div class="feature-row reveal">
       <div class="feature-description">
         <div class="card-icon" style="background:rgba(255,255,255,0.08);color:#e8e5f5;">&#128736;</div>
@@ -937,33 +1994,112 @@
         <p style="margin-top:12px;">Code review issues are linked to specific lines. Diagrams visualize the architecture so you understand the PR before reading a single diff.</p>
       </div>
       <div class="feature-shot">
-        <img src="/screenshots/github-dark.png" alt="GitHub PR analysis with OAuth2 class diagram, merge status, and line-linked code issues" loading="lazy">
-      </div>
-    </div>
-
-    <!-- Row 4: Chat Refinement — Screenshot left, Description right -->
-    <div class="feature-row reversed reveal">
-      <div class="feature-description">
-        <div class="card-icon" style="background:rgba(251,191,36,0.12);color:#fbbf24;">&#128488;</div>
-        <h3>Chat Refinement</h3>
-        <p>Every summary is a starting point, not the final word. Ask xTil to expand a section, translate everything to another language, or add an entirely new section like &ldquo;Timeline&rdquo; or &ldquo;Key Statistics.&rdquo;</p>
-        <p style="margin-top:12px;">Made a wrong turn? Every message has a revert button &mdash; one click rolls the summary back to the state before that message was sent. You can even ask follow-up questions about the content itself.</p>
-      </div>
-      <div class="feature-shot">
-        <img src="/screenshots/chat-dark-v4.png" alt="Chat refinement with Spanish translation, new Timeline section, and revert buttons" loading="lazy">
-      </div>
-    </div>
-
-    <!-- Row 5: Auto Diagrams — Description left, Screenshot right -->
-    <div class="feature-row reveal">
-      <div class="feature-description">
-        <div class="card-icon" style="background:rgba(167,139,250,0.12);color:var(--accent);">&#9878;</div>
-        <h3>Auto Diagrams</h3>
-        <p>xTil generates Mermaid diagrams when they genuinely help understanding &mdash; not just as decoration. Over 20 types: flowcharts, sequence diagrams, timelines, ER diagrams, pie charts, mind maps, Gantt charts, Sankey flows, and more.</p>
-        <p style="margin-top:12px;">If a diagram has a syntax error, xTil automatically fixes it (up to 5 attempts) without you lifting a finger.</p>
-      </div>
-      <div class="feature-shot">
-        <img src="/screenshots/diagram-dark.png" alt="CI/CD pipeline analysis with auto-generated Mermaid flowchart diagram" loading="lazy">
+        <div class="mock-panel-card">
+          <div class="mock-panel-header">
+            <div class="mock-panel-brand"><img src="/icon.svg" alt=""><span>xTil</span></div>
+            <div class="mock-toolbar">
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="6" width="16" height="2" rx="1"/><rect x="4" y="11" width="12" height="2" rx="1"/><rect x="4" y="16" width="8" height="2" rx="1"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.37 5.51A7.35 7.35 0 0 0 9.1 7.5c0 4.08 3.32 7.4 7.4 7.4.68 0 1.35-.09 1.99-.27A7.014 7.014 0 0 1 12 19c-3.86 0-7-3.14-7-7 0-2.93 1.81-5.45 4.37-6.49zM12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg></span>
+              <span class="mock-tb"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span>
+            </div>
+          </div>
+          <div class="mock-panel-scroll">
+            <div class="mock-badges">
+              <span class="mock-badge pr">GITHUB PR</span>
+            </div>
+            <div class="mock-vstats">
+              <span class="mock-vstats-badge">&#10003; 847 lines</span>
+              <span class="mock-vstats-badge">&#128172; 12 comments</span>
+            </div>
+            <!-- TL;DR -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">TL;DR</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-callout">
+                Migrates the legacy cookie-based login to a <b>full OAuth2 flow</b> with Google and GitHub providers. Adds <b>token refresh</b>, secure storage via encrypted cookies, and a new <b>/auth/oauth</b> callback endpoint.
+                <div class="mock-merge-status"><span class="mock-merge-dot"></span> Open &mdash; Ready to merge</div>
+              </div>
+            </div>
+            <!-- Key Takeaways -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Key Takeaways</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-takeaway"><span class="mock-tk-num">1</span><span><b>New OAuth2 flow</b> &mdash; Replaces <span class="mock-code">/api/login</span> with <span class="mock-code">/auth/oauth</span> callback supporting Google and GitHub.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">2</span><span><b>Token management</b> &mdash; Adds <span class="mock-code">TokenStore</span> class with encrypted refresh tokens and automatic expiry handling.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">3</span><span><b>Backwards compatible</b> &mdash; Legacy session cookies are gracefully migrated on first OAuth login attempt.</span></div>
+            </div>
+            <!-- Summary + class diagram -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Summary</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-sum-text">This PR restructures the entire authentication layer around an OAuth2 provider pattern, replacing direct password validation with delegated identity providers.</div>
+              <div class="mock-diagram">
+                <svg viewBox="0 0 280 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- AuthService box (blue) -->
+                  <rect x="2" y="8" width="72" height="32" rx="6" fill="#1a3a8a" stroke="#b4c5ff" stroke-opacity="0.3"/>
+                  <text x="38" y="28" text-anchor="middle" fill="#b4c5ff" font-size="7" font-family="sans-serif" font-weight="600">AuthService</text>
+                  <!-- Arrow to TokenStore -->
+                  <line x1="74" y1="24" x2="98" y2="24" stroke="#8e9099" stroke-width="1.2" marker-end="url(#ah)"/>
+                  <!-- TokenStore box (green) -->
+                  <rect x="98" y="8" width="68" height="32" rx="6" fill="rgba(74,222,128,0.12)" stroke="#4ade80" stroke-opacity="0.3"/>
+                  <text x="132" y="28" text-anchor="middle" fill="#4ade80" font-size="7" font-family="sans-serif" font-weight="600">TokenStore</text>
+                  <!-- OAuthProvider interface (orange) -->
+                  <rect x="88" y="58" width="88" height="28" rx="6" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-opacity="0.3" stroke-dasharray="3 2"/>
+                  <text x="132" y="69" text-anchor="middle" fill="#fbbf24" font-size="5.5" font-family="sans-serif" font-style="italic">&laquo;interface&raquo;</text>
+                  <text x="132" y="79" text-anchor="middle" fill="#fbbf24" font-size="6.5" font-family="sans-serif" font-weight="600">OAuthProvider</text>
+                  <!-- Dashed arrow from interface to AuthService -->
+                  <line x1="110" y1="58" x2="55" y2="40" stroke="#8e9099" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#ah)"/>
+                  <!-- GoogleAuth box -->
+                  <rect x="192" y="48" width="68" height="22" rx="5" fill="#2b2d31" stroke="#44474e"/>
+                  <text x="226" y="63" text-anchor="middle" fill="#b4c5ff" font-size="6" font-family="sans-serif">GoogleAuth</text>
+                  <!-- GitHubAuth box -->
+                  <rect x="192" y="78" width="68" height="22" rx="5" fill="#2b2d31" stroke="#44474e"/>
+                  <text x="226" y="93" text-anchor="middle" fill="#b4c5ff" font-size="6" font-family="sans-serif">GitHubAuth</text>
+                  <!-- Dashed arrows from implementations to interface -->
+                  <line x1="192" y1="59" x2="176" y2="68" stroke="#8e9099" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#ah)"/>
+                  <line x1="192" y1="89" x2="176" y2="80" stroke="#8e9099" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#ah)"/>
+                </svg>
+              </div>
+            </div>
+            <!-- Fact Check -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Fact Check</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-claim"><span class="mock-claim-icon warn">&#9888;</span><span><b>Token expiry not validated</b> &mdash; <span style="color:#b4c5ff">auth.ts:47</span> stores tokens but never checks expiry before use.</span></div>
+              <div class="mock-claim"><span class="mock-claim-icon warn">&#9888;</span><span><b>Missing CSRF protection</b> &mdash; <span style="color:#b4c5ff">oauth.ts:23</span> callback doesn&rsquo;t validate state parameter.</span></div>
+              <div class="mock-claim"><span class="mock-claim-icon ok">&#10003;</span><span><b>Encrypted cookie storage</b> &mdash; Uses AES-256-GCM with rotating keys. Good practice.</span></div>
+            </div>
+            <!-- Conclusion -->
+            <div class="mock-sec">
+              <div class="mock-sec-head">
+                <span class="mock-sec-arrow">&#9660;</span>
+                <span class="mock-sec-label">Conclusion</span>
+                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
+              </div>
+              <div class="mock-callout">
+                Well-structured OAuth2 migration. Fix the <b>CSRF state validation</b> and <b>token expiry check</b> before merging. Otherwise ready for production.
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1166,10 +2302,11 @@
 
 <footer>
   <div class="container">
-    <span class="copy">&copy; 2025 xTil</span>
+    <span class="copy">&copy; 2026 xTil</span>
     <div class="links">
+      <a href="https://buymeacoffee.com/xtil" target="_blank" rel="noopener">&#9749; Support Development</a>
       <a href="https://github.com/aitkn/xtil">GitHub</a>
-      <a href="https://github.com/aitkn/xtil/issues">Support</a>
+      <a href="https://github.com/aitkn/xtil/issues">Issues</a>
       <a href="https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon" target="_blank" rel="noopener">Chrome Web Store</a>
     </div>
   </div>
