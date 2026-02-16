@@ -1264,7 +1264,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           </a>
           <span style={{ color: 'var(--md-sys-color-outline-variant)' }}>&middot;</span>
           <a
-            href="https://buymeacoffee.com/aitkn"
+            href="https://buymeacoffee.com/xtil"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: 'var(--md-sys-color-on-surface-variant)', textDecoration: 'none' }}

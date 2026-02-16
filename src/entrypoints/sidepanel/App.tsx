@@ -474,6 +474,7 @@ export function App() {
   const [summary, setSummary] = useState<SummaryDocument | null>(null);
   const [content, setContent] = useState<ExtractedContent | null>(null);
   const [extracting, setExtracting] = useState(false);
+  const [restricted, setRestricted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
   const [extractEpoch, setExtractEpoch] = useState(0);
@@ -673,6 +674,7 @@ export function App() {
           return;
         }
 
+        setRestricted(false);
         const tabId = response.tabId ?? activeTabIdRef.current;
 
         // Check session storage for persisted state (survives sidepanel close/reopen)
@@ -714,6 +716,9 @@ export function App() {
         setNotionUrl(null);
         setChatMessages([]);
         setPendingResummarize(false);
+      } else if (response.error === 'restricted') {
+        setRestricted(true);
+        setContent(null);
       }
     } catch {
       // Silently fail — user can still click Summarize which will retry
@@ -801,7 +806,8 @@ export function App() {
     let spaTimer: ReturnType<typeof setTimeout> | null = null;
 
     const isUnreachable = (url?: string) =>
-      !url || url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('chrome-extension://');
+      !url || url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('chrome-extension://')
+      || url.startsWith('https://chromewebstore.google.com') || url.startsWith('https://chrome.google.com/webstore');
 
     const switchToTab = async (tabId: number) => {
       const prevTabId = activeTabIdRef.current;
@@ -830,7 +836,18 @@ export function App() {
 
     const onUpdated = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
       if (tabId === activeTabIdRef.current) {
-        if (isUnreachable(changeInfo.url ?? tab.url)) return;
+        if (isUnreachable(changeInfo.url ?? tab.url)) {
+          if (changeInfo.url) {
+            // Navigated to a restricted page — clear stale content
+            setRestricted(true);
+            setContent(null);
+            setSummary(null);
+            setChatMessages([]);
+            setNotionUrl(null);
+          }
+          return;
+        }
+        if (changeInfo.url) setRestricted(false);
         // Cancel in-flight summarization on URL change or page reload
         if ((changeInfo.url || changeInfo.status === 'loading') && loadingRef.current) {
           sendMessage({ type: 'CANCEL_SUMMARIZE', tabId } as import('@/lib/messaging/types').CancelSummarizeMessage).catch(() => {});
@@ -889,12 +906,20 @@ export function App() {
     };
   }, [extractContent, saveTabState, restoreTabState]);
 
-  // YouTube/Facebook lazy-load comments as the user scrolls — poll periodically to pick up new ones
+  // Poll for comments — social pages load lazily (long poll), other pages may use
+  // iframe-based comment systems like Disqus/Giscus/Utterances or AJAX-loaded comments
   useEffect(() => {
-    if (!content || (content.type !== 'youtube' && content.type !== 'facebook' && content.type !== 'twitter')) return;
+    if (!content) return;
+
+    const isSocial = content.type === 'youtube' || content.type === 'facebook' || content.type === 'twitter';
+    const maxStable = isSocial ? 10 : 3;
+    const interval = isSocial ? 5000 : 4000;
+    // Keep polling longer when no comments found yet (AJAX may still be loading)
+    const maxZeroRounds = isSocial ? 15 : 8;
 
     let lastCount = content.comments?.length ?? 0;
     let stableRounds = 0;
+    let zeroRounds = 0;
 
     const poll = async () => {
       try {
@@ -903,7 +928,11 @@ export function App() {
           if (resp.comments.length > lastCount) {
             lastCount = resp.comments.length;
             stableRounds = 0;
+            zeroRounds = 0;
             setContent((prev) => prev ? { ...prev, comments: resp.comments } : prev);
+          } else if (lastCount === 0) {
+            // Haven't found any comments yet — keep trying longer
+            zeroRounds++;
           } else {
             stableRounds++;
           }
@@ -911,11 +940,12 @@ export function App() {
       } catch { /* ignore */ }
     };
 
-    // Poll at increasing intervals; stop after count stabilizes for several rounds
+    // Poll at fixed intervals; stop after count stabilizes (or give up waiting for AJAX)
     const id = setInterval(() => {
-      if (stableRounds >= 10) { clearInterval(id); return; }
+      if (lastCount > 0 && stableRounds >= maxStable) { clearInterval(id); return; }
+      if (lastCount === 0 && zeroRounds >= maxZeroRounds) { clearInterval(id); return; }
       poll();
-    }, 5000);
+    }, interval);
 
     // Also do an immediate check after a short delay for initial load
     const initial = setTimeout(poll, 2000);
@@ -1574,7 +1604,7 @@ export function App() {
           </div>
         )}
 
-        {/* No content extracted (e.g. chrome:// pages) */}
+        {/* No content extracted (e.g. chrome:// or restricted pages) */}
         {!content && !extracting && !loading && (
           <div style={{ padding: '48px 24px', textAlign: 'center' }}>
             <div style={{
@@ -1588,7 +1618,9 @@ export function App() {
               font: 'var(--md-sys-typescale-body-medium)',
               color: 'var(--md-sys-color-on-surface-variant)',
             }}>
-              Navigate to a page to get started.
+              {restricted
+                ? 'Chrome restricts extensions on this page.'
+                : 'Navigate to a page to get started.'}
             </p>
           </div>
         )}
@@ -2194,7 +2226,7 @@ function Header({ onThemeToggle, themeMode, onOpenSettings, onRefresh, onExport,
       boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-        <IconButton onClick={() => window.open('https://buymeacoffee.com/aitkn', '_blank', 'noopener,noreferrer')} label="Support">
+        <IconButton onClick={() => window.open('https://buymeacoffee.com/xtil', '_blank', 'noopener,noreferrer')} label="Support">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
         </IconButton>
       </div>
