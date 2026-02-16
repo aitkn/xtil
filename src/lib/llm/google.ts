@@ -22,7 +22,10 @@ export class GoogleProvider implements LLMProvider {
       temperature: options?.temperature ?? 0.3,
       maxOutputTokens: options?.maxTokens ?? 4096,
     };
-    if (options?.jsonMode) {
+    if (options?.jsonSchema) {
+      generationConfig.responseMimeType = 'application/json';
+      generationConfig.responseSchema = convertToGeminiSchema(options.jsonSchema.schema);
+    } else if (options?.jsonMode) {
       generationConfig.responseMimeType = 'application/json';
     }
 
@@ -141,6 +144,42 @@ export class GoogleProvider implements LLMProvider {
       return false;
     }
   }
+}
+
+/**
+ * Convert a standard JSON Schema to Gemini's schema format:
+ * - `anyOf: [{type: X}, {type: "null"}]` → `type: X, nullable: true`
+ * - Strip `additionalProperties` (unsupported by Gemini)
+ */
+function convertToGeminiSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === 'additionalProperties') continue;
+
+    if (key === 'anyOf' && Array.isArray(value)) {
+      const nonNull = value.filter((v: Record<string, unknown>) => v.type !== 'null');
+      const hasNull = value.some((v: Record<string, unknown>) => v.type === 'null');
+      if (nonNull.length === 1 && hasNull) {
+        Object.assign(result, convertToGeminiSchema(nonNull[0] as Record<string, unknown>));
+        result.nullable = true;
+        continue;
+      }
+    }
+
+    if (key === 'properties' && typeof value === 'object' && value !== null) {
+      const converted: Record<string, unknown> = {};
+      for (const [propKey, propValue] of Object.entries(value as Record<string, unknown>)) {
+        converted[propKey] = convertToGeminiSchema(propValue as Record<string, unknown>);
+      }
+      result[key] = converted;
+      continue;
+    }
+
+    result[key] = value;
+  }
+
+  return result;
 }
 
 function convertMessages(messages: ChatMessage[]): {

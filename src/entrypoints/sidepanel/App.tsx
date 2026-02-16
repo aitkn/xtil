@@ -1922,6 +1922,7 @@ const DELETE_SENTINEL = '__DELETE__';
 function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDocument> | null {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
+    if (value === null) continue; // skip null (unchanged field from schema enforcement)
     if (key === 'llmProvider' || key === 'llmModel') continue;
     if (value === DELETE_SENTINEL) {
       result[key] = undefined; // marks for removal during merge

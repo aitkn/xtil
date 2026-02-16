@@ -53,7 +53,13 @@ export class OpenAICompatibleProvider implements LLMProvider {
       ...this.tokenLimitParam(options?.maxTokens ?? 4096),
       stream: false,
     };
-    if (options?.jsonMode) {
+    if (options?.jsonSchema && this.isOpenAI) {
+      // Native JSON Schema enforcement (OpenAI only); strict: false for dynamic keys
+      body.response_format = {
+        type: 'json_schema',
+        json_schema: { name: options.jsonSchema.name, schema: options.jsonSchema.schema, strict: false },
+      };
+    } else if (options?.jsonSchema || options?.jsonMode) {
       body.response_format = { type: 'json_object' };
     }
 

@@ -18,11 +18,18 @@ export interface ChatMessage {
   cacheBreakpoint?: boolean;
 }
 
+export interface JsonSchema {
+  name: string;
+  schema: Record<string, unknown>;
+}
+
 export interface ChatOptions {
   temperature?: number;
   maxTokens?: number;
   /** When true, ask the provider to enforce valid JSON output. */
   jsonMode?: boolean;
+  /** When set, enforce a specific JSON schema on the response (provider-specific mechanism). */
+  jsonSchema?: JsonSchema;
   /** External abort signal to cancel the request (e.g. user navigated away). */
   signal?: AbortSignal;
 }

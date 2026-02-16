@@ -8,7 +8,8 @@ import { fetchImages } from '@/lib/images/fetcher';
 import { probeVision } from '@/lib/llm/vision-probe';
 import type { FetchedImage } from '@/lib/images/fetcher';
 import type { Message, ExtractResultMessage, SummaryResultMessage, ChatResponseMessage, ConnectionTestResultMessage, SettingsResultMessage, SaveSettingsResultMessage, NotionDatabasesResultMessage, ExportResultMessage, FetchModelsResultMessage } from '@/lib/messaging/types';
-import type { ChatMessage, ImageContent, VisionSupport, LLMProvider } from '@/lib/llm/types';
+import type { ChatMessage, ImageContent, VisionSupport, LLMProvider, ChatOptions } from '@/lib/llm/types';
+import { CHAT_RESPONSE_SCHEMA, SCHEMA_ENFORCED_PROVIDERS } from '@/lib/llm/schemas';
 import type { SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent, ExtractedComment } from '@/lib/extractors/types';
 import type { IframeCommentsMessage } from '@/lib/messaging/types';
@@ -678,6 +679,23 @@ async function handleChatMessage(
       ? `\n\nLANGUAGE OVERRIDE: The current summary JSON is in ${langNames[summaryLang] || summaryLang}, but per the language settings it MUST be in ${langNames[targetLangCode] || targetLangCode}. When you produce ANY "updates", write all text fields in ${langNames[targetLangCode] || targetLangCode}. If the user asks a general question (no updates), answer in ${langNames[targetLangCode] || targetLangCode}. The existing non-${langNames[targetLangCode] || targetLangCode} summary is a prior mistake — do not perpetuate it.`
       : '';
 
+    const schemaEnforced = SCHEMA_ENFORCED_PROVIDERS.has(llmConfig.providerId);
+
+    const chatFormatInstructions = schemaEnforced
+      ? `Chat response rules:
+- "text": your conversational response. Markdown supported. Use "" if only updating.
+- "updates": include ONLY the summary fields you want to change. Omit unchanged fields. Set to null if no changes.
+- To remove an optional field, set its value to "__DELETE__".
+- "extraSections" is DEEP-MERGED by key. Only include keys you're changing. "__DELETE__" removes a section.`
+      : `Chat response format:
+- You MUST respond with a JSON object: {"text": "your message", "updates": <changed fields or null>}
+- "text": your conversational response to the user. Markdown supported. Use "" if you have nothing to say beyond the update.
+- "updates": an object with ONLY the summary fields you want to change. Omit fields that stay the same. Set to null if no changes needed (e.g. just answering a question).
+- Each field you include is replaced entirely (exception: "extraSections" — see below). Always provide the complete value for any field you want to change.
+- To remove an optional field, set its value to the string "__DELETE__" (e.g. "factCheck": "__DELETE__").
+- IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.
+- "extraSections" is DEEP-MERGED — only include the keys you are changing. To add or update a section: {"extraSections": {"New Title": "content"}}. To delete one: {"extraSections": {"Old Title": "__DELETE__"}}. Do NOT resend unchanged sections. Keys are plain-text titles (no markdown). Content supports full markdown and mermaid diagrams.`;
+
     const rulesSystem = `${summarizationPrompt}
 
 ---
@@ -688,14 +706,7 @@ USER AUTHORITY: The user's messages in this chat are the highest-priority instru
 
 IMPORTANT: When answering questions about the content, always use the original page content below as your primary source of truth — it contains the full detail. Only refer to the current summary JSON when the user specifically asks about the summary or requests changes to it.${langFixNote}
 
-Chat response format:
-- You MUST respond with a JSON object: {"text": "your message", "updates": <changed fields or null>}
-- "text": your conversational response to the user. Markdown supported. Use "" if you have nothing to say beyond the update.
-- "updates": an object with ONLY the summary fields you want to change. Omit fields that stay the same. Set to null if no changes needed (e.g. just answering a question).
-- Each field you include is replaced entirely (exception: "extraSections" — see below). Always provide the complete value for any field you want to change.
-- To remove an optional field, set its value to the string "__DELETE__" (e.g. "factCheck": "__DELETE__").
-- IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.
-- "extraSections" is DEEP-MERGED — only include the keys you are changing. To add or update a section: {"extraSections": {"New Title": "content"}}. To delete one: {"extraSections": {"Old Title": "__DELETE__"}}. Do NOT resend unchanged sections. Keys are plain-text titles (no markdown). Content supports full markdown and mermaid diagrams.${imageCapabilityNote}`;
+${chatFormatInstructions}${imageCapabilityNote}`;
 
     // --- SYSTEM MSG 2: Document extract (cached across turns) ---
     let documentSystem = `Source metadata:\n${metaLines.join('\n')}`;
@@ -729,7 +740,10 @@ Chat response format:
 
     const rawResponses: string[] = [];
 
-    const response = await provider.sendChat(chatMessages, { jsonMode: true });
+    const chatOpts: ChatOptions = schemaEnforced
+      ? { jsonSchema: CHAT_RESPONSE_SCHEMA }
+      : { jsonMode: true };
+    const response = await provider.sendChat(chatMessages, chatOpts);
     rawResponses.push(response);
 
     const conversationLog = [

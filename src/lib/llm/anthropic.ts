@@ -25,6 +25,17 @@ export class AnthropicProvider implements LLMProvider {
     };
     if (system) body.system = system;
 
+    // Use tool_use to enforce JSON schema when provided
+    if (options?.jsonSchema) {
+      const schema = options.jsonSchema;
+      body.tools = [{
+        name: schema.name,
+        description: 'Respond with structured JSON',
+        input_schema: schema.schema,
+      }];
+      body.tool_choice = { type: 'tool', name: schema.name };
+    }
+
     const timeoutController = new AbortController();
     const timer = setTimeout(() => timeoutController.abort(), 90_000);
     const signal = options?.signal
@@ -50,6 +61,16 @@ export class AnthropicProvider implements LLMProvider {
       }
 
       const data = await response.json();
+
+      // Extract from tool_use block when schema enforcement was used
+      if (options?.jsonSchema) {
+        for (const block of data.content || []) {
+          if (block.type === 'tool_use') {
+            return JSON.stringify(block.input);
+          }
+        }
+      }
+
       return data.content?.[0]?.text || '';
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
