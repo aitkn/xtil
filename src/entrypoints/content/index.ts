@@ -260,17 +260,7 @@ function preferManual(tracks: CaptionTrack[]): CaptionTrack {
   return tracks.find(t => t.kind !== 'asr') || tracks[0];
 }
 
-async function fetchYouTubeTranscript(
-  videoId: string,
-  hintLang?: string,
-  langPrefs?: string[],
-  summaryLang?: string,
-): Promise<string> {
-  // Use ANDROID innertube client from page context.
-  // - ANDROID client bypasses age-restriction checks
-  // - Page context provides YouTube cookies (avoids 403 from service worker)
-  // - Returns fresh caption URLs (unlike ytInitialPlayerResponse which has expired tokens)
-  //
+async function fetchPlayerData(videoId: string, hintLang?: string) {
   // This is YouTube's public Innertube API key, embedded in YouTube's own frontend JS.
   // It is not a private credential — it is shipped to every YouTube visitor.
   // nosemgrep: generic-api-key
@@ -297,10 +287,33 @@ async function fetchYouTubeTranscript(
   );
 
   if (!playerResponse.ok) throw new Error(`Innertube API: ${playerResponse.status}`);
+  return playerResponse.json();
+}
 
-  const data = await playerResponse.json();
-  const captionsRenderer = data?.captions?.playerCaptionsTracklistRenderer;
-  const tracks: CaptionTrack[] = captionsRenderer?.captionTracks;
+async function fetchYouTubeTranscript(
+  videoId: string,
+  hintLang?: string,
+  langPrefs?: string[],
+  summaryLang?: string,
+): Promise<string> {
+  // Use ANDROID innertube client from page context.
+  // - ANDROID client bypasses age-restriction checks
+  // - Page context provides YouTube cookies (avoids 403 from service worker)
+  // - Returns fresh caption URLs (unlike ytInitialPlayerResponse which has expired tokens)
+
+  let data = await fetchPlayerData(videoId, hintLang);
+  let captionsRenderer = data?.captions?.playerCaptionsTracklistRenderer;
+  let tracks: CaptionTrack[] = captionsRenderer?.captionTracks;
+
+  // Retry once after 1s — during SPA navigation the API sometimes returns
+  // empty caption tracks before YouTube's backend has fully resolved the video.
+  if (!tracks || tracks.length === 0) {
+    await new Promise(r => setTimeout(r, 1000));
+    data = await fetchPlayerData(videoId, hintLang);
+    captionsRenderer = data?.captions?.playerCaptionsTracklistRenderer;
+    tracks = captionsRenderer?.captionTracks;
+  }
+
   if (!tracks || tracks.length === 0) throw new Error('No caption tracks available');
 
   // Extract original language and YouTube's default track index
