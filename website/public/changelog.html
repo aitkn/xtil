@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Changelog — xTil</title>
+  <meta name="description" content="What's new in xTil — release notes and user-facing improvements.">
+  <meta property="og:title" content="Changelog — xTil">
+  <meta property="og:description" content="What's new in xTil — release notes and user-facing improvements.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://xtil.ai/changelog">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-deep: #06050e;
+      --bg: #0b0918;
+      --surface: #13102a;
+      --surface-light: #1a1538;
+      --border: #221d40;
+      --primary: #6d5ff5;
+      --primary-bright: #8577ff;
+      --accent: #a78bfa;
+      --glow: #7c3aed;
+      --text: #e8e5f5;
+      --text-muted: #827ca0;
+      --emerald: #34d399;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      color: var(--text);
+      background: var(--bg-deep);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* Noise grain overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 256px 256px;
+    }
+
+    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--primary-bright); }
+
+    .container { max-width: 1100px; width: 100%; margin: 0 auto; padding: 0 28px; min-width: 0; }
+
+    /* ─── Nav ─── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 0 28px;
+      background: rgba(6, 5, 14, 0.82);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .nav-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 1.7rem;
+      color: var(--text);
+    }
+    .nav-brand img { width: 48px; height: 48px; }
+    .nav-links { display: flex; gap: 32px; align-items: center; }
+    .nav-links a {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-cta {
+      background: var(--primary) !important;
+      color: #fff !important;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-weight: 600 !important;
+      font-size: 0.88rem !important;
+      transition: background 0.2s, box-shadow 0.2s !important;
+    }
+    .nav-cta:hover {
+      background: var(--primary-bright) !important;
+      box-shadow: 0 0 24px rgba(109, 95, 245, 0.4);
+    }
+
+    /* ─── Changelog content ─── */
+    .changelog {
+      padding: 120px 0 80px;
+    }
+    .changelog-header {
+      margin-bottom: 48px;
+    }
+    .changelog-header h1 {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 2.4rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .changelog-header p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+    }
+    .changelog-header p a {
+      color: var(--text-muted);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .changelog-header p a:hover { color: var(--text); }
+
+    /* Rendered markdown */
+    .changelog-body h2 {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-top: 48px;
+      margin-bottom: 4px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--primary-bright);
+    }
+    .changelog-body h2:first-child {
+      margin-top: 0;
+    }
+    .changelog-body p {
+      margin: 8px 0 12px;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-style: italic;
+    }
+    .changelog-body ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 32px;
+    }
+    .changelog-body li {
+      position: relative;
+      padding: 8px 0 8px 24px;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: var(--text);
+      border-bottom: 1px solid rgba(34, 29, 64, 0.5);
+    }
+    .changelog-body li:last-child {
+      border-bottom: none;
+    }
+    .changelog-body li::before {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 15px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .changelog-body a {
+      color: var(--accent);
+    }
+    .changelog-body hr {
+      display: none;
+    }
+    /* Hide the H1 title from the rendered markdown — we have our own */
+    .changelog-body > h1:first-child,
+    .changelog-body > h1:first-child + p {
+      display: none;
+    }
+    .changelog-body strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Loading / error states */
+    .changelog-loading {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      padding: 40px 0;
+    }
+    .changelog-error {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      padding: 40px 0;
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 24px;
+      border: 1px solid var(--border);
+    }
+
+    /* ─── Footer ─── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 0;
+    }
+    footer .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    footer .copy {
+      color: #4a4562;
+      font-size: 0.82rem;
+      font-weight: 400;
+    }
+    footer .links { display: flex; gap: 24px; }
+    footer .links a {
+      color: #4a4562;
+      font-size: 0.82rem;
+      font-weight: 400;
+    }
+    footer .links a:hover { color: var(--text-muted); }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 768px) {
+      .nav-links a:not(.nav-cta) { display: none; }
+      .changelog-header h1 { font-size: 1.7rem; }
+      .changelog-body h2 { font-size: 1.25rem; }
+      footer .container { flex-direction: column; text-align: center; }
+      footer .links { flex-wrap: wrap; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div style="display:flex;align-items:center;gap:0;">
+      <a class="nav-brand" href="/">
+        <img src="/icon.svg" alt="xTil">
+        xTil
+      </a>
+    </div>
+    <div class="nav-links">
+      <a href="/#features">Features</a>
+      <a href="/#how-it-works">How it works</a>
+      <a href="https://github.com/aitkn/xtil">GitHub</a>
+      <a class="nav-cta" href="https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon" target="_blank" rel="noopener">Install</a>
+    </div>
+  </div>
+</nav>
+
+<section class="changelog">
+  <div class="container">
+    <div class="changelog-header">
+      <h1>What's New</h1>
+      <p>Release notes for xTil. Source: <a href="https://github.com/aitkn/xtil/blob/master/CHANGELOG.md">CHANGELOG.md</a></p>
+    </div>
+    <div id="changelog-content" class="changelog-body">
+      <div class="changelog-loading">Loading changelog&hellip;</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <span class="copy">&copy; 2026 xTil</span>
+    <div class="links">
+      <a href="https://buymeacoffee.com/xtil" target="_blank" rel="noopener">&#9749; Support Development</a>
+      <a href="https://github.com/aitkn/xtil">GitHub</a>
+      <a href="https://github.com/aitkn/xtil/issues">Issues</a>
+      <a href="https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon" target="_blank" rel="noopener">Chrome Web Store</a>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+  import { marked } from 'https://cdn.jsdelivr.net/npm/marked@15/lib/marked.esm.js';
+
+  const container = document.getElementById('changelog-content');
+  const RAW_URL = 'https://raw.githubusercontent.com/aitkn/xtil/master/CHANGELOG.md';
+
+  try {
+    const res = await fetch(RAW_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const md = await res.text();
+    container.innerHTML = marked.parse(md);
+  } catch (err) {
+    container.innerHTML = `
+      <div class="changelog-error">
+        Could not load changelog from GitHub. You can
+        <a href="https://github.com/aitkn/xtil/blob/master/CHANGELOG.md">view it directly on GitHub</a>.
+      </div>`;
+  }
+</script>
+
+</body>
+</html>
