@@ -15,6 +15,7 @@ All notable user-facing changes to xTil are documented here.
 - Works on mobile browsers like Kiwi and Yandex that support extensions but lack the side panel API — xTil opens as a tab instead
 - Fixed image analysis getting stuck after a transient API failure
 - Fixed duplicate thumbnail images appearing in summaries
+- Fixed YouTube transcript fetch failing on slow-loading captions
 
 ## 1.0.1
 
