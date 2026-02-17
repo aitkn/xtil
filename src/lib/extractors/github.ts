@@ -572,8 +572,18 @@ function extractCommit(url: string, doc: Document): ExtractedContent {
   // Commit message
   const titleEl = doc.querySelector('.commit-title, .js-commits-list-item .markdown-title');
   const commitTitle = textOf(titleEl) || 'Commit';
-  const descEl = doc.querySelector('.commit-desc');
-  const commitDesc = textOf(descEl);
+  // Gather ALL .commit-desc elements (GitHub may split the extended message across multiple containers)
+  const descEls = doc.querySelectorAll('.commit-desc');
+  const commitDescParts = Array.from(descEls)
+    .map(el => markdownBodyToText(el) || textOf(el))
+    .filter(Boolean) as string[];
+  // Fallback: try modern GitHub selectors if .commit-desc yielded nothing
+  if (commitDescParts.length === 0) {
+    const altDesc = doc.querySelector('.commit-message-container .comment-body, .commit-message-container .markdown-body');
+    const text = markdownBodyToText(altDesc) || textOf(altDesc);
+    if (text) commitDescParts.push(text);
+  }
+  const commitDesc = commitDescParts.join('\n\n');
 
   // Author
   const authorEl = doc.querySelector('.commit-author, .user-mention, [data-testid="author-avatar"] + a');
