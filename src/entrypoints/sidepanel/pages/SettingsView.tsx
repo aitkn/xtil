@@ -261,6 +261,20 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   useEffect(() => {
     if (!currentConfig.model || !currentConfig.apiKey && currentProviderId !== 'self-hosted') return;
     if (visionCapability !== 'unknown') return;
+
+    // Trust catalog vision field for known models — skip the fragile runtime probe
+    const catalogModel = currentModels.find((m) => m.id === currentConfig.model);
+    if (catalogModel?.vision === true) {
+      setLocal((prev) => ({
+        ...prev,
+        modelCapabilities: {
+          ...prev.modelCapabilities,
+          [visionKey]: { vision: 'base64', probedAt: Date.now() },
+        },
+      }));
+      return;
+    }
+
     let cancelled = false;
     setProbingVision(true);
     onProbeVision(currentProviderId, currentConfig.apiKey, currentConfig.model, currentConfig.endpoint).then((vision) => {
@@ -276,7 +290,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       if (!cancelled) setProbingVision(false);
     });
     return () => { cancelled = true; };
-  }, [visionKey]);
+  }, [visionKey, visionCapability]);
 
   const updateProviderConfig = (patch: Partial<ProviderConfig>) => {
     setLocal({
@@ -785,7 +799,13 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         {/* Vision capability badge */}
         {currentConfig.model && (
           <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <VisionBadge vision={visionCapability} probing={probingVision} />
+            <VisionBadge vision={visionCapability} probing={probingVision} onReprobe={() => {
+              setLocal((prev) => {
+                const caps = { ...prev.modelCapabilities };
+                delete caps[visionKey];
+                return { ...prev, modelCapabilities: caps };
+              });
+            }} />
           </div>
         )}
 
@@ -1539,7 +1559,7 @@ const inputStyle: Record<string, string> = {
   color: 'var(--md-sys-color-on-surface)',
 };
 
-function VisionBadge({ vision, probing }: { vision: VisionSupport; probing: boolean }) {
+function VisionBadge({ vision, probing, onReprobe }: { vision: VisionSupport; probing: boolean; onReprobe?: () => void }) {
   if (probing) {
     return (
       <span style={{
@@ -1562,14 +1582,20 @@ function VisionBadge({ vision, probing }: { vision: VisionSupport; probing: bool
   };
 
   const c = config[vision];
+  const clickable = onReprobe && (vision === 'none' || vision === 'unknown');
   return (
-    <span style={{
-      font: 'var(--md-sys-typescale-label-small)',
-      color: c.color,
-      padding: '2px 8px',
-      borderRadius: '10px',
-      backgroundColor: c.bg,
-    }}>
+    <span
+      onClick={clickable ? onReprobe : undefined}
+      title={clickable ? 'Click to recheck vision support' : undefined}
+      style={{
+        font: 'var(--md-sys-typescale-label-small)',
+        color: c.color,
+        padding: '2px 8px',
+        borderRadius: '10px',
+        backgroundColor: c.bg,
+        ...(clickable ? { cursor: 'pointer', textDecoration: 'underline dotted' } : {}),
+      }}
+    >
       {c.label}
     </span>
   );
