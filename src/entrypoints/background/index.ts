@@ -9,7 +9,7 @@ import { probeVision } from '@/lib/llm/vision-probe';
 import type { FetchedImage } from '@/lib/images/fetcher';
 import type { Message, ExtractResultMessage, SummaryResultMessage, ChatResponseMessage, ConnectionTestResultMessage, SettingsResultMessage, SaveSettingsResultMessage, NotionDatabasesResultMessage, ExportResultMessage, FetchModelsResultMessage } from '@/lib/messaging/types';
 import type { ChatMessage, ImageContent, VisionSupport, LLMProvider, ChatOptions } from '@/lib/llm/types';
-import { CHAT_RESPONSE_SCHEMA, SCHEMA_ENFORCED_PROVIDERS } from '@/lib/llm/schemas';
+import { RESPONSE_SCHEMA, SCHEMA_ENFORCED_PROVIDERS } from '@/lib/llm/schemas';
 import type { SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent, ExtractedComment } from '@/lib/extractors/types';
 import type { IframeCommentsMessage } from '@/lib/messaging/types';
@@ -40,10 +40,25 @@ const iframeComments = new Map<number, ExtractedComment[]>();
 export default defineBackground(() => {
   const chromeObj = (globalThis as unknown as { chrome: typeof chrome }).chrome;
 
-  // Open side panel when extension icon is clicked
-  (chromeObj as unknown as { sidePanel?: { setPanelBehavior: (opts: { openPanelOnActionClick: boolean }) => Promise<void> } })
-    .sidePanel?.setPanelBehavior({ openPanelOnActionClick: true })
-    .catch(console.error);
+  // Open side panel when available (Chrome 114+), otherwise fall back to opening as a tab
+  // (Kiwi, Yandex mobile, and other browsers that support extensions but not sidePanel)
+  const sidePanel = (chromeObj as unknown as { sidePanel?: { setPanelBehavior: (opts: { openPanelOnActionClick: boolean }) => Promise<void> } }).sidePanel;
+  if (sidePanel?.setPanelBehavior) {
+    sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(console.error);
+  } else {
+    chromeObj.action.onClicked.addListener(() => {
+      const url = chromeObj.runtime.getURL('/sidepanel.html');
+      // Reuse existing xTil tab if already open
+      chromeObj.tabs.query({}, (tabs: chrome.tabs.Tab[]) => {
+        const existing = tabs.find((t: chrome.tabs.Tab) => t.url === url);
+        if (existing?.id != null) {
+          chromeObj.tabs.update(existing.id, { active: true });
+        } else {
+          chromeObj.tabs.create({ url });
+        }
+      });
+    });
+  }
 
   chromeObj.runtime.onMessage.addListener(
     (message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void) => {
@@ -491,6 +506,10 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
   // Declared outside try so the outer catch can include them in error responses
   const rawResponses: string[] = [];
   let actualSystemPrompt = '';
+  let lastConversation: { role: string; content: string }[] = [];
+  let rollingSummaryText = '';
+  let lastRequestBody = '';
+  let lastResponseBody = '';
 
   try {
     // Clear stale image cache from previous summarization
@@ -541,12 +560,12 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
 
     const onRawResponse = (r: string) => rawResponses.push(r);
     const onSystemPrompt = (p: string) => { actualSystemPrompt = p; };
-    let lastConversation: { role: string; content: string }[] = [];
     const onConversation = (msgs: { role: string; content: string }[]) => {
       lastConversation = msgs.map(m => ({ role: m.role, content: m.content }));
     };
-    let rollingSummaryText = '';
     const onRollingSummary = (s: string) => { rollingSummaryText = s; };
+    const onRequestBody = (b: string) => { lastRequestBody = b; };
+    const onResponseBody = (b: string) => { lastResponseBody = b; };
 
     try {
       const result = await summarize(provider, content, {
@@ -554,6 +573,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         language: settings.summaryLanguage,
         languageExcept: settings.summaryLanguageExcept,
         contextWindow: llmConfig.contextWindow,
+        providerId: llmConfig.providerId,
         userInstructions,
         fetchedImages: allFetchedImages.length > 0 ? allFetchedImages : undefined,
         imageUrlList: imageUrlList.length > 0 ? imageUrlList : undefined,
@@ -562,10 +582,13 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         onSystemPrompt,
         onConversation,
         onRollingSummary,
+        onRequestBody,
+        onResponseBody,
       });
       result.llmProvider = providerName;
       result.llmModel = llmConfig.model;
-      return { type: 'SUMMARY_RESULT', success: true, data: result, rawResponses, systemPrompt: actualSystemPrompt, conversationLog: lastConversation, rollingSummary: rollingSummaryText || undefined };
+      console.log('[debug] handleSummarize returning — conversationLog:', lastConversation.length, 'msgs, requestBody:', !!lastRequestBody, 'responseBody:', !!lastResponseBody);
+      return { type: 'SUMMARY_RESULT', success: true, data: result, rawResponses, systemPrompt: actualSystemPrompt, conversationLog: lastConversation, rollingSummary: rollingSummaryText || undefined, lastRequestBody: lastRequestBody || undefined, lastResponseBody: lastResponseBody || undefined };
     } catch (err) {
       // Round-trip: LLM requested additional images
       if (err instanceof ImageRequestError && imageAnalysisEnabled) {
@@ -590,6 +613,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
           language: settings.summaryLanguage,
           languageExcept: settings.summaryLanguageExcept,
           contextWindow: llmConfig.contextWindow,
+          providerId: llmConfig.providerId,
           userInstructions,
           fetchedImages: allFetchedImages.length > 0 ? allFetchedImages : undefined,
           imageUrlList: imageUrlList.length > 0 ? imageUrlList : undefined,
@@ -597,10 +621,12 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
           onRawResponse,
           onSystemPrompt,
           onConversation,
+          onRequestBody,
+          onResponseBody,
         });
         result.llmProvider = providerName;
         result.llmModel = llmConfig.model;
-        return { type: 'SUMMARY_RESULT', success: true, data: result, rawResponses, systemPrompt: actualSystemPrompt, conversationLog: lastConversation };
+        return { type: 'SUMMARY_RESULT', success: true, data: result, rawResponses, systemPrompt: actualSystemPrompt, conversationLog: lastConversation, lastRequestBody: lastRequestBody || undefined, lastResponseBody: lastResponseBody || undefined };
       }
       throw err;
     }
@@ -611,6 +637,10 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
       error: err instanceof Error ? err.message : String(err),
       rawResponses,
       systemPrompt: actualSystemPrompt,
+      conversationLog: lastConversation.length > 0 ? lastConversation : undefined,
+      rollingSummary: rollingSummaryText || undefined,
+      lastRequestBody: lastRequestBody || undefined,
+      lastResponseBody: lastResponseBody || undefined,
     };
   } finally {
     if (tabId != null) activeSummarizations.delete(tabId);
@@ -681,21 +711,12 @@ async function handleChatMessage(
 
     const schemaEnforced = SCHEMA_ENFORCED_PROVIDERS.has(llmConfig.providerId);
 
-    const chatFormatInstructions = schemaEnforced
-      ? `Chat response rules:
-- "updates" vs "summary": use ONE or NEITHER, set the other to null.
-  - "updates": partial — only changed fields. extraSections is deep-merged by key. "__DELETE__" removes a field or section.
-  - "summary": full rewrite — complete summary with all fields. Use when the user asks to redo/regenerate the summary or when most fields change.
-- "text": your conversational response. Markdown supported. Use "" if only updating.`
-      : `Chat response format:
-- You MUST respond with a JSON object: {"text": "...", "updates": ... or null, "summary": ... or null}
-- "text": your conversational response to the user. Markdown supported. Use "" if you have nothing to say beyond the update.
-- "updates" vs "summary": use ONE or NEITHER, set the other to null.
-  - "updates": partial changes — only include fields you want to change. Set to null if no changes or using "summary".
-  - "summary": full rewrite — complete summary with all fields. Use when the user asks to redo/regenerate the summary or when most fields change. Set to null if no changes or using "updates".
-- In "updates", each field replaces the existing value. To remove an optional field, set it to "__DELETE__".
-- In "updates", "extraSections" is DEEP-MERGED — only include keys you're changing. {"extraSections": {"New Title": "content"}} adds/updates. {"extraSections": {"Old Title": "__DELETE__"}} removes. Do NOT resend unchanged sections.
-- IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.`;
+    const chatFormatInstructions = `Response format: same JSON envelope as summarization.
+- "text": your conversational response. Markdown supported. Use "" if only updating.
+- "updates": partial changes — only include fields you want to change. "__DELETE__" removes a field. extraSections is deep-merged by key.
+- "summary": full summary replacement (all fields). Use when regenerating the entire summary.
+- Use "updates" or "summary", not both. Use neither if just answering a question.`
+      + (schemaEnforced ? '' : '\n- IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.');
 
     const rulesSystem = `${summarizationPrompt}
 
@@ -740,10 +761,12 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
     }
 
     const rawResponses: string[] = [];
+    let lastRequestBody = '';
+    let lastResponseBody = '';
 
     const chatOpts: ChatOptions = schemaEnforced
-      ? { jsonSchema: CHAT_RESPONSE_SCHEMA }
-      : { jsonMode: true };
+      ? { jsonSchema: RESPONSE_SCHEMA, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } }
+      : { jsonMode: true, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } };
     const response = await provider.sendChat(chatMessages, chatOpts);
     rawResponses.push(response);
 
@@ -752,7 +775,7 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
       { role: 'assistant', content: response },
     ];
 
-    return { type: 'CHAT_RESPONSE', success: true, message: response, rawResponses, conversationLog };
+    return { type: 'CHAT_RESPONSE', success: true, message: response, rawResponses, conversationLog, lastRequestBody: lastRequestBody || undefined, lastResponseBody: lastResponseBody || undefined };
   } catch (err) {
     return {
       type: 'CHAT_RESPONSE',

@@ -70,13 +70,16 @@ export class OpenAICompatibleProvider implements LLMProvider {
       : timeoutController.signal;
 
     try {
+      const bodyJson = JSON.stringify(body);
+      options?.onRequestBody?.(bodyJson);
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.config.apiKey}`,
         },
-        body: JSON.stringify(body),
+        body: bodyJson,
         signal,
       });
 
@@ -86,6 +89,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       }
 
       const data = await response.json();
+      options?.onResponseBody?.(JSON.stringify(data));
       return data.choices[0]?.message?.content || '';
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {

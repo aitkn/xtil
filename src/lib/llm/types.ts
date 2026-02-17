@@ -32,6 +32,10 @@ export interface ChatOptions {
   jsonSchema?: JsonSchema;
   /** External abort signal to cancel the request (e.g. user navigated away). */
   signal?: AbortSignal;
+  /** Called with the full HTTP request body (JSON string) before sending. */
+  onRequestBody?: (body: string) => void;
+  /** Called with the full HTTP response body (JSON string) after receiving. */
+  onResponseBody?: (body: string) => void;
 }
 
 export interface LLMProvider {

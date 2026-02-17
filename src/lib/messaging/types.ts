@@ -76,6 +76,10 @@ export interface SummaryResultMessage {
   conversationLog?: { role: string; content: string }[];
   /** Rolling summary from chunked summarization (for debug panel). */
   rollingSummary?: string;
+  /** Last raw HTTP request body sent to the LLM API (JSON string). */
+  lastRequestBody?: string;
+  /** Last raw HTTP response body from the LLM API (JSON string). */
+  lastResponseBody?: string;
 }
 
 export interface ChatMessageRequest {
@@ -94,6 +98,10 @@ export interface ChatResponseMessage {
   systemPrompt?: string;
   /** Full message array sent to the LLM (for debug panel). */
   conversationLog?: { role: string; content: string }[];
+  /** Last raw HTTP request body sent to the LLM API (JSON string). */
+  lastRequestBody?: string;
+  /** Last raw HTTP response body from the LLM API (JSON string). */
+  lastResponseBody?: string;
 }
 
 export interface ChatChunkMessage {

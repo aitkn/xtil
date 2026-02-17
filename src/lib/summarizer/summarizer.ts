@@ -1,9 +1,10 @@
-import type { LLMProvider, ChatMessage, ImageContent } from '../llm/types';
+import type { LLMProvider, ChatMessage, ImageContent, ChatOptions } from '../llm/types';
 import type { ExtractedContent } from '../extractors/types';
 import { coerceExtraSections, type SummaryDocument } from './types';
 import type { FetchedImage } from '../images/fetcher';
 import { chunkContent, type ChunkOptions } from './chunker';
 import { parseJsonSafe, findMatchingBrace } from '../json-repair';
+import { RESPONSE_SCHEMA, SCHEMA_ENFORCED_PROVIDERS } from '../llm/schemas';
 import {
   getSystemPrompt,
   getSummarizationPrompt,
@@ -41,6 +42,7 @@ export interface SummarizeOptions {
   languageExcept?: string[];
   contextWindow: number;
   maxRetries?: number;
+  providerId?: string;
   userInstructions?: string;
   fetchedImages?: FetchedImage[];
   imageUrlList?: { url: string; alt: string }[];
@@ -53,6 +55,10 @@ export interface SummarizeOptions {
   onConversation?: (messages: ChatMessage[]) => void;
   /** Called with the rolling summary text when chunked summarization is used (for debug panel). */
   onRollingSummary?: (summary: string) => void;
+  /** Called with the full HTTP request body (JSON) sent to the LLM API. */
+  onRequestBody?: (body: string) => void;
+  /** Called with the full HTTP response body (JSON) from the LLM API. */
+  onResponseBody?: (body: string) => void;
 }
 
 /** Build the full system prompt for summarization (includes skill catalog when appropriate). */
@@ -80,7 +86,7 @@ export async function summarize(
   content: ExtractedContent,
   options: SummarizeOptions,
 ): Promise<SummaryDocument> {
-  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, userInstructions, fetchedImages, imageUrlList, signal, onRawResponse, onSystemPrompt, onConversation, onRollingSummary } = options;
+  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, providerId, userInstructions, fetchedImages, imageUrlList, signal, onRawResponse, onSystemPrompt, onConversation, onRollingSummary, onRequestBody, onResponseBody } = options;
   const imageContents: ImageContent[] | undefined = fetchedImages?.map((fi) => ({
     base64: fi.base64,
     mimeType: fi.mimeType,
@@ -105,9 +111,9 @@ export async function summarize(
     if (signal?.aborted) throw new Error('Summarization cancelled');
     try {
       if (chunks.length === 1) {
-        return await oneShotSummarize(provider, content, systemPrompt, detailLevel, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation);
+        return await oneShotSummarize(provider, content, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRequestBody, onResponseBody);
       } else {
-        return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRollingSummary);
+        return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRollingSummary, onRequestBody, onResponseBody);
       }
     } catch (err) {
       // Don't retry cancellation, text responses, no-content, or image requests
@@ -129,12 +135,15 @@ async function oneShotSummarize(
   content: ExtractedContent,
   systemPrompt: string,
   detailLevel: 'brief' | 'standard' | 'detailed',
+  providerId?: string,
   images?: ImageContent[],
   imageUrlList?: { url: string; alt: string }[],
   thumbnailUrls?: Set<string>,
   signal?: AbortSignal,
   onRawResponse?: (response: string) => void,
   onConversation?: (messages: ChatMessage[]) => void,
+  onRequestBody?: (body: string) => void,
+  onResponseBody?: (body: string) => void,
 ): Promise<SummaryDocument> {
   let userPrompt = getSummarizationPrompt(content, detailLevel);
   if (images?.length && imageUrlList?.length) {
@@ -147,7 +156,10 @@ async function oneShotSummarize(
   ];
 
   onConversation?.(messages);
-  const response = await provider.sendChat(messages, { maxTokens: 8192, jsonMode: true, signal });
+  const chatOpts: ChatOptions = providerId && SCHEMA_ENFORCED_PROVIDERS.has(providerId)
+    ? { maxTokens: 8192, jsonSchema: RESPONSE_SCHEMA, signal, onRequestBody, onResponseBody }
+    : { maxTokens: 8192, jsonMode: true, signal, onRequestBody, onResponseBody };
+  const response = await provider.sendChat(messages, chatOpts);
   onRawResponse?.(response);
   return replacePlaceholders(parseSummaryResponse(response, !!images?.length), buildPlaceholders(content, imageUrlList));
 }
@@ -158,6 +170,7 @@ async function rollingContextSummarize(
   chunks: string[],
   systemPrompt: string,
   detailLevel: 'brief' | 'standard' | 'detailed',
+  providerId?: string,
   images?: ImageContent[],
   imageUrlList?: { url: string; alt: string }[],
   thumbnailUrls?: Set<string>,
@@ -165,6 +178,8 @@ async function rollingContextSummarize(
   onRawResponse?: (response: string) => void,
   onConversation?: (messages: ChatMessage[]) => void,
   onRollingSummary?: (summary: string) => void,
+  onRequestBody?: (body: string) => void,
+  onResponseBody?: (body: string) => void,
 ): Promise<SummaryDocument> {
   let rollingSummary = '';
 
@@ -210,7 +225,12 @@ async function rollingContextSummarize(
     ];
 
     onConversation?.(messages);
-    const response = await provider.sendChat(messages, { maxTokens: 8192, jsonMode: isLast, signal });
+    const chatOpts: ChatOptions = isLast
+      ? (providerId && SCHEMA_ENFORCED_PROVIDERS.has(providerId)
+        ? { maxTokens: 8192, jsonSchema: RESPONSE_SCHEMA, signal, onRequestBody, onResponseBody }
+        : { maxTokens: 8192, jsonMode: true, signal, onRequestBody, onResponseBody })
+      : { maxTokens: 8192, signal, onRequestBody, onResponseBody };
+    const response = await provider.sendChat(messages, chatOpts);
     onRawResponse?.(response);
 
     if (isLast) {
@@ -251,18 +271,62 @@ function parseSummaryResponse(response: string, imageAnalysisEnabled = false): S
     throw new LLMTextResponse(cleaned);
   }
 
-  // LLM respected "don't summarize" request — surface the message as a chat response
-  if (parsed.noSummary) {
-    throw new LLMTextResponse((parsed.message as string) || 'OK, feel free to ask questions about the content.');
+  // If summary is a JSON string (Haiku sometimes stringifies it), parse it in place
+  if (typeof parsed.summary === 'string' && parsed.summary.trimStart().startsWith('{')) {
+    const inner = parseJsonSafe(parsed.summary as string) as Record<string, unknown> | null;
+    if (inner && typeof inner === 'object') parsed.summary = inner;
   }
 
-  if (parsed.noContent) {
-    throw new NoContentError((parsed.reason as string) || 'No meaningful content found on this page.');
+  // Detect envelope format vs flat format
+  // Envelope: { text?, summary: {...}, noContent?, requestedImages? }
+  // Flat (legacy fallback): { tldr, summary: "string", ... }
+  const summaryIsObj = parsed.summary != null && typeof parsed.summary === 'object' && !Array.isArray(parsed.summary);
+  const isEnvelope = 'text' in parsed
+    || (summaryIsObj && typeof (parsed.summary as Record<string, unknown>).tldr === 'string');
+  const isFlat = typeof parsed.tldr === 'string';
+
+  if (isEnvelope) {
+    const text = typeof parsed.text === 'string' ? parsed.text : '';
+
+    // noContent signal
+    if (parsed.noContent) {
+      throw new NoContentError(text || 'No meaningful content found on this page.');
+    }
+
+    // Image request signal
+    if (imageAnalysisEnabled && Array.isArray(parsed.requestedImages) && parsed.requestedImages.length > 0) {
+      throw new ImageRequestError(parsed.requestedImages as string[]);
+    }
+
+    // No summary — user said don't summarize, or LLM had nothing to summarize
+    const summaryObj = parsed.summary as Record<string, unknown> | null | undefined;
+    if (!summaryObj || typeof summaryObj !== 'object') {
+      throw new LLMTextResponse(text || 'OK, feel free to ask questions about the content.');
+    }
+
+    return extractSummaryFields(summaryObj);
   }
-  // Check if LLM is requesting additional images for analysis
-  if (imageAnalysisEnabled && Array.isArray(parsed.requestedImages) && parsed.requestedImages.length > 0) {
-    throw new ImageRequestError(parsed.requestedImages as string[]);
+
+  // Flat format fallback — model ignored envelope instruction
+  if (isFlat) {
+    // Legacy signals
+    if (parsed.noSummary) {
+      throw new LLMTextResponse((parsed.message as string) || 'OK, feel free to ask questions about the content.');
+    }
+    if (parsed.noContent) {
+      throw new NoContentError((parsed.reason as string) || 'No meaningful content found on this page.');
+    }
+    if (imageAnalysisEnabled && Array.isArray(parsed.requestedImages) && parsed.requestedImages.length > 0) {
+      throw new ImageRequestError(parsed.requestedImages as string[]);
+    }
+    return extractSummaryFields(parsed);
   }
+
+  // Neither envelope nor flat — LLM returned something unexpected
+  throw new LLMTextResponse(cleaned);
+}
+
+function extractSummaryFields(parsed: Record<string, unknown>): SummaryDocument {
   const pc = parsed.prosAndCons as Record<string, unknown> | undefined;
   return {
     tldr: (parsed.tldr as string) || '',

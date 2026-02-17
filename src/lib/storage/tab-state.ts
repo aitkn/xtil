@@ -17,6 +17,8 @@ export interface PersistedTabState {
   chatMessages: DisplayMessage[];
   notionUrl: string | null;
   url: string;
+  conversationLog?: { role: string; content: string }[];
+  rollingSummary?: string;
 }
 
 const PREFIX = 'tldr_tab_';

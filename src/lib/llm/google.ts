@@ -41,10 +41,13 @@ export class GoogleProvider implements LLMProvider {
       : timeoutController.signal;
 
     try {
+      const bodyJson = JSON.stringify(body);
+      options?.onRequestBody?.(bodyJson);
+
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: bodyJson,
         signal,
       });
 
@@ -54,6 +57,7 @@ export class GoogleProvider implements LLMProvider {
       }
 
       const data = await response.json();
+      options?.onResponseBody?.(JSON.stringify(data));
       const candidate = data.candidates?.[0];
       const text = candidate?.content?.parts?.[0]?.text || '';
       if (candidate?.finishReason === 'MAX_TOKENS') {
@@ -149,25 +153,15 @@ export class GoogleProvider implements LLMProvider {
 /**
  * Convert a standard JSON Schema to Gemini's schema format:
  * - `anyOf: [{type: X}, {type: "null"}]` → `type: X, nullable: true`
- * - Strip `additionalProperties`, `oneOf` (unsupported by Gemini)
- * - Make properties with `oneOf`-based optionality `nullable: true`
+ * - Strip `additionalProperties` (unsupported by Gemini)
+ * - Non-required properties become `nullable: true`
  */
 function convertToGeminiSchema(schema: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-
-  // Collect property names that oneOf makes optional (required in a branch, not globally)
-  const oneOfOptionalProps = new Set<string>();
-  if (Array.isArray(schema.oneOf)) {
-    for (const branch of schema.oneOf as Record<string, unknown>[]) {
-      const branchRequired = branch.required as string[] | undefined;
-      if (branchRequired) {
-        for (const prop of branchRequired) oneOfOptionalProps.add(prop);
-      }
-    }
-  }
+  const required = new Set(Array.isArray(schema.required) ? schema.required as string[] : []);
 
   for (const [key, value] of Object.entries(schema)) {
-    if (key === 'additionalProperties' || key === 'oneOf') continue;
+    if (key === 'additionalProperties') continue;
 
     if (key === 'anyOf' && Array.isArray(value)) {
       const nonNull = value.filter((v: Record<string, unknown>) => v.type !== 'null');
@@ -183,8 +177,8 @@ function convertToGeminiSchema(schema: Record<string, unknown>): Record<string, 
       const converted: Record<string, unknown> = {};
       for (const [propKey, propValue] of Object.entries(value as Record<string, unknown>)) {
         const prop = convertToGeminiSchema(propValue as Record<string, unknown>);
-        // Properties that are optional via oneOf become nullable for Gemini
-        if (oneOfOptionalProps.has(propKey)) prop.nullable = true;
+        // Non-required properties become nullable for Gemini
+        if (!required.has(propKey)) prop.nullable = true;
         converted[propKey] = prop;
       }
       result[key] = converted;

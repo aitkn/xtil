@@ -43,6 +43,9 @@ export class AnthropicProvider implements LLMProvider {
       : timeoutController.signal;
 
     try {
+      const bodyJson = JSON.stringify(body);
+      options?.onRequestBody?.(bodyJson);
+
       const response = await fetch(`${this.endpoint}/v1/messages`, {
         method: 'POST',
         headers: {
@@ -51,7 +54,7 @@ export class AnthropicProvider implements LLMProvider {
           'anthropic-version': API_VERSION,
           'anthropic-dangerous-direct-browser-access': 'true',
         },
-        body: JSON.stringify(body),
+        body: bodyJson,
         signal,
       });
 
@@ -61,6 +64,7 @@ export class AnthropicProvider implements LLMProvider {
       }
 
       const data = await response.json();
+      options?.onResponseBody?.(JSON.stringify(data));
 
       // Extract from tool_use block when schema enforcement was used
       if (options?.jsonSchema) {

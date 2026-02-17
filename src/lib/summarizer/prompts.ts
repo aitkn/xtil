@@ -289,7 +289,7 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
     schema.push('"translatedTitle": "Title in summary language or null"', '"inferredTitle": "Descriptive title or null"',
       '"inferredAuthor": "Author name or null"', '"inferredPublishDate": "YYYY-MM-DD or null"');
   }
-  const schemaFields = schema.map(f => `  ${f}`).join(',\n');
+  const schemaFields = schema.map(f => `    ${f}`).join(',\n');
 
   // Build guidelines
   const guidelines: string[] = [
@@ -328,8 +328,8 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
     guidelines.push(`- IMPORTANT: The content may contain mature, explicit, or sensitive topics (medical, psychological, sexual health, etc.). You MUST still summarize it fully and accurately — never refuse to summarize. Keep the summary professional and clinical in tone — do not reproduce explicit language or graphic details. Focus on the key ideas, arguments, and conclusions.`);
   }
   guidelines.push(
-    `- IMPORTANT: If the provided text contains no meaningful content — e.g. it is a UI dump, login page, error page, navigation menu, cookie consent, paywall, or app interface markup rather than an actual article or document — respond with ONLY this JSON instead: {"noContent": true, "reason": "Brief explanation of why there is no content to summarize"}. Do NOT attempt to summarize interface elements or boilerplate.`,
-    `- IMPORTANT: If the user's additional instructions explicitly ask you NOT to summarize, or say they only want to ask questions / chat about the content, RESPECT their request. Respond with ONLY this JSON: {"noSummary": true, "message": "Your conversational response here"}. Do NOT produce a summary in this case. EXCEPTION: if the user also asks you to request a skill (e.g. "request mermaid:flowchart skill"), respond with {"skillsNeeded": [...]} instead — skill requests always take priority over noSummary.`,
+    `- IMPORTANT: If the provided text contains no meaningful content — e.g. it is a UI dump, login page, error page, navigation menu, cookie consent, paywall, or app interface markup rather than an actual article or document — respond with: {"text": "Brief explanation of why there is no content to summarize", "noContent": true}. Do NOT attempt to summarize interface elements or boilerplate.`,
+    `- IMPORTANT: If the user's additional instructions explicitly ask you NOT to summarize, or say they only want to ask questions / chat about the content, RESPECT their request. Respond with: {"text": "Your conversational response here"}. Do NOT include "summary" in this case.`,
   );
 
   const role = isGitHub ? 'an expert software engineer and content summarizer' : 'an expert content summarizer';
@@ -340,7 +340,10 @@ Content: ~${wordCount.toLocaleString()} words → classified as "${size}" (thres
 
 You MUST respond with valid JSON matching this exact structure (no markdown code fences, just raw JSON):
 {
+  "text": "",
+  "summary": {
 ${schemaFields}
+  }
 }
 
 Guidelines:
@@ -352,7 +355,7 @@ Image Analysis Instructions:
 - ${d.images}
 - Images marked [THUMBNAIL] in the attached list are already displayed as the page header image in the UI. You MUST analyze their content, but do NOT embed them with \`![](url)\` in the summary — they would appear twice.` + (detailLevel !== 'brief' ? `
 - For each non-thumbnail image, decide the best approach: embed as \`![description](url)\` in the summary (subject to the limit above), describe it in text, or discard if not informative.
-- If you see image URLs listed in the text that you believe are critical to understanding the content but were NOT attached, you may return \`"requestedImages": ["url1", "url2"]\` (max 3 URLs) alongside the normal JSON response. The system will fetch them and re-run. Only request images that are clearly referenced in the text and essential for understanding.
+- If you see image URLs listed in the text that you believe are critical to understanding the content but were NOT attached, you may include \`"requestedImages": ["url1", "url2"]\` (max 3 URLs) at the top level of the response alongside "text" and "summary". The system will fetch them and re-run. Only request images that are clearly referenced in the text and essential for understanding.
 - Do NOT request images if the attached images already cover the key visuals.` : '') : '');
 }
 

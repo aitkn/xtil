@@ -37,6 +37,7 @@ import { ChatInputBar } from '@/components/ChatInputBar';
 import type { SummarizeVariant } from '@/components/ChatInputBar';
 import { useTheme } from '@/hooks/useTheme';
 import { buildSummarizationSystemPrompt, replacePlaceholders, buildPlaceholders } from '@/lib/summarizer/summarizer';
+import { getSummarizationPrompt } from '@/lib/summarizer/prompts';
 
 interface TabState {
   content: ExtractedContent | null;
@@ -46,6 +47,8 @@ interface TabState {
   actualSystemPrompt: string;
   conversationLog: { role: string; content: string }[];
   rollingSummary: string;
+  lastRequestBody: string;
+  lastResponseBody: string;
   notionUrl: string | null;
   extractEpoch: number;
   loading: boolean;
@@ -488,6 +491,8 @@ export function App() {
   const [actualSystemPrompt, setActualSystemPrompt] = useState('');
   const [conversationLog, setConversationLog] = useState<{ role: string; content: string }[]>([]);
   const [rollingSummary, setRollingSummary] = useState('');
+  const [lastRequestBody, setLastRequestBody] = useState('');
+  const [lastResponseBody, setLastResponseBody] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
 
@@ -526,6 +531,8 @@ export function App() {
   const actualSystemPromptRef = useRef('');
   const conversationLogRef = useRef<{ role: string; content: string }[]>([]);
   const rollingSummaryRef = useRef('');
+  const lastRequestBodyRef = useRef('');
+  const lastResponseBodyRef = useRef('');
   const notionUrlRef = useRef<string | null>(null);
   const extractEpochRef = useRef<number>(0);
   const activeTabIdRef = useRef<number | null>(null);
@@ -541,6 +548,8 @@ export function App() {
   actualSystemPromptRef.current = actualSystemPrompt;
   conversationLogRef.current = conversationLog;
   rollingSummaryRef.current = rollingSummary;
+  lastRequestBodyRef.current = lastRequestBody;
+  lastResponseBodyRef.current = lastResponseBody;
   notionUrlRef.current = notionUrl;
   extractEpochRef.current = extractEpoch;
   activeTabIdRef.current = activeTabId;
@@ -567,6 +576,8 @@ export function App() {
         })),
         notionUrl: notionUrlRef.current,
         url: c.url,
+        conversationLog: conversationLogRef.current.length > 0 ? conversationLogRef.current : undefined,
+        rollingSummary: rollingSummaryRef.current || undefined,
       };
       savePersistedTabState(tabId, persisted).catch(() => {});
     }, 0);
@@ -582,6 +593,8 @@ export function App() {
       actualSystemPrompt: actualSystemPromptRef.current,
       conversationLog: conversationLogRef.current,
       rollingSummary: rollingSummaryRef.current,
+      lastRequestBody: lastRequestBodyRef.current,
+      lastResponseBody: lastResponseBodyRef.current,
       notionUrl: notionUrlRef.current,
       extractEpoch: extractEpochRef.current,
       loading: loadingRef.current,
@@ -603,6 +616,8 @@ export function App() {
       setActualSystemPrompt(saved.actualSystemPrompt);
       setConversationLog(saved.conversationLog);
       setRollingSummary(saved.rollingSummary);
+      setLastRequestBody(saved.lastRequestBody);
+      setLastResponseBody(saved.lastResponseBody);
       setNotionUrl(saved.notionUrl);
       setExtractEpoch(saved.extractEpoch);
       setLoading(saved.loading);
@@ -624,8 +639,10 @@ export function App() {
         setChatMessages(persisted.chatMessages);
         setRawResponses([]);
         setActualSystemPrompt('');
-        setConversationLog([]);
-        setRollingSummary('');
+        setConversationLog(persisted.conversationLog ?? []);
+        setRollingSummary(persisted.rollingSummary ?? '');
+        setLastRequestBody('');
+        setLastResponseBody('');
         setNotionUrl(persisted.notionUrl);
         setLoading(false);
         setChatLoading(false);
@@ -637,8 +654,10 @@ export function App() {
           chatMessages: persisted.chatMessages,
           rawResponses: [],
           actualSystemPrompt: '',
-          conversationLog: [],
-          rollingSummary: '',
+          conversationLog: persisted.conversationLog ?? [],
+          rollingSummary: persisted.rollingSummary ?? '',
+          lastRequestBody: '',
+          lastResponseBody: '',
           notionUrl: persisted.notionUrl,
           extractEpoch: 0,
           loading: false,
@@ -687,6 +706,10 @@ export function App() {
               setSummary(persisted.summary);
               setChatMessages(persisted.chatMessages);
               setNotionUrl(persisted.notionUrl);
+              setConversationLog(persisted.conversationLog ?? []);
+              setRollingSummary(persisted.rollingSummary ?? '');
+              setLastRequestBody('');
+              setLastResponseBody('');
               // Populate in-memory cache
               tabStatesRef.current.set(tabId, {
                 content: response.data,
@@ -694,8 +717,10 @@ export function App() {
                 chatMessages: persisted.chatMessages,
                 rawResponses: [],
                 actualSystemPrompt: '',
-                conversationLog: [],
-                rollingSummary: '',
+                conversationLog: persisted.conversationLog ?? [],
+                rollingSummary: persisted.rollingSummary ?? '',
+                lastRequestBody: '',
+                lastResponseBody: '',
                 notionUrl: persisted.notionUrl,
                 extractEpoch: 0,
                 loading: false,
@@ -1037,6 +1062,7 @@ export function App() {
       // Store raw LLM responses and system prompt for debug panel BEFORE
       // checking success — they're available even when summarization fails
       // (e.g. LLM text response, noSummary refusal, noContent detection).
+      console.log('[debug] summaryResponse keys:', Object.keys(summaryResponse), 'conversationLog length:', summaryResponse.conversationLog?.length, 'lastRequestBody:', !!summaryResponse.lastRequestBody);
       if (summaryResponse.rawResponses?.length) {
         setRawResponses(prev => [...prev, ...summaryResponse.rawResponses!]);
       }
@@ -1048,6 +1074,12 @@ export function App() {
       }
       if (summaryResponse.rollingSummary) {
         setRollingSummary(summaryResponse.rollingSummary);
+      }
+      if (summaryResponse.lastRequestBody) {
+        setLastRequestBody(summaryResponse.lastRequestBody);
+      }
+      if (summaryResponse.lastResponseBody) {
+        setLastResponseBody(summaryResponse.lastResponseBody);
       }
 
       if (!summaryResponse.success || !summaryResponse.data) {
@@ -1086,6 +1118,12 @@ export function App() {
           }
           if (summaryResponse.rollingSummary) {
             saved.rollingSummary = summaryResponse.rollingSummary;
+          }
+          if (summaryResponse.lastRequestBody) {
+            saved.lastRequestBody = summaryResponse.lastRequestBody;
+          }
+          if (summaryResponse.lastResponseBody) {
+            saved.lastResponseBody = summaryResponse.lastResponseBody;
           }
         }
       }
@@ -1357,6 +1395,8 @@ export function App() {
       const chatRaw = response.rawResponses?.length ? response.rawResponses : [response.message!];
       setRawResponses(prev => [...prev, ...chatRaw]);
       if (response.conversationLog?.length) setConversationLog(response.conversationLog);
+      if (response.lastRequestBody) setLastRequestBody(response.lastRequestBody);
+      if (response.lastResponseBody) setLastResponseBody(response.lastResponseBody);
 
       // Parse response: extract updates (partial or full) and remaining text (chat)
       const { updates, text: chatText } = extractJsonAndText(response.message!);
@@ -1651,6 +1691,8 @@ export function App() {
             summary={summary}
             conversationLog={conversationLog}
             rollingSummary={rollingSummary}
+            lastRequestBody={lastRequestBody}
+            lastResponseBody={lastResponseBody}
           />
         )}
 
@@ -2008,6 +2050,20 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
       } else if (parsed.updates && typeof parsed.updates === 'object') {
         updates = sanitizePartialUpdate(parsed.updates as Record<string, unknown>);
       }
+
+      // Fallback: model stuffed JSON into "text" instead of using updates/summary
+      if (!updates && text) {
+        const innerParsed = parseJsonSafe(text) as Record<string, unknown> | null;
+        if (innerParsed && typeof innerParsed === 'object') {
+          if (innerParsed.tldr && innerParsed.summary) {
+            return { updates: normalizeSummary(innerParsed), text: '' };
+          }
+          if (innerParsed.tldr || innerParsed.keyTakeaways) {
+            return { updates: sanitizePartialUpdate(innerParsed), text: '' };
+          }
+        }
+      }
+
       return { updates, text };
     }
     // Also handle a flat summary object (has tldr+summary but no text field)
@@ -2410,15 +2466,17 @@ function ChatBubble({ role, content: text, didUpdateSummary, canRevert, onRevert
   );
 }
 
-function DebugPanel({ content, settings, summary, conversationLog, rollingSummary }: {
+function DebugPanel({ content, settings, summary, conversationLog, rollingSummary, lastRequestBody, lastResponseBody }: {
   content: ExtractedContent;
   settings: Settings;
   summary: SummaryDocument | null;
   conversationLog: { role: string; content: string }[];
   rollingSummary: string;
+  lastRequestBody: string;
+  lastResponseBody: string;
 }) {
   // Before summarization runs, show a preview of what will be sent
-  const previewPrompt = conversationLog.length === 0 ? (() => {
+  const previewSystem = conversationLog.length === 0 ? (() => {
     const imageCount = content.richImages?.length ?? 0;
     let imageAnalysisEnabled = false;
     if (imageCount > 0) {
@@ -2437,6 +2495,9 @@ function DebugPanel({ content, settings, summary, conversationLog, rollingSummar
       content.githubPageType,
     );
   })() : '';
+  const previewUser = conversationLog.length === 0
+    ? getSummarizationPrompt(content, settings.summaryDetailLevel)
+    : '';
 
   const totalChars = conversationLog.reduce((sum, m) => sum + m.content.length, 0);
 
@@ -2500,7 +2561,10 @@ function DebugPanel({ content, settings, summary, conversationLog, rollingSummar
               </>
             );
           })()
-        : <DebugSection title="[system] (preview)" content={previewPrompt} />
+        : <>
+            <DebugSection title="1. [system] (preview)" content={previewSystem} />
+            <DebugSection title="2. [user] (preview)" content={previewUser} />
+          </>
       }
 
       {/* --- Reference sections (not part of the LLM prompt) --- */}
@@ -2513,8 +2577,36 @@ function DebugPanel({ content, settings, summary, conversationLog, rollingSummar
       {summary && (
         <DebugSection title="Summary Result (local)" content={JSON.stringify(summary, null, 2)} />
       )}
+
+      {/* --- Raw API request/response --- */}
+      {(lastRequestBody || lastResponseBody) && (
+        <div style={dividerStyle} />
+      )}
+      {lastRequestBody && (
+        <DebugSection title="Last RAW Request" content={formatRawBody(lastRequestBody)} />
+      )}
+      {lastResponseBody && (
+        <DebugSection title="Last RAW Response" content={formatRawBody(lastResponseBody)} />
+      )}
     </div>
   );
+}
+
+/** Pretty-print a JSON body string, truncating large base64 values. */
+function formatRawBody(body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    return JSON.stringify(parsed, (_, v) => {
+      if (typeof v === 'string' && v.length > 200) {
+        // Detect base64 image data and truncate
+        if (/^data:[^;]+;base64,/.test(v)) return v.slice(0, 40) + `... [${v.length} chars]`;
+        if (/^[A-Za-z0-9+/=]{200,}$/.test(v)) return v.slice(0, 40) + `... [base64, ${v.length} chars]`;
+      }
+      return v;
+    }, 2);
+  } catch {
+    return body;
+  }
 }
 
 function DebugSection({ title, content }: { title: string; content: string }) {
