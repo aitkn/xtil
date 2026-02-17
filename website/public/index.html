@@ -58,7 +58,7 @@
     a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
     a:hover { color: var(--primary-bright); }
 
-    .container { max-width: 1100px; margin: 0 auto; padding: 0 28px; }
+    .container { max-width: 1100px; width: 100%; margin: 0 auto; padding: 0 28px; min-width: 0; }
 
     /* ─── Scroll reveal ─── */
     .reveal {
@@ -181,6 +181,7 @@
       text-align: center;
       max-width: 800px;
       margin: 0 auto 56px;
+      overflow-wrap: break-word;
     }
 
     .hero-badge {
@@ -1188,10 +1189,30 @@
 
     /* ─── Responsive ─── */
     @media (max-width: 768px) {
-      .browser-mockup { margin: 0 12px; }
+      .container { padding: 0 20px; }
+      nav { padding: 0 20px; }
+
+      /* Nav — hide section anchors, keep GitHub */
+      .nav-links { gap: 16px; }
+      .nav-links a[href="#features"],
+      .nav-links a[href="#how-it-works"] { display: none; }
+      .nav-cta { display: none !important; }
+
+      /* Hero */
+      .hero { min-height: auto; padding: 80px 0 48px; }
+      .hero-content { margin-bottom: 32px; }
+      .hero h1 { font-size: clamp(1.8rem, 6vw, 2.6rem); }
+      .hero-sub { font-size: 1rem; }
+
+      /* Browser mockup */
+      .browser-mockup { margin: 0; border-radius: 8px; max-width: 100%; overflow: hidden; }
       .mock-article { display: none; }
-      .mock-panel { flex: 0 0 100%; }
-      .browser-content { height: 680px; }
+      .mock-panel { flex: 1 1 100%; min-width: 0; }
+      .browser-content { height: 560px; }
+      .browser-tab { display: none; }
+      .mock-toolbar { flex-wrap: wrap; }
+
+      /* Feature rows */
       .feature-row {
         grid-template-columns: 1fr;
         gap: 24px;
@@ -1200,29 +1221,107 @@
       .feature-description {
         position: static;
         order: 1 !important;
+        padding: 0;
       }
+      .feature-description h3 { font-size: 1.4rem; }
+      .feature-description p { font-size: 1rem; }
       .feature-shot {
         order: 2 !important;
-        max-height: 500px;
-        mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
-        -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
       }
-      .bento { grid-template-columns: 1fr; }
+      .mock-panel-card {
+        max-width: 100%;
+        margin-left: 0;
+        margin-right: 0;
+        overflow: hidden;
+      }
+      .feature-row.reversed .mock-panel-card {
+        margin-left: 0;
+        margin-right: 0;
+      }
+      .mock-panel-card .mock-toolbar { flex-wrap: wrap; }
+
+      /* Bento — !important to override inline grid-template-columns */
+      .bento { grid-template-columns: 1fr !important; }
+
+      /* Pipeline */
       .pipeline { grid-template-columns: 1fr; gap: 32px; }
       .pipeline::before { display: none; }
+
+      /* Providers */
       .providers-grid { grid-template-columns: repeat(2, 1fr); }
-      .privacy-block { padding: 36px 24px; }
+
+      /* Privacy */
+      .privacy-block { padding: 36px 20px; }
       .privacy-points { gap: 16px; }
-      .nav-links { gap: 16px; }
-      .nav-cta { display: none !important; }
+
+      /* Sections */
+      .features-section { padding: 64px 0; }
+      .pipeline-section { padding: 64px 0; }
+      .providers-section { padding: 64px 0; }
+      .privacy-section { padding: 64px 0; }
+
+      /* Ticker */
+      .ticker-item { padding: 0 16px; font-size: 0.85rem; }
+
+      /* Footer */
+      footer .container { flex-direction: column; text-align: center; }
+      footer .links { flex-wrap: wrap; justify-content: center; }
     }
+
     @media (max-width: 480px) {
-      .hero h1 { font-size: 2.2rem; }
-      .hero-actions { flex-direction: column; }
+      .container { padding: 0 16px; }
+      nav { padding: 0 16px; }
+
+      /* Nav — hide all nav links, keep only brand */
+      .nav-links { display: none; }
+      .nav-brand { font-size: 1.4rem; }
+      .nav-brand img { width: 38px; height: 38px; }
+
+      /* Hero */
+      .hero { padding: 72px 0 36px; }
+      .hero h1 { font-size: 1.8rem; }
+      .hero-sub { font-size: 0.92rem; max-width: 100%; }
+      .hero-actions { flex-direction: column; width: 100%; }
+      .hero-actions .btn-primary,
+      .hero-actions .btn-ghost { width: 100%; justify-content: center; }
+
+      /* Browser mockup */
+      .browser-content { height: 420px; }
+      .mock-tb { width: 18px; height: 18px; }
+      .mock-tb svg { width: 10px; height: 10px; }
+      .mock-panel-brand img { width: 16px; height: 16px; }
+      .mock-panel-brand span { font-size: 0.75rem; }
+
+      /* Feature descriptions */
+      .feature-description .card-icon { width: 40px; height: 40px; font-size: 1.2rem; }
+      .feature-description h3 { font-size: 1.2rem; }
+      .feature-description p { font-size: 0.9rem; line-height: 1.7; }
+      .feature-shot { }
+
+      /* Bento cards */
+      .bento-card { padding: 20px; }
+      .bento-card h3 { font-size: 1rem; }
+      .bento-card p { font-size: 0.85rem; }
+
+      /* Providers */
       .providers-grid { grid-template-columns: 1fr 1fr; }
-      .browser-content { height: 560px; }
-      .mock-tb { width: 20px; height: 20px; }
-      .mock-tb svg { width: 11px; height: 11px; }
+      .provider-card { padding: 20px 16px; }
+      .provider-models { font-size: 0.68rem; }
+
+      /* Privacy */
+      .privacy-block h2 { font-size: 1.3rem; }
+      .privacy-block p { font-size: 0.88rem; }
+      .privacy-points { flex-direction: column; align-items: center; }
+
+      /* Pipeline */
+      .pipeline-step { padding: 0 8px; }
+      .step-orb { width: 56px; height: 56px; }
+      .step-orb .num { font-size: 1.2rem; }
+      .pipeline-step h3 { font-size: 0.95rem; }
+      .pipeline-step p { font-size: 0.82rem; }
+
+      /* CTA */
+      .cta-section h2 { font-size: 1.3rem; }
     }
   </style>
 </head>
@@ -1239,6 +1338,7 @@
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#how-it-works">How it works</a>
+      <a href="/changelog">What's New</a>
       <a href="https://github.com/aitkn/xtil">GitHub</a>
       <a class="nav-cta" href="https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon" target="_blank" rel="noopener">Install</a>
     </div>
@@ -2304,6 +2404,7 @@
   <div class="container">
     <span class="copy">&copy; 2026 xTil</span>
     <div class="links">
+      <a href="/changelog">What's New</a>
       <a href="https://buymeacoffee.com/xtil" target="_blank" rel="noopener">&#9749; Support Development</a>
       <a href="https://github.com/aitkn/xtil">GitHub</a>
       <a href="https://github.com/aitkn/xtil/issues">Issues</a>
