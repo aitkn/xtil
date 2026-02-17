@@ -10,8 +10,9 @@ All notable user-facing changes to xTil are documented here.
 
 - Smart YouTube transcript language selection — picks the best available transcript based on your language preferences
 - Chat can now fully replace the entire summary — ask for a complete rewrite and get one
-- Improved response quality with per-provider JSON schema enforcement (OpenAI, Anthropic, Google)
+- Schema enforcement (structured output) now applies to summarization too, not just chat — improves response quality across all providers
 - Summaries now reliably follow the page's language instead of defaulting to English
+- Works on mobile browsers like Kiwi and Yandex that support extensions but lack the side panel API — xTil opens as a tab instead
 - Fixed image analysis getting stuck after a transient API failure
 - Fixed duplicate thumbnail images appearing in summaries
 
