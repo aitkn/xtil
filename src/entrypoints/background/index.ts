@@ -60,6 +60,23 @@ export default defineBackground(() => {
     });
   }
 
+  // On first install, navigate to xtil.ai (reuse existing tab if open)
+  chromeObj.runtime.onInstalled.addListener((details: { reason: string }) => {
+    if (details.reason !== 'install') return;
+    chromeObj.windows.getCurrent({ populate: true }, (win: chrome.windows.Window) => {
+      const tabs = win.tabs || [];
+      const existing = tabs.find((t: chrome.tabs.Tab) => {
+        try { return new URL(t.url || '').hostname.endsWith('xtil.ai'); }
+        catch { return false; }
+      });
+      if (existing?.id != null) {
+        chromeObj.tabs.update(existing.id, { active: true });
+      } else {
+        chromeObj.tabs.create({ url: 'https://xtil.ai' });
+      }
+    });
+  });
+
   chromeObj.runtime.onMessage.addListener(
     (message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void) => {
       if (sender.id !== chromeObj.runtime.id) {
