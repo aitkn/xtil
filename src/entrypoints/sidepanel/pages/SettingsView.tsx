@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import type { Settings, ThemeMode, ProviderConfig } from '@/lib/storage/types';
 import type { ModelInfo, VisionSupport } from '@/lib/llm/types';
 import { PROVIDER_DEFINITIONS } from '@/lib/llm/registry';
-import { filterChatModels } from '@/lib/llm/models';
+import { filterChatModels, getCatalogModels, getCatalogVersion } from '@/lib/llm/models';
 import { Button } from '@/components/Button';
 
 const LANGUAGES = [
@@ -126,6 +126,29 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       for (const [pid, models] of Object.entries(settings.cachedModels)) {
         filtered[pid] = filterChatModels(models);
       }
+
+      // Auto-merge new catalog models into cached list when catalog version changes
+      const currentCatalogVersion = getCatalogVersion();
+      if (settings.catalogVersion !== currentCatalogVersion) {
+        let merged = false;
+        for (const pid of Object.keys(filtered)) {
+          const catalogModels = getCatalogModels(pid);
+          if (catalogModels.length === 0) continue;
+          const existingIds = new Set(filtered[pid].map((m) => m.id));
+          const newModels = catalogModels.filter((m) => !existingIds.has(m.id));
+          if (newModels.length > 0) {
+            filtered[pid] = [...filtered[pid], ...newModels];
+            merged = true;
+          }
+        }
+        // Persist the merged models and updated catalog version
+        if (merged || settings.catalogVersion !== currentCatalogVersion) {
+          const updatedSettings = { ...settings, cachedModels: filtered, catalogVersion: currentCatalogVersion };
+          lastSavedJson.current = JSON.stringify(updatedSettings);
+          onSave(updatedSettings);
+        }
+      }
+
       setFetchedModels(filtered);
     }
     lastSavedJson.current = JSON.stringify(settings);
@@ -568,7 +591,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   }
 
   return (
-    <div style={{ padding: '16px', font: 'var(--md-sys-typescale-body-medium)' }}>
+    <div style={{ padding: '16px', font: 'var(--md-sys-typescale-body-medium)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {/* Onboarding header — dots + skip only, no helper here */}
       {isOnboarding && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -1495,7 +1518,6 @@ function StepHint({ step, currentStep, title, subtitle, details }: { step: Exclu
 function SectionCard({ title, style, children }: { title: string; style?: Record<string, string | number>; children: preact.ComponentChildren }) {
   return (
     <div style={{
-      marginTop: '16px',
       padding: '16px',
       borderRadius: 'var(--md-sys-shape-corner-medium)',
       border: '1px solid var(--md-sys-color-outline-variant)',
