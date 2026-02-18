@@ -855,7 +855,10 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           name="context-window"
           type="number"
           value={currentConfig.contextWindow}
-          onInput={(e) => updateProviderConfig({ contextWindow: parseInt((e.target as HTMLInputElement).value) || 100000 })}
+          onInput={(e) => {
+            const value = parseInt((e.target as HTMLInputElement).value, 10);
+            updateProviderConfig({ contextWindow: value > 0 ? value : 100000 });
+          }}
           style={inputStyle}
         />
         <StepHint step="contextWindow" currentStep={onboardingStep} />
