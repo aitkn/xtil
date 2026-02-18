@@ -238,7 +238,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       case 'apiKey': return !!(config.apiKey || selfHosted);
       case 'endpoint': return !!(selfHosted && config.endpoint);
       case 'model': return !!config.model;
-      case 'contextWindow': return selfHosted; // always has a default value
+      case 'contextWindow': return true; // always has a default value from catalog
       // test and all subsequent steps are not provider-specific — never skip
       default: return false;
     }
@@ -252,7 +252,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     for (let i = idx + 1; i < ONBOARDING_STEPS.length; i++) {
       const candidate = ONBOARDING_STEPS[i];
       // Skip self-hosted-only steps for standard providers
-      if ((candidate === 'endpoint' || candidate === 'contextWindow') && !selfHosted) continue;
+      if (candidate === 'endpoint' && !selfHosted) continue;
       // Skip steps already completed for this provider
       if (isStepComplete(candidate, config, providerId)) continue;
       return candidate;
@@ -847,31 +847,32 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         )}
       </div>
 
-      {/* === Context Window Section (self-hosted only) === */}
-      {isSelfHosted && (
-        <div style={getSectionStyle('contextWindow')}>
-          <Label htmlFor="settings-context-window">Context Window (tokens)</Label>
-          <input
-            id="settings-context-window"
-            name="context-window"
-            type="number"
-            value={currentConfig.contextWindow}
-            onInput={(e) => updateProviderConfig({ contextWindow: parseInt((e.target as HTMLInputElement).value) || 100000 })}
-            style={inputStyle}
-          />
-          <StepHint step="contextWindow" currentStep={onboardingStep} />
-          {isOnboarding && onboardingStep === 'contextWindow' && (
-            <Button
-              onClick={() => advanceStep('contextWindow')}
-              size="sm"
-              variant="secondary"
-              style={{ marginTop: '8px' }}
-            >
-              Continue
-            </Button>
-          )}
-        </div>
-      )}
+      {/* === Context Window Section === */}
+      <div style={getSectionStyle('contextWindow')}>
+        <Label htmlFor="settings-context-window">Context Window (tokens)</Label>
+        <input
+          id="settings-context-window"
+          name="context-window"
+          type="number"
+          value={currentConfig.contextWindow}
+          onInput={(e) => {
+            const value = parseInt((e.target as HTMLInputElement).value, 10);
+            updateProviderConfig({ contextWindow: value > 0 ? value : 100000 });
+          }}
+          style={inputStyle}
+        />
+        <StepHint step="contextWindow" currentStep={onboardingStep} />
+        {isOnboarding && onboardingStep === 'contextWindow' && (
+          <Button
+            onClick={() => advanceStep('contextWindow')}
+            size="sm"
+            variant="secondary"
+            style={{ marginTop: '8px' }}
+          >
+            Continue
+          </Button>
+        )}
+      </div>
 
       {/* === Image Analysis + Test Connection Section === */}
       <div style={getSectionStyle('test')}>
