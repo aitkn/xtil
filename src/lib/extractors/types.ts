@@ -26,6 +26,7 @@ export interface ExtractedContent {
 
   // GitHub-specific
   githubPageType?: 'pr' | 'issue' | 'code' | 'repo' | 'commit' | 'release';
+  prNumber?: number;
   prState?: 'open' | 'closed' | 'merged';
   issueState?: 'open' | 'closed';
   repoStars?: number;
