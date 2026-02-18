@@ -196,6 +196,10 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   const visionKey = `${currentProviderId}:${currentConfig.model}`;
   const visionCapability: VisionSupport = local.modelCapabilities?.[visionKey]?.vision || 'unknown';
   const isSelfHosted = currentProviderId === 'self-hosted';
+  const articlePrice = useMemo(() => {
+    const modelInfo = currentModels.find((m) => m.id === currentConfig.model);
+    return estimateArticlePrice(modelInfo?.inputPrice, modelInfo?.outputPrice);
+  }, [currentConfig.model, currentModels]);
 
   const isOnboarding = onboardingStep !== null;
   const currentStepIndex = isOnboarding ? ONBOARDING_STEPS.indexOf(onboardingStep) : -1;
@@ -830,24 +834,20 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
                 return { ...prev, modelCapabilities: caps };
               });
             }} />
-            {(() => {
-              const modelInfo = currentModels.find((m) => m.id === currentConfig.model);
-              const price = estimateArticlePrice(modelInfo?.inputPrice, modelInfo?.outputPrice);
-              return price !== null ? (
-                <span
-                  title="Estimated cost for a typical 5,000-word article summary"
-                  style={{
-                    font: 'var(--md-sys-typescale-label-small)',
-                    color: 'var(--md-sys-color-on-surface-variant)',
-                    backgroundColor: 'var(--md-sys-color-surface-container-highest)',
-                    padding: '2px 8px',
-                    borderRadius: 'var(--md-sys-shape-corner-small)',
-                  }}
-                >
-                  {formatArticlePrice(price)} / article
-                </span>
-              ) : null;
-            })()}
+            {articlePrice !== null && (
+              <span
+                title="Estimated cost for a typical 5,000-word article summary"
+                style={{
+                  font: 'var(--md-sys-typescale-label-small)',
+                  color: 'var(--md-sys-color-on-surface-variant)',
+                  backgroundColor: 'var(--md-sys-color-surface-container-highest)',
+                  padding: '2px 8px',
+                  borderRadius: 'var(--md-sys-shape-corner-small)',
+                }}
+              >
+                {formatArticlePrice(articlePrice)} / article
+              </span>
+            )}
           </div>
         )}
 
