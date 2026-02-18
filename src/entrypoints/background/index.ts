@@ -61,9 +61,10 @@ export default defineBackground(() => {
   }
 
   // On first install, navigate to xtil.ai (reuse existing tab if open)
-  chromeObj.runtime.onInstalled.addListener((details: { reason: string }) => {
+  chromeObj.runtime.onInstalled.addListener(async (details: chrome.runtime.InstalledDetails) => {
     if (details.reason !== 'install') return;
-    chromeObj.windows.getCurrent({ populate: true }, (win: chrome.windows.Window) => {
+    try {
+      const win = await chromeObj.windows.getCurrent({ populate: true });
       const tabs = win.tabs || [];
       const existing = tabs.find((t: chrome.tabs.Tab) => {
         try { return new URL(t.url || '').hostname.endsWith('xtil.ai'); }
@@ -74,7 +75,9 @@ export default defineBackground(() => {
       } else {
         chromeObj.tabs.create({ url: 'https://xtil.ai' });
       }
-    });
+    } catch {
+      chromeObj.tabs.create({ url: 'https://xtil.ai' });
+    }
   });
 
   chromeObj.runtime.onMessage.addListener(
