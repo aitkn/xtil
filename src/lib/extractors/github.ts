@@ -288,10 +288,12 @@ function extractPR(url: string, doc: Document): ExtractedContent {
     doc.querySelector('h1');
   let title = textOf(titleEl);
   // GitHub <title> format: "PR title by author · Pull Request #123 · owner/repo · GitHub"
-  if (!title || title === 'GitHub') {
-    const docTitle = doc.title || '';
-    const titleMatch = docTitle.match(/^(.+?)\s+by\s+.+?\s+·\s+Pull Request\s+#\d+/);
-    if (titleMatch) title = titleMatch[1].trim();
+  const docTitle = doc.title || '';
+  const titleMatch = docTitle.match(/^(.+?)\s+by\s+.+?\s+·\s+Pull Request\s+#\d+/);
+  const docTitleParsed = titleMatch ? titleMatch[1].trim() : '';
+  // Prefer <title> when DOM-extracted title is empty, generic, or matches the page name
+  if ((!title || title === 'GitHub' || title === 'Pull Request') && docTitleParsed) {
+    title = docTitleParsed;
   }
   if (!title) title = prNumber ? `Pull Request #${prNumber}` : 'Pull Request';
 
