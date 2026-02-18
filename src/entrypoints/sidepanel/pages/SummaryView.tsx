@@ -420,7 +420,7 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
     <img
       src={content.thumbnailUrl}
       alt={content.title}
-      style={{ width: '100%', borderRadius: 'var(--md-sys-shape-corner-medium)', marginBottom: '8px', display: 'block' }}
+      style={{ width: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: 'var(--md-sys-shape-corner-medium)', marginBottom: '8px', display: 'block' }}
       onLoad={(e) => {
         const img = e.currentTarget as HTMLImageElement;
         const scrollContainer = img.closest('.print-content') as HTMLElement;
@@ -525,7 +525,7 @@ function ThumbnailCollage({ urls, title, fallbackUrl }: { urls: string[]; title:
       <img
         src={fallbackUrl}
         alt={title}
-        style={{ width: '100%', borderRadius: 'var(--md-sys-shape-corner-medium)', marginBottom: '8px' }}
+        style={{ width: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: 'var(--md-sys-shape-corner-medium)', marginBottom: '8px' }}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
       />
     ) : null;
