@@ -1285,7 +1285,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         textAlign: 'center',
         lineHeight: 1.6,
       }}>
-        <div>xTil v1.0.0</div>
+        <div>xTil v{(globalThis as unknown as { chrome: typeof chrome }).chrome.runtime.getManifest().version}</div>
         <div>&copy; 2026 AI Tech Knowledge LLC</div>
         <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', flexWrap: 'wrap', font: 'var(--md-sys-typescale-label-small)', opacity: 0.7 }}>
           <a
