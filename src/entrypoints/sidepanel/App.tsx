@@ -740,6 +740,7 @@ export function App() {
         setSummary(null);
         setNotionUrl(null);
         setChatMessages([]);
+        setInputValue('');
         setPendingResummarize(false);
       } else if (response.error === 'restricted') {
         setRestricted(true);
@@ -869,6 +870,7 @@ export function App() {
             setSummary(null);
             setChatMessages([]);
             setNotionUrl(null);
+            setInputValue('');
           }
           return;
         }
@@ -880,6 +882,7 @@ export function App() {
           setSummary(null);
           setChatMessages([]);
           setNotionUrl(null);
+          setInputValue('');
         }
         if (changeInfo.status === 'complete') extractContent();
         if (changeInfo.url) {
