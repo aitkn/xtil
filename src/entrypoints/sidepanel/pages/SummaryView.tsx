@@ -496,6 +496,11 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
             {content.prState.charAt(0).toUpperCase() + content.prState.slice(1)}
           </span>
         )}
+        {content.type === 'github' && content.prNumber && (
+          <span style={{ font: 'var(--md-sys-typescale-label-small)', fontWeight: 600 }}>
+            #{content.prNumber}
+          </span>
+        )}
         {content.type === 'github' && content.issueState && !content.prState && (
           <span style={{
             backgroundColor: content.issueState === 'open' ? '#1a7f37' : '#cf222e',

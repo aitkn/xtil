@@ -275,21 +275,59 @@ function buildResult(
 // ─── Page-type extractors ──────────────────────────────────────────────
 
 function extractPR(url: string, doc: Document): ExtractedContent {
-  // Title
-  const titleEl = doc.querySelector('.gh-header-title .js-issue-title') || doc.querySelector('h1 bdi');
-  const title = textOf(titleEl) || 'Pull Request';
+  // PR number from URL (always reliable)
+  const prNumberMatch = url.match(/\/pull\/(\d+)/);
+  const prNumber = prNumberMatch ? parseInt(prNumberMatch[1], 10) : undefined;
 
-  // State badge
-  const stateEl = doc.querySelector('.State, [title="Status: Open"], [title="Status: Closed"], [title="Status: Merged"]');
-  const stateText = textOf(stateEl).toLowerCase();
+  // Title — try multiple selectors, fall back to <title> parsing
+  const titleEl =
+    doc.querySelector('.gh-header-title .js-issue-title') ||
+    doc.querySelector('h1 bdi') ||
+    doc.querySelector('[data-testid="issue-title"]') ||
+    doc.querySelector('h1.gh-header-title') ||
+    doc.querySelector('h1');
+  let title = textOf(titleEl);
+  // GitHub <title> format: "PR title by author · Pull Request #123 · owner/repo · GitHub"
+  if (!title || title === 'GitHub') {
+    const docTitle = doc.title || '';
+    const titleMatch = docTitle.match(/^(.+?)\s+by\s+.+?\s+·\s+Pull Request\s+#\d+/);
+    if (titleMatch) title = titleMatch[1].trim();
+  }
+  if (!title) title = prNumber ? `Pull Request #${prNumber}` : 'Pull Request';
+
+  // State badge — try multiple selectors and aria-label patterns
+  const stateEl =
+    doc.querySelector('.State') ||
+    doc.querySelector('[title="Status: Open"], [title="Status: Closed"], [title="Status: Merged"]') ||
+    doc.querySelector('[data-testid="state-badge"]');
+  let stateText = textOf(stateEl).toLowerCase();
+  // Fallback: scan for state in aria-labels or the header meta area
+  if (!stateText) {
+    const headerMeta = doc.querySelector('.gh-header-meta, [class*="header"] [class*="state"]');
+    if (headerMeta) stateText = textOf(headerMeta).toLowerCase();
+  }
+  // Fallback: check <title> for "Merged" or page body
+  if (!stateText) {
+    const docTitle = (doc.title || '').toLowerCase();
+    if (docTitle.includes('merged')) stateText = 'merged';
+    else if (docTitle.includes('closed')) stateText = 'closed';
+  }
   const prState: 'open' | 'closed' | 'merged' =
     stateText.includes('merged') ? 'merged'
     : stateText.includes('closed') ? 'closed'
     : 'open';
 
-  // Author
-  const authorEl = doc.querySelector('.gh-header-meta .author, .js-issue-header-author');
-  const author = textOf(authorEl);
+  // Author — try multiple selectors, fall back to <title> parsing
+  const authorEl =
+    doc.querySelector('.gh-header-meta .author') ||
+    doc.querySelector('.js-issue-header-author') ||
+    doc.querySelector('[data-testid="author"]');
+  let author = textOf(authorEl);
+  if (!author) {
+    const docTitle = doc.title || '';
+    const authorMatch = docTitle.match(/by\s+(\S+)\s+·\s+Pull Request/);
+    if (authorMatch) author = authorMatch[1];
+  }
 
   // Branch info
   const headRef = textOf(doc.querySelector('.head-ref'));
@@ -330,7 +368,7 @@ function extractPR(url: string, doc: Document): ExtractedContent {
   // Build content
   const lines: string[] = [];
   if (fileMapComment) lines.push(fileMapComment, '');
-  lines.push(`# ${title}`);
+  lines.push(`# ${prNumber ? `#${prNumber} ` : ''}${title}`);
   lines.push('');
   lines.push(`**State:** ${prState} | **Author:** ${author || 'unknown'}`);
   if (headRef && baseRef) lines.push(`**Branch:** ${headRef} → ${baseRef}`);
@@ -369,6 +407,7 @@ function extractPR(url: string, doc: Document): ExtractedContent {
   return buildResult(url, 'pr', title, lines.join('\n'), {
     author,
     publishDate,
+    prNumber,
     prState,
   });
 }
