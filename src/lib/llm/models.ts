@@ -67,6 +67,29 @@ export function filterChatModels(models: ModelInfo[]): ModelInfo[] {
   });
 }
 
+export function getCatalogVersion(): string {
+  return catalog._generated;
+}
+
+export function getCatalogModels(providerId: string): ModelInfo[] {
+  const providerCatalog = catalog.providers?.[providerId];
+  if (!providerCatalog) return [];
+  const defaultCtx = getProviderDefinition(providerId)?.defaultContextWindow || 100000;
+  const models: ModelInfo[] = Object.entries(providerCatalog.models)
+    .filter(([, e]) => e.textGeneration !== false)
+    .map(([id, e]) => ({
+      id,
+      name: e.name || id,
+      contextWindow: e.contextWindow || defaultCtx,
+      maxOutput: e.maxOutput,
+      inputPrice: e.inputPrice,
+      outputPrice: e.outputPrice,
+      vision: e.vision,
+      textGeneration: e.textGeneration,
+    }));
+  return filterChatModels(models);
+}
+
 export async function fetchModels(
   providerId: string,
   apiKey: string,

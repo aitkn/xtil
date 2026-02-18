@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-02-17T09:38:52.731Z",
+  "_generated": "2026-02-17T19:50:28.187Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -73,6 +73,14 @@
         },
         "claude-sonnet-4-5-20250929": {
           "name": "Claude Sonnet 4.5",
+          "contextWindow": 200000,
+          "maxOutput": 16384,
+          "inputPrice": 3,
+          "outputPrice": 15,
+          "vision": true
+        },
+        "claude-sonnet-4-6": {
+          "name": "Claude Sonnet 4.6",
           "contextWindow": 200000,
           "maxOutput": 64000,
           "inputPrice": 3,
