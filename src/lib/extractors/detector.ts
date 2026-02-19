@@ -1,6 +1,7 @@
 import type { ContentExtractor } from './types';
 import { youtubeExtractor } from './youtube';
 import { gdocsExtractor } from './gdocs';
+import { gmailExtractor } from './gmail';
 import { facebookExtractor } from './facebook';
 import { redditExtractor } from './reddit';
 import { twitterExtractor } from './twitter';
@@ -11,6 +12,7 @@ import { genericExtractor } from './generic';
 const extractors: ContentExtractor[] = [
   youtubeExtractor,
   gdocsExtractor,
+  gmailExtractor,
   facebookExtractor,
   redditExtractor,
   twitterExtractor,

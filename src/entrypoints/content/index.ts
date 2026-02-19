@@ -10,6 +10,33 @@ export default defineContentScript({
   main() {
     const chromeRuntime = (globalThis as unknown as { chrome: { runtime: typeof chrome.runtime } }).chrome.runtime;
 
+    // Watch for Gmail email changes in reading pane → notify sidepanel
+    if (window.location.hostname === 'mail.google.com') {
+      let lastThreadId = '';
+      let gmailDebounce: ReturnType<typeof setTimeout> | null = null;
+
+      const checkGmailThread = () => {
+        if (gmailDebounce) return;
+        gmailDebounce = setTimeout(() => {
+          gmailDebounce = null;
+          const threadEl = document.querySelector('h2[data-legacy-thread-id]');
+          const currentId = threadEl?.getAttribute('data-legacy-thread-id') || '';
+          if (currentId && currentId !== lastThreadId) {
+            lastThreadId = currentId;
+            chromeRuntime.sendMessage({ type: 'CONTENT_CHANGED' }).catch(() => {});
+          } else if (!currentId && lastThreadId) {
+            lastThreadId = '';
+          }
+        }, 500);
+      };
+
+      // Gmail uses hash-based routing — detect navigation between emails
+      window.addEventListener('hashchange', checkGmailThread);
+      // Also watch DOM mutations for reading pane updates (split view)
+      const gmailObserver = new MutationObserver(checkGmailThread);
+      gmailObserver.observe(document.body, { childList: true, subtree: true });
+    }
+
     // Watch for Facebook post modals appearing/changing → notify sidepanel
     if (/(^|\.)facebook\.com$/.test(window.location.hostname)) {
       let lastModalHeading = '';

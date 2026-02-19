@@ -1,4 +1,4 @@
-export type ContentType = 'article' | 'youtube' | 'facebook' | 'reddit' | 'twitter' | 'github' | 'generic';
+export type ContentType = 'article' | 'youtube' | 'facebook' | 'reddit' | 'twitter' | 'github' | 'gmail' | 'generic';
 
 export interface ExtractedContent {
   type: ContentType;

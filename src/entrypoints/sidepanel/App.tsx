@@ -1058,7 +1058,6 @@ export function App() {
       // Store raw LLM responses and system prompt for debug panel BEFORE
       // checking success — they're available even when summarization fails
       // (e.g. LLM text response, noSummary refusal, noContent detection).
-      console.log('[debug] summaryResponse keys:', Object.keys(summaryResponse), 'conversationLog length:', summaryResponse.conversationLog?.length, 'lastRequestBody:', !!summaryResponse.lastRequestBody);
       if (summaryResponse.rawResponses?.length) {
         setRawResponses(prev => [...prev, ...summaryResponse.rawResponses!]);
       }

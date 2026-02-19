@@ -428,6 +428,8 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
     />
   ) : null;
 
+  const hasThumbnail = thumbnailImg !== null;
+
   return (
     <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid var(--md-sys-color-outline-variant)' }}>
       {hasThumbnail ? (
