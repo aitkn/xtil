@@ -461,7 +461,8 @@
       letter-spacing: 0.04em;
     }
     .mock-badge.type { background: rgba(74,222,128,0.15); color: #4ade80; }
-    .mock-badge.model { background: rgba(180,197,255,0.15); color: #b4c5ff; }
+    .mock-badge.github, .mock-badge.model { background: rgba(180,197,255,0.15); color: #b4c5ff; }
+    .mock-badge.reddit { background: rgba(255,69,0,0.15); color: #ff6b35; }
     .mock-badge.meta-b { background: rgba(142,144,153,0.12); color: #8e9099; }
     .mock-thumb {
       width: 100%;
@@ -1641,13 +1642,14 @@
           </div>
           <div class="mock-panel-scroll">
             <div class="mock-badges">
-              <span class="mock-badge type">ARTICLE</span>
-              <span class="mock-badge model">GPT-4o</span>
+              <span class="mock-badge github">GITHUB PR</span>
+              <span class="mock-badge model">Claude 3.5</span>
             </div>
+            <div class="mock-ptitle">Add streaming response support for chat API</div>
+            <div class="mock-pmeta">acme/api &middot; PR #847 &middot; opened by @mchen &middot; 12 files changed</div>
             <div class="mock-vstats">
-              <span class="mock-vstats-badge">&#10003; 3,450 words</span>
-              <span class="mock-vstats-badge">&#128248; 2 images &mdash; will analyze</span>
-              <span class="mock-vstats-badge">&#128172; 47 comments</span>
+              <span class="mock-vstats-badge">&#10003; 2,180 words</span>
+              <span class="mock-vstats-badge">+342 / &minus;89 lines</span>
             </div>
             <!-- TL;DR -->
             <div class="mock-sec">
@@ -1657,74 +1659,38 @@
                 <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
               </div>
               <div class="mock-callout">
-                Researchers have crossed the critical <b>error-correction threshold</b> for quantum computing, reducing overhead by <b>10x</b>. IBM&rsquo;s 1,121-qubit Condor and Google&rsquo;s Sycamore demonstrate <b>quantum advantage</b>, with the market projected to hit <b>$65B by 2030</b>.
+                Adds <b>Server-Sent Events</b> streaming to the chat completions endpoint. Refactors the response pipeline to support both buffered and streamed output, with a new <b>StreamManager</b> class handling back-pressure and client disconnects.
               </div>
             </div>
-            <!-- Key Takeaways -->
+            <!-- Key Changes -->
             <div class="mock-sec">
               <div class="mock-sec-head">
                 <span class="mock-sec-arrow">&#9660;</span>
-                <span class="mock-sec-label">Key Takeaways</span>
+                <span class="mock-sec-label">Key Changes</span>
                 <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
               </div>
-              <div class="mock-takeaway"><span class="mock-tk-num">1</span><span><b>Error correction breakthrough</b> &mdash; MIT/Caltech reduced quantum error correction overhead by 10x, crossing a critical threshold.</span></div>
-              <div class="mock-takeaway"><span class="mock-tk-num">2</span><span><b>Hardware milestones</b> &mdash; IBM Condor reaches <span style="color:#fbbf24">1,121 qubits</span>; Google Sycamore demonstrates quantum advantage.</span></div>
-              <div class="mock-takeaway"><span class="mock-tk-num">3</span><span><b>Market growth</b> &mdash; <span style="color:#4ade80">$65B projected by 2030</span> across superconducting, trapped-ion, and topological approaches.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">1</span><span><b>StreamManager class</b> &mdash; New <span style="color:#fbbf24">src/stream.ts</span> handles chunked transfer encoding, back-pressure, and graceful disconnect.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">2</span><span><b>API contract</b> &mdash; Accepts <span style="color:#4ade80">stream: true</span> parameter; returns SSE with <code>data:</code> frames matching OpenAI format.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num">3</span><span><b>Tests</b> &mdash; 14 new test cases covering timeout, reconnect, and partial-chunk edge cases.</span></div>
             </div>
-            <!-- Summary -->
+            <!-- Code Quality -->
             <div class="mock-sec">
               <div class="mock-sec-head">
                 <span class="mock-sec-arrow">&#9660;</span>
-                <span class="mock-sec-label">Summary</span>
+                <span class="mock-sec-label">Code Quality</span>
                 <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
               </div>
-              <div class="mock-sum-text">The quantum computing field reached a pivotal moment when MIT and Caltech researchers demonstrated a novel error-correction approach that reduces computational overhead by an order of magnitude. Combined with IBM&rsquo;s 1,121-qubit Condor chip and Google&rsquo;s quantum advantage demonstrations, the field is transitioning from laboratory curiosities to practical systems.</div>
+              <div class="mock-claim"><span class="mock-claim-icon ok">&#10003;</span><span><b>Error handling</b> &mdash; Proper cleanup on client disconnect via AbortController.</span></div>
+              <div class="mock-claim"><span class="mock-claim-icon ok">&#10003;</span><span><b>Type safety</b> &mdash; Full TypeScript types for stream events and options.</span></div>
+              <div class="mock-claim"><span class="mock-claim-icon warn">&#9888;</span><span><b>Memory</b> &mdash; No explicit buffer size limit in StreamManager; could grow unbounded under slow consumers.</span></div>
             </div>
-            <!-- Fact Check -->
-            <div class="mock-sec">
-              <div class="mock-sec-head">
-                <span class="mock-sec-arrow">&#9660;</span>
-                <span class="mock-sec-label">Fact Check</span>
-                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
-              </div>
-              <div class="mock-claim"><span class="mock-claim-icon ok">&#10003;</span><span><b>IBM Condor has 1,121 qubits</b> &mdash; Verified. Announced Dec 2023.</span></div>
-              <div class="mock-claim"><span class="mock-claim-icon ok">&#10003;</span><span><b>$65B market by 2030</b> &mdash; Verified. Matches McKinsey &amp; BCG estimates.</span></div>
-              <div class="mock-claim"><span class="mock-claim-icon warn">&#9888;</span><span><b>10x overhead reduction</b> &mdash; Contested. Paper claims 8&ndash;12x depending on architecture.</span></div>
-            </div>
-            <!-- Notable Quotes -->
-            <div class="mock-sec">
-              <div class="mock-sec-head">
-                <span class="mock-sec-arrow">&#9660;</span>
-                <span class="mock-sec-label">Notable Quotes</span>
-                <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
-              </div>
-              <div class="mock-quote">
-                &ldquo;We are now at the stage where quantum computers can do things that classical computers cannot.&rdquo;
-                <div class="mock-quote-attr">&mdash; Dr. John Preskill, Caltech</div>
-              </div>
-              <div class="mock-quote">
-                &ldquo;Error correction is the bridge between quantum toys and quantum tools.&rdquo;
-                <div class="mock-quote-attr">&mdash; Dr. Sarah Chen, MIT</div>
-              </div>
+            <!-- Review Comments (collapsed) -->
+            <div class="mock-sec mock-collapsed">
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Review Comments (8)</span></div>
             </div>
             <!-- Conclusion (collapsed) -->
             <div class="mock-sec mock-collapsed">
-              <div class="mock-sec-head">
-                <span class="mock-sec-arrow">&#9654;</span>
-                <span class="mock-sec-label">Conclusion</span>
-              </div>
-            </div>
-            <!-- Related Topics -->
-            <div class="mock-sec">
-              <div class="mock-sec-head">
-                <span class="mock-sec-arrow">&#9660;</span>
-                <span class="mock-sec-label">Related Topics</span>
-              </div>
-              <div class="mock-tags">
-                <span class="mock-tag">Quantum Computing</span>
-                <span class="mock-tag">Error Correction</span>
-                <span class="mock-tag">Superconducting Qubits</span>
-              </div>
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Conclusion</span></div>
             </div>
           </div>
         </div>
@@ -1902,14 +1868,16 @@
           </div>
           <div class="mock-panel-scroll">
             <div class="mock-badges">
-              <span class="mock-badge type">ARTICLE</span>
+              <span class="mock-badge reddit">REDDIT</span>
               <span class="mock-badge model">GPT-4o</span>
             </div>
+            <div class="mock-ptitle">Is it worth switching from React to Svelte in 2025?</div>
+            <div class="mock-pmeta">r/webdev &middot; u/frontenddev42 &middot; 347 comments &middot; 1.2K upvotes</div>
             <div class="mock-vstats">
-              <span class="mock-vstats-badge">&#10003; 3,450 words</span>
-              <span class="mock-vstats-badge">&#128248; 2 images</span>
+              <span class="mock-vstats-badge">&#10003; 5,120 words</span>
+              <span class="mock-vstats-badge">&#128172; 347 comments parsed</span>
             </div>
-            <!-- TL;DR (Spanish) -->
+            <!-- TL;DR -->
             <div class="mock-sec">
               <div class="mock-sec-head">
                 <span class="mock-sec-arrow">&#9660;</span>
@@ -1917,40 +1885,32 @@
                 <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
               </div>
               <div class="mock-callout">
-                Los investigadores han cruzado el <b>umbral cr&iacute;tico de correcci&oacute;n de errores</b> para la computaci&oacute;n cu&aacute;ntica, reduciendo la sobrecarga en <b>10x</b>. El mercado se proyecta a <b>$65 mil millones para 2030</b>.
+                The community is split but leans toward <b>staying with React</b> for large teams and existing codebases. Svelte wins on <b>DX and bundle size</b>, but React&rsquo;s ecosystem, hiring pool, and Server Components momentum keep it dominant.
               </div>
             </div>
-            <!-- Puntos Clave (collapsed) -->
+            <!-- Key Arguments (collapsed) -->
             <div class="mock-sec mock-collapsed">
-              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Puntos Clave</span></div>
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Key Arguments</span></div>
             </div>
-            <!-- Resumen (collapsed) -->
+            <!-- Notable Quotes (collapsed) -->
             <div class="mock-sec mock-collapsed">
-              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Resumen</span></div>
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Notable Quotes (6)</span></div>
             </div>
-            <!-- Citas Destacadas (collapsed) -->
-            <div class="mock-sec mock-collapsed">
-              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Citas Destacadas</span></div>
-            </div>
-            <!-- Cronolog&iacute;a (expanded, NEW badge) -->
+            <!-- Pros &amp; Cons (expanded, NEW badge) -->
             <div class="mock-sec">
               <div class="mock-sec-head">
                 <span class="mock-sec-arrow">&#9660;</span>
-                <span class="mock-sec-label">Cronolog&iacute;a<span class="mock-new-badge">NEW</span></span>
+                <span class="mock-sec-label">Pros &amp; Cons<span class="mock-new-badge">NEW</span></span>
                 <div class="mock-sec-btns"><span class="mock-sec-btn">+</span><span class="mock-sec-btn">&minus;</span><span class="mock-sec-btn">&times;</span></div>
               </div>
-              <div class="mock-timeline-entry"><span class="mock-timeline-year">2019</span><span>Google demuestra la <b>ventaja cu&aacute;ntica</b> con Sycamore (53 qubits).</span></div>
-              <div class="mock-timeline-entry"><span class="mock-timeline-year">2021</span><span>IBM presenta el procesador Eagle con <b>127 qubits</b>.</span></div>
-              <div class="mock-timeline-entry"><span class="mock-timeline-year">2023</span><span>IBM Condor alcanza <b>1.121 qubits</b>; Microsoft anuncia qubits topol&oacute;gicos.</span></div>
-              <div class="mock-timeline-entry"><span class="mock-timeline-year">2024</span><span>MIT/Caltech logra <b>reducci&oacute;n de 10x</b> en sobrecarga de correcci&oacute;n de errores.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num" style="background:rgba(34,197,94,0.15);color:#22c55e;">&#10003;</span><span><b>Svelte DX</b> &mdash; Less boilerplate, faster builds, <span style="color:#4ade80">smaller bundles</span> (up to 40% reduction).</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num" style="background:rgba(34,197,94,0.15);color:#22c55e;">&#10003;</span><span><b>Learning curve</b> &mdash; Closer to vanilla HTML/JS; easier for junior devs to pick up.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num" style="background:rgba(239,68,68,0.15);color:#ef4444;">&times;</span><span><b>Ecosystem</b> &mdash; React has <span style="color:#fbbf24">10x more packages</span> and battle-tested solutions for every use case.</span></div>
+              <div class="mock-takeaway"><span class="mock-tk-num" style="background:rgba(239,68,68,0.15);color:#ef4444;">&times;</span><span><b>Hiring</b> &mdash; Finding experienced Svelte developers remains significantly harder.</span></div>
             </div>
-            <!-- Verificaci&oacute;n de Hechos (collapsed) -->
+            <!-- Conclusion (collapsed) -->
             <div class="mock-sec mock-collapsed">
-              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Verificaci&oacute;n de Hechos</span></div>
-            </div>
-            <!-- Conclusi&oacute;n (collapsed) -->
-            <div class="mock-sec mock-collapsed">
-              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Conclusi&oacute;n</span></div>
+              <div class="mock-sec-head"><span class="mock-sec-arrow">&#9654;</span><span class="mock-sec-label">Conclusion</span></div>
             </div>
           </div>
           <!-- Chat area -->
@@ -1958,19 +1918,19 @@
             <div class="mock-chat-label">Chat</div>
             <div class="mock-chat-msg user">
               <span class="mock-chat-rollback"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg></span>
-              <div class="mock-chat-bubble">Translate everything to Spanish</div>
+              <div class="mock-chat-bubble">What&rsquo;s the community consensus?</div>
             </div>
             <div class="mock-change-dot"></div>
             <div class="mock-chat-msg assistant">
-              <div class="mock-chat-bubble">Done! I&rsquo;ve translated all sections to Spanish.</div>
+              <div class="mock-chat-bubble">The thread leans toward React for production apps, but Svelte for side projects and smaller teams.</div>
             </div>
             <div class="mock-chat-msg user">
               <span class="mock-chat-rollback"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg></span>
-              <div class="mock-chat-bubble">Add a Cronolog&iacute;a section</div>
+              <div class="mock-chat-bubble">Add a pros &amp; cons section</div>
             </div>
             <div class="mock-change-dot"></div>
             <div class="mock-chat-msg assistant">
-              <div class="mock-chat-bubble">Added a new <b>Cronolog&iacute;a</b> section with key quantum computing milestones from 2019 to 2024.</div>
+              <div class="mock-chat-bubble">Added a new <b>Pros &amp; Cons</b> section comparing Svelte and React based on the top-voted arguments.</div>
             </div>
             <div class="mock-chat-input">
               <span class="mock-chat-ph">Ask anything about this page...</span>
