@@ -1,6 +1,6 @@
 {
   "name": "xtil",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Summarize any page or YouTube video with AI, refine via chat, and save to Notion",
   "private": true,
   "type": "module",
