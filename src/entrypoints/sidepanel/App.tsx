@@ -981,13 +981,6 @@ export function App() {
     return () => { clearInterval(id); clearTimeout(initial); };
   }, [extractEpoch, activeTabId]); // re-run on every new extraction or tab switch
 
-  // Clean up temporary scroll padding added by tall-image onLoad once summary provides enough content
-  useEffect(() => {
-    if (summary && scrollAreaRef.current) {
-      scrollAreaRef.current.style.paddingBottom = '';
-    }
-  }, [summary]);
-
   // Scroll to bottom only when a new *visible assistant* message arrives (skip internal/user)
   const prevVisibleAssistantCountRef = useRef(0);
   useEffect(() => {
@@ -1639,7 +1632,7 @@ export function App() {
       />
 
       {/* Scrollable content area */}
-      <div ref={scrollAreaRef} class="print-content" style={{ flex: 1, overflow: 'auto', scrollSnapType: 'y proximity' }}>
+      <div ref={scrollAreaRef} class="print-content" style={{ flex: 1, overflow: 'auto' }}>
         {/* Extracting state */}
         {extracting && !content && (
           <div style={{ padding: '48px 24px', textAlign: 'center' }}>

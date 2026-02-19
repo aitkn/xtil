@@ -1048,7 +1048,7 @@
     }
     .providers-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 16px;
       margin-top: 48px;
     }
@@ -1193,11 +1193,11 @@
       .container { padding: 0 20px; }
       nav { padding: 0 20px; }
 
-      /* Nav — hide section anchors, keep GitHub */
+      /* Nav — hide section anchors and GitHub, keep Install */
       .nav-links { gap: 16px; }
       .nav-links a[href="#features"],
-      .nav-links a[href="#how-it-works"] { display: none; }
-      .nav-cta { display: none !important; }
+      .nav-links a[href="#how-it-works"],
+      .nav-links a[href="https://github.com/aitkn/xtil"] { display: none; }
 
       /* Hero */
       .hero { min-height: auto; padding: 80px 0 48px; }
@@ -2334,7 +2334,21 @@
         <div class="provider-name">Google</div>
         <div class="provider-models">Gemini 2.5 Pro, Flash &middot; 1M context &middot; Vision</div>
       </div>
-      <div class="provider-card reveal reveal-delay-3">
+      <div class="provider-card reveal">
+        <div class="provider-logo" style="background:rgba(255,255,255,0.06);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </div>
+        <div class="provider-name">xAI</div>
+        <div class="provider-models">Grok 2, Grok 3 &middot; 128K context &middot; Vision</div>
+      </div>
+      <div class="provider-card reveal reveal-delay-1">
+        <div class="provider-logo" style="background:rgba(77,144,254,0.12);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-1-1 4-4-4-4 1-1 5 5-5 5z"/></svg>
+        </div>
+        <div class="provider-name">DeepSeek</div>
+        <div class="provider-models">DeepSeek V3, R1 &middot; 64K context</div>
+      </div>
+      <div class="provider-card reveal reveal-delay-2">
         <div class="provider-logo selfhost">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
         </div>
@@ -2342,7 +2356,7 @@
         <div class="provider-models">Ollama, LM Studio, vLLM &middot; Any OpenAI-compatible endpoint</div>
       </div>
     </div>
-    <p class="reveal" style="text-align:center;color:var(--text-muted);font-size:0.85rem;font-weight:300;margin-top:28px;max-width:640px;margin-left:auto;margin-right:auto;">xTil automatically discovers available models from your provider and probes each model's actual vision capability &mdash; so image analysis just works without manual configuration. Also supports xAI (Grok) and DeepSeek.</p>
+    <p class="reveal" style="text-align:center;color:var(--text-muted);font-size:0.85rem;font-weight:300;margin-top:28px;max-width:640px;margin-left:auto;margin-right:auto;">xTil automatically discovers available models from your provider and probes each model's actual vision capability &mdash; so image analysis just works without manual configuration.</p>
     <p class="reveal" style="text-align:center;font-size:0.85rem;margin-top:16px;max-width:640px;margin-left:auto;margin-right:auto;">
       <span style="color:var(--text-muted);font-weight:300;">Already use ChatGPT or Claude? You likely have an API key.</span>
       <span style="color:var(--primary-bright);font-weight:400;"> Most summaries cost less than $0.01.</span>

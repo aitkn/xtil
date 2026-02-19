@@ -349,17 +349,10 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
   };
   const badge = badgeColors[content.type] || badgeColors.generic;
 
-  const hasThumbnail = !!(content.thumbnailUrl || (content.thumbnailUrls && content.thumbnailUrls.length >= 2));
-
   const badgeRow = (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '8px',
       marginBottom: '4px',
-      ...(hasThumbnail ? {
-        position: 'sticky' as const, top: 0, zIndex: 2,
-        backgroundColor: 'var(--md-sys-color-surface)',
-        padding: '4px 0',
-      } : {}),
     }}>
       <span style={{
         backgroundColor: badge.bg,
@@ -421,31 +414,6 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
       src={content.thumbnailUrl}
       alt={content.title}
       style={{ width: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: 'var(--md-sys-shape-corner-medium)', marginBottom: '8px', display: 'block' }}
-      onLoad={(e) => {
-        const img = e.currentTarget as HTMLImageElement;
-        const scrollContainer = img.closest('.print-content') as HTMLElement;
-        if (!scrollContainer || scrollContainer.scrollTop !== 0) return;
-        const imgQuarter = Math.round(window.innerHeight * 0.25);
-        if (img.offsetHeight > imgQuarter) {
-          const titleEl = scrollContainer.querySelector<HTMLElement>('[data-title-snap]');
-          const badgeRow = img.previousElementSibling as HTMLElement;
-          if (titleEl) {
-            // snap margin = sticky badges height + 25% image peek
-            const snapMargin = (badgeRow ? badgeRow.offsetHeight : 0) + imgQuarter;
-            titleEl.style.scrollMarginTop = `${snapMargin}px`;
-            const titleTop = titleEl.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top;
-            const targetScroll = titleTop - snapMargin;
-            if (targetScroll > 0) {
-              // Ensure enough scrollable space before summary loads
-              const deficit = targetScroll + scrollContainer.clientHeight - scrollContainer.scrollHeight;
-              if (deficit > 0) {
-                scrollContainer.style.paddingBottom = `${deficit}px`;
-              }
-              scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
-            }
-          }
-        }
-      }}
       onError={(e) => {
         const img = e.currentTarget as HTMLImageElement;
         if (content.type === 'youtube') {
@@ -474,7 +442,7 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
         </>
       )}
 
-      <h2 data-title-snap style={{ font: 'var(--md-sys-typescale-title-medium)', lineHeight: 1.3, margin: '4px 0', color: 'var(--md-sys-color-on-surface)', scrollSnapAlign: 'start' }}>
+      <h2 style={{ font: 'var(--md-sys-typescale-title-medium)', lineHeight: 1.3, margin: '4px 0', color: 'var(--md-sys-color-on-surface)' }}>
         {summary?.translatedTitle || content.title || summary?.inferredTitle || ''}
       </h2>
 
