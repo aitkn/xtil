@@ -45,6 +45,9 @@ const NON_CHAT_PATTERNS = [
 /** Date suffix like -2024-05-13 or -0709 (MMDD) */
 const DATE_SUFFIX_RE = /^(.+)-(\d{4}-\d{2}-\d{2}|\d{4})$/;
 
+/** Preview suffix like -preview-05-06 or -preview-09-2025 */
+const PREVIEW_SUFFIX_RE = /^(.+)-preview-\d{2}-\d{2,4}$/;
+
 export function filterChatModels(models: ModelInfo[]): ModelInfo[] {
   // Collect all model IDs for dedup lookup
   const idSet = new Set(models.map((m) => m.id));
@@ -60,6 +63,13 @@ export function filterChatModels(models: ModelInfo[]): ModelInfo[] {
     const match = DATE_SUFFIX_RE.exec(m.id);
     if (match) {
       const base = match[1];
+      if (idSet.has(base)) return false;
+    }
+
+    // d) Preview snapshot dedup: hide "foo-preview-05-06" if "foo" exists
+    const previewMatch = PREVIEW_SUFFIX_RE.exec(m.id);
+    if (previewMatch) {
+      const base = previewMatch[1];
       if (idSet.has(base)) return false;
     }
 

@@ -4,7 +4,7 @@ import type { ModelInfo, VisionSupport } from '@/lib/llm/types';
 import { PROVIDER_DEFINITIONS } from '@/lib/llm/registry';
 import { filterChatModels, getCatalogModels, getCatalogVersion } from '@/lib/llm/models';
 import { Button } from '@/components/Button';
-import { estimateArticlePrice, formatArticlePrice } from '@/lib/pricing';
+import { estimateArticlePrice, formatArticlePriceFixed } from '@/lib/pricing';
 
 const LANGUAGES = [
   { code: 'en', name: 'English' },
@@ -128,13 +128,21 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         filtered[pid] = filterChatModels(models);
       }
 
-      // Auto-merge new catalog models into cached list when catalog version changes
+      // Auto-merge new catalog models and update metadata when catalog version changes
       const currentCatalogVersion = getCatalogVersion();
       if (settings.catalogVersion !== currentCatalogVersion) {
         let merged = false;
         for (const pid of Object.keys(filtered)) {
           const catalogModels = getCatalogModels(pid);
           if (catalogModels.length === 0) continue;
+          const catalogMap = new Map(catalogModels.map((m) => [m.id, m]));
+          // Update metadata (name, prices, etc.) for existing models from catalog
+          filtered[pid] = filtered[pid].map((m) => {
+            const cat = catalogMap.get(m.id);
+            if (!cat) return m;
+            return { ...m, name: cat.name, inputPrice: cat.inputPrice ?? m.inputPrice, outputPrice: cat.outputPrice ?? m.outputPrice, contextWindow: cat.contextWindow ?? m.contextWindow, maxOutput: cat.maxOutput ?? m.maxOutput, vision: cat.vision ?? m.vision };
+          });
+          // Add new models not already in the cached list
           const existingIds = new Set(filtered[pid].map((m) => m.id));
           const newModels = catalogModels.filter((m) => !existingIds.has(m.id));
           if (newModels.length > 0) {
@@ -196,10 +204,6 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   const visionKey = `${currentProviderId}:${currentConfig.model}`;
   const visionCapability: VisionSupport = local.modelCapabilities?.[visionKey]?.vision || 'unknown';
   const isSelfHosted = currentProviderId === 'self-hosted';
-  const articlePrice = useMemo(() => {
-    const modelInfo = currentModels.find((m) => m.id === currentConfig.model);
-    return estimateArticlePrice(modelInfo?.inputPrice, modelInfo?.outputPrice);
-  }, [currentConfig.model, currentModels]);
 
   const isOnboarding = onboardingStep !== null;
   const currentStepIndex = isOnboarding ? ONBOARDING_STEPS.indexOf(onboardingStep) : -1;
@@ -780,32 +784,42 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       {/* === Model Section === */}
       <div style={getSectionStyle('model')}>
         <Label htmlFor="settings-model">Model</Label>
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-          <select
-            id="settings-model"
-            name="model"
-            value={currentConfig.model}
-            onChange={(e) => {
-              const val = (e.target as HTMLSelectElement).value;
-              const model = currentModels.find((m) => m.id === val);
-              updateProviderConfig({
-                model: val,
-                contextWindow: model?.contextWindow || currentConfig.contextWindow,
-              });
-              // Advance onboarding on model select
-              if (onboardingStep === 'model') {
-                advanceStep('model');
-              }
-            }}
-            style={{ ...selectStyle, flex: 1 }}
-          >
-            {currentModels.length === 0 && !currentConfig.model && (
-              <option value="">Enter API key to load models...</option>
-            )}
-            {currentModels.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
+        <select
+          id="settings-model"
+          name="model"
+          value={currentConfig.model}
+          onChange={(e) => {
+            const val = (e.target as HTMLSelectElement).value;
+            const model = currentModels.find((m) => m.id === val);
+            updateProviderConfig({
+              model: val,
+              contextWindow: model?.contextWindow || currentConfig.contextWindow,
+            });
+            // Advance onboarding on model select
+            if (onboardingStep === 'model') {
+              advanceStep('model');
+            }
+          }}
+          style={{ ...selectStyle, fontFamily: 'monospace', fontSize: '13px' }}
+        >
+          {currentModels.length === 0 && !currentConfig.model && (
+            <option value="">Enter API key to load models...</option>
+          )}
+          {(() => {
+            const nbsp = '\u00A0';
+            const maxNameLen = Math.max(...currentModels.map((m) => m.name.length), 0);
+            return currentModels.map((m) => {
+              const price = estimateArticlePrice(m.inputPrice, m.outputPrice);
+              const pad = nbsp.repeat(maxNameLen - m.name.length + 2);
+              const label = price != null ? `${m.name}${pad}${formatArticlePriceFixed(price)}` : m.name;
+              return <option key={m.id} value={m.id}>{label}</option>;
+            });
+          })()}
+        </select>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+          <span style={{ font: 'var(--md-sys-typescale-label-small)', color: 'var(--md-sys-color-on-surface-variant)', fontStyle: 'italic' }}>
+            Prices are approximate, per 5,000-word article
+          </span>
           <Button onClick={() => doFetchModels()} loading={loadingModels} size="sm" variant="ghost" title="Refresh model list">
             Refresh
           </Button>
@@ -830,7 +844,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           </div>
         )}
 
-        {/* Vision capability badge + price estimate */}
+        {/* Vision capability badge */}
         {currentConfig.model && (
           <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <VisionBadge vision={visionCapability} probing={probingVision} onReprobe={() => {
@@ -840,20 +854,6 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
                 return { ...prev, modelCapabilities: caps };
               });
             }} />
-            {articlePrice !== null && (
-              <span
-                title="Estimated cost for a typical 5,000-word article summary"
-                style={{
-                  font: 'var(--md-sys-typescale-label-small)',
-                  color: 'var(--md-sys-color-on-surface-variant)',
-                  backgroundColor: 'var(--md-sys-color-surface-container-highest)',
-                  padding: '2px 8px',
-                  borderRadius: 'var(--md-sys-shape-corner-small)',
-                }}
-              >
-                {formatArticlePrice(articlePrice)} / article
-              </span>
-            )}
           </div>
         )}
 

@@ -19,3 +19,11 @@ export function formatArticlePrice(dollars: number): string {
   if (dollars < 0.01) return `~$${dollars.toFixed(4)}`;
   return `~$${dollars.toFixed(3)}`;
 }
+
+/**
+ * Format a dollar amount with fixed width for monospace alignment.
+ * Always uses 4 decimal places so decimal points align in a column.
+ */
+export function formatArticlePriceFixed(dollars: number): string {
+  return `$${dollars.toFixed(4)}`;
+}

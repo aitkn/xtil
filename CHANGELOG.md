@@ -4,6 +4,24 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.0.3
+
+**Gmail support, pricing in model selector & UX improvements**
+
+- Gmail extractor — summarize emails and threaded conversations, auto-detects when you switch emails
+- Model prices shown inline in the dropdown with aligned monospace formatting
+- Catalog auto-updates model metadata (names, prices) on version change, not just new models
+- Deduplicate preview-dated model variants (e.g., Gemini 2.5 Pro)
+- Thumbnail height capped at 320px across all layouts including multi-image collages
+- Side panel opens automatically on fresh install
+- Show context window setting for all providers
+- Dynamic version display in Settings
+- GitHub PR title, number, and state displayed correctly
+- Clear chat input when switching tabs
+- Notion onboarding fix — auto-select first database
+- Updated model catalog (181 models across 5 providers)
+- Website: comparison table, benefit-driven copy, API key guidance, scroll animations
+
 ## 1.0.2
 
 **Smarter chat & better language handling**
