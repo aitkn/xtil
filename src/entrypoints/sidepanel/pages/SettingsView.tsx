@@ -4,6 +4,7 @@ import type { ModelInfo, VisionSupport } from '@/lib/llm/types';
 import { PROVIDER_DEFINITIONS } from '@/lib/llm/registry';
 import { filterChatModels, getCatalogModels, getCatalogVersion } from '@/lib/llm/models';
 import { Button } from '@/components/Button';
+import { estimateArticlePrice, formatArticlePrice } from '@/lib/pricing';
 
 const LANGUAGES = [
   { code: 'en', name: 'English' },
@@ -195,6 +196,10 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   const visionKey = `${currentProviderId}:${currentConfig.model}`;
   const visionCapability: VisionSupport = local.modelCapabilities?.[visionKey]?.vision || 'unknown';
   const isSelfHosted = currentProviderId === 'self-hosted';
+  const articlePrice = useMemo(() => {
+    const modelInfo = currentModels.find((m) => m.id === currentConfig.model);
+    return estimateArticlePrice(modelInfo?.inputPrice, modelInfo?.outputPrice);
+  }, [currentConfig.model, currentModels]);
 
   const isOnboarding = onboardingStep !== null;
   const currentStepIndex = isOnboarding ? ONBOARDING_STEPS.indexOf(onboardingStep) : -1;
@@ -819,9 +824,9 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           </div>
         )}
 
-        {/* Vision capability badge */}
+        {/* Vision capability badge + price estimate */}
         {currentConfig.model && (
-          <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <VisionBadge vision={visionCapability} probing={probingVision} onReprobe={() => {
               setLocal((prev) => {
                 const caps = { ...prev.modelCapabilities };
@@ -829,6 +834,20 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
                 return { ...prev, modelCapabilities: caps };
               });
             }} />
+            {articlePrice !== null && (
+              <span
+                title="Estimated cost for a typical 5,000-word article summary"
+                style={{
+                  font: 'var(--md-sys-typescale-label-small)',
+                  color: 'var(--md-sys-color-on-surface-variant)',
+                  backgroundColor: 'var(--md-sys-color-surface-container-highest)',
+                  padding: '2px 8px',
+                  borderRadius: 'var(--md-sys-shape-corner-small)',
+                }}
+              >
+                {formatArticlePrice(articlePrice)} / article
+              </span>
+            )}
           </div>
         )}
 
