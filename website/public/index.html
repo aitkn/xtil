@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>xTil — AI Page Insights</title>
-  <meta name="description" content="Extract content, distill knowledge. AI-powered summaries of any page or video with image analysis, diagrams, chat, and Notion export.">
-  <meta property="og:title" content="xTil — AI Page Insights">
-  <meta property="og:description" content="Extract content, distill knowledge. AI-powered summaries of any page or video with image analysis, diagrams, chat, and export.">
+  <title>xTil — AI Page Summarizer Chrome Extension</title>
+  <meta name="description" content="xTil (extract + distill) is a free, privacy-first Chrome extension that summarizes articles, YouTube videos, GitHub PRs, and more using your own AI key. Diagrams, fact-checks, chat, and Notion export.">
+  <meta property="og:title" content="xTil — AI Page Summarizer Chrome Extension">
+  <meta property="og:description" content="Free, privacy-first Chrome extension that summarizes any page or video using your own AI key. Diagrams, fact-checks, chat refinement, and Notion export.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://xtil.ai">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -1338,7 +1338,6 @@
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#how-it-works">How it works</a>
-      <a href="/changelog">What's New</a>
       <a href="https://github.com/aitkn/xtil">GitHub</a>
       <a class="nav-cta" href="https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon" target="_blank" rel="noopener">Install</a>
     </div>
@@ -1358,20 +1357,29 @@
         Chrome Extension &middot; Open Source
       </div>
       <h1>
-        <span class="gradient">Extract</span> content,<br>
-        <span class="gradient">distill</span> knowledge
+        Stop reading <span class="gradient">3,000-word</span> articles.<br>
+        Get <span class="gradient">structured insights</span> in seconds.
       </h1>
-      <p style="font-size:0.85rem;opacity:0.5;margin-bottom:12px;letter-spacing:0.02em;">xTil &mdash; pronounced &ldquo;ex-til,&rdquo; from <span style="opacity:1;color:var(--primary-bright)">ex</span>tract + dis<span style="opacity:1;color:var(--primary-bright)">til</span>l</p>
-      <p class="hero-sub">Turn any web page into a structured, multi-section analysis &mdash; overview, key takeaways, fact-checks, visual diagrams, and more. Then refine it with chat and export anywhere.</p>
+      <p class="hero-sub">xTil <span style="opacity:0.5;font-size:0.85em" title="from extract + distill">(ex-til)</span> turns any web page, video, or PR into a multi-section analysis &mdash; key takeaways, fact-checks, diagrams, and more. Then refine with chat and export anywhere.</p>
       <div class="hero-actions">
         <a class="btn-primary" href="https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Install for Chrome
+          Install for Chrome &mdash; free, no account needed
         </a>
-        <a class="btn-ghost" href="https://github.com/aitkn/xtil" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-          View source
+        <a class="btn-ghost" href="#features">
+          See what it does
         </a>
+      </div>
+      <div class="hero-proof" style="display:flex;align-items:center;gap:16px;margin-top:20px;font-size:0.85rem;opacity:0.6;flex-wrap:wrap;">
+        <a href="https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;display:flex;align-items:center;gap:4px;" title="Chrome Web Store">
+          <span style="color:#facc15;">&#9733;</span> Chrome Web Store
+        </a>
+        <span style="opacity:0.4;">&middot;</span>
+        <a href="https://github.com/aitkn/xtil" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;display:flex;align-items:center;gap:4px;">
+          <img src="https://img.shields.io/github/stars/aitkn/xtil?style=flat&logo=github&label=GitHub&color=333" alt="GitHub stars" style="height:18px;vertical-align:middle;">
+        </a>
+        <span style="opacity:0.4;">&middot;</span>
+        <span>Open source &middot; Privacy-first</span>
       </div>
     </div>
 
@@ -2402,7 +2410,7 @@
 
 <footer>
   <div class="container">
-    <span class="copy">&copy; 2026 xTil</span>
+    <span class="copy">&copy; 2025&ndash;2026 xTil</span>
     <div class="links">
       <a href="/changelog">What's New</a>
       <a href="https://buymeacoffee.com/xtil" target="_blank" rel="noopener">&#9749; Support Development</a>
