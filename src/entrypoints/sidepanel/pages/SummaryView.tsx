@@ -508,7 +508,7 @@ function ThumbnailCollage({ urls, title, fallbackUrl }: { urls: string[]; title:
 
   if (count === 2) {
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap, borderRadius: 'var(--md-sys-shape-corner-medium)', overflow: 'hidden', aspectRatio: '16/9', marginBottom: '8px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap, borderRadius: 'var(--md-sys-shape-corner-medium)', overflow: 'hidden', aspectRatio: '16/9', maxHeight: '320px', marginBottom: '8px' }}>
         <img src={urls[0]} alt={title} style={imgStyle} onError={onImgError} />
         <img src={urls[1]} alt={title} style={imgStyle} onError={onImgError} />
       </div>
@@ -517,7 +517,7 @@ function ThumbnailCollage({ urls, title, fallbackUrl }: { urls: string[]; title:
 
   if (count === 3) {
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap, borderRadius: 'var(--md-sys-shape-corner-medium)', overflow: 'hidden', aspectRatio: '16/9', marginBottom: '8px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap, borderRadius: 'var(--md-sys-shape-corner-medium)', overflow: 'hidden', aspectRatio: '16/9', maxHeight: '320px', marginBottom: '8px' }}>
         <img src={urls[0]} alt={title} style={{ ...imgStyle, gridRow: '1 / 3' }} onError={onImgError} />
         <img src={urls[1]} alt={title} style={imgStyle} onError={onImgError} />
         <img src={urls[2]} alt={title} style={imgStyle} onError={onImgError} />
@@ -527,7 +527,7 @@ function ThumbnailCollage({ urls, title, fallbackUrl }: { urls: string[]; title:
 
   // count === 4
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap, borderRadius: 'var(--md-sys-shape-corner-medium)', overflow: 'hidden', aspectRatio: '16/9', marginBottom: '8px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap, borderRadius: 'var(--md-sys-shape-corner-medium)', overflow: 'hidden', aspectRatio: '16/9', maxHeight: '320px', marginBottom: '8px' }}>
       <img src={urls[0]} alt={title} style={imgStyle} onError={onImgError} />
       <img src={urls[1]} alt={title} style={imgStyle} onError={onImgError} />
       <img src={urls[2]} alt={title} style={imgStyle} onError={onImgError} />
