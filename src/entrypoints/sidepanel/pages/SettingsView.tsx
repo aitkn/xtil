@@ -470,7 +470,13 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       await handleSave();
       const dbs = await onFetchNotionDatabases();
       setNotionDatabases(dbs);
-      setNotionStatus('success');
+      // Auto-select first compatible database if none currently selected
+      if (dbs.length > 0) {
+        const currentId = local.notion.databaseId;
+        if (!currentId || !dbs.some(db => db.id === currentId)) {
+          setLocal(prev => ({ ...prev, notion: { ...prev.notion, databaseId: dbs[0].id } }));
+        }
+      }
     } catch (err) {
       setNotionStatus('error');
       setNotionWarning(String(err));
@@ -1091,7 +1097,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         {/* Continue / Skip buttons during onboarding */}
         {isOnboarding && onboardingStep === 'notionDb' && (
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            {(local.notion.databaseId || notionStatus === 'success') && (
+            {local.notion.databaseId && (
               <Button
                 onClick={() => advanceStep('notionDb')}
                 size="sm"
