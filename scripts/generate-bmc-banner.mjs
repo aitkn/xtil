@@ -206,14 +206,16 @@ const html = `<!DOCTYPE html>
 </html>`;
 
 const browser = await chromium.launch();
-const context = await browser.newContext({ deviceScaleFactor: 1 });
-const page = await context.newPage();
-await page.setViewportSize({ width: WIDTH, height: HEIGHT });
-await page.setContent(html, { waitUntil: 'networkidle' });
-await page.waitForTimeout(500); // let fonts render
+try {
+  const context = await browser.newContext({ deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  await page.setViewportSize({ width: WIDTH, height: HEIGHT });
+  await page.setContent(html, { waitUntil: 'networkidle' });
+  await page.evaluate(() => document.fonts.ready);
 
-const buf = await page.screenshot({ type: 'png' });
-writeFileSync(outPath, buf);
-console.log(`Banner saved to ${outPath} (${buf.length} bytes, ${WIDTH}x${HEIGHT}px)`);
-
-await browser.close();
+  const buf = await page.screenshot({ type: 'png' });
+  writeFileSync(outPath, buf);
+  console.log(`Banner saved to ${outPath} (${buf.length} bytes, ${WIDTH}x${HEIGHT}px)`);
+} finally {
+  await browser.close();
+}
