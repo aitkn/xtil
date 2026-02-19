@@ -1339,6 +1339,24 @@
     .compare-table thead th:first-child { border-radius: 8px 0 0 0; }
     .compare-table thead th:last-child { border-radius: 0 8px 0 0; }
     .compare-table .xtil-col { color: var(--primary-bright); font-weight: 600; }
+
+    /* ─── Feature panel hover ─── */
+    .mock-panel-card {
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .mock-panel-card:hover {
+      border-color: rgba(109, 95, 245, 0.25);
+      box-shadow: 0 4px 32px rgba(109, 95, 245, 0.1);
+    }
+
+    /* ─── Reduced motion ─── */
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { transition: none; opacity: 1; transform: none; }
+      .ticker-track { animation: none; }
+      .bento-card { transition: none; }
+      .mock-panel-card { transition: none; }
+      .pipeline-step:hover .step-orb { transition: none; }
+    }
   </style>
 </head>
 <body>
