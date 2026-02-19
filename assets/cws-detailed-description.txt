@@ -1,0 +1,34 @@
+Stop reading 3,000-word articles. Get structured insights in seconds.
+
+xTil turns any web page, video, or PR into a multi-section analysis — key takeaways, fact-checks, diagrams, and more. Then refine with chat and export anywhere.
+
+WHAT YOU GET
+Every page produces a structured breakdown: concise overview, key takeaways with bold labels, notable quotes with original language preserved, a fact-check grading claims as verified/contested/unverifiable, pros & cons, and a conclusion. Choose between brief, standard, or detailed analysis — xTil automatically scales the depth to match the content.
+
+PLATFORM AWARENESS
+Every platform gets special treatment:
+• YouTube — Full transcript summary with clickable timestamp links
+• GitHub — Six modes: PRs, issues, code files, repos, commits, and releases
+• Reddit — Complete threads with nested comments, scores, and engagement metrics
+• Twitter/X — Thread reconstruction with engagement data and notable replies
+• Google Docs — Reads content directly from your authenticated session
+• Facebook — Extracts posts from feed overlays with reaction counts
+
+BRING YOUR OWN KEY
+No subscription. Use the AI you already pay for. Works with OpenAI, Anthropic, Google, Mistral, xAI, DeepSeek, or any OpenAI-compatible endpoint (Ollama, LM Studio, vLLM). xTil auto-discovers available models and probes vision capability — image analysis just works.
+
+REFINE WITH CHAT
+Ask follow-up questions, request deeper analysis, or explore specific sections. Chat responses are structured with the same quality as the initial summary.
+
+EXPORT ANYWHERE
+Copy as Markdown, export to Notion, or print. Your summaries go where you need them.
+
+MAKE IT YOURS
+• Light, dark, or system theme — diagrams adapt automatically
+• Summarize in any language, or match the source
+• Three detail levels: brief, standard, or detailed
+
+PRIVACY FIRST
+No backend, no proxy, no middleman. Content goes directly from your browser to your chosen LLM provider using your own API key. No accounts, no analytics, no tracking, no servers. Open source — verify every line at github.com/aitkn/xtil.
+
+Free. No account needed. Just install and add your API key.
