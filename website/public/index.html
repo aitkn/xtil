@@ -1340,6 +1340,33 @@
     .compare-table thead th:first-child { border-radius: 8px 0 0 0; }
     .compare-table thead th:last-child { border-radius: 0 8px 0 0; }
     .compare-table .xtil-col { color: var(--primary-bright); font-weight: 600; }
+
+    /* ─── Feature panel hover ─── */
+    .mock-panel-card {
+      transition: box-shadow 0.3s;
+    }
+    .mock-panel-card:hover {
+      box-shadow: 0 4px 32px rgba(109, 95, 245, 0.1), 0 0 0 1px rgba(109, 95, 245, 0.25);
+    }
+
+    /* ─── Reduced motion ─── */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal { transition: none; opacity: 1; transform: none; }
+      .ticker-track, .orb, .hero h1 .gradient, .mock-article .hl,
+      .browser-mockup.visible .mock-badges, .browser-mockup.visible .mock-thumb,
+      .browser-mockup.visible .mock-ptitle, .browser-mockup.visible .mock-pmeta,
+      .browser-mockup.visible .mock-sec, .browser-mockup.visible .mock-diagram .dg-node,
+      .browser-mockup.visible .mock-diagram .dg-arrow, .browser-mockup.visible .mock-chat-msg,
+      .browser-mockup.visible .mock-chat-input {
+        animation: none;
+      }
+      a, nav, .btn-primary, .btn-ghost, .provider-card, .bento-card,
+      .mock-panel-card, .pipeline-step:hover .step-orb {
+        transition: none;
+      }
+      .nav-cta { transition: none !important; }
+    }
   </style>
 </head>
 <body>
