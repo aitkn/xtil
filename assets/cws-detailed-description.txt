@@ -13,6 +13,10 @@ Every platform gets special treatment:
 • Twitter/X — Thread reconstruction with engagement data and notable replies
 • Google Docs — Reads content directly from your authenticated session
 • Facebook — Extracts posts from feed overlays with reaction counts
+• Gmail — Summarize emails and threaded conversations from the reading pane
+
+AUTO-GENERATED DIAGRAMS & IMAGE ANALYSIS
+xTil generates Mermaid diagrams that visualize the content's structure — flowcharts, timelines, and more, with automatic light/dark theme support. Pages with images get vision-powered analysis: charts, screenshots, and infographics are read and woven into the summary.
 
 BRING YOUR OWN KEY
 No subscription. Use the AI you already pay for. Works with OpenAI, Anthropic, Google, Mistral, xAI, DeepSeek, or any OpenAI-compatible endpoint (Ollama, LM Studio, vLLM). xTil auto-discovers available models and probes vision capability — image analysis just works.
