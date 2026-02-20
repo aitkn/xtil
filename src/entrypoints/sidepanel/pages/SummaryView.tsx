@@ -679,7 +679,7 @@ function summaryToMarkdown(summary: SummaryDocument, content: ExtractedContent |
     lines.push('---', '', `[Original source](${content.url})`, '');
   }
 
-  lines.push(`*Generated with [xTil](https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon)*`);
+  lines.push(`*Generated with [xTil](https://xtil.ai)*`);
 
   return fixMermaidSyntax(lines.join('\n'));
 }
@@ -774,7 +774,7 @@ async function svgToPng(liveSvg: SVGSVGElement): Promise<string> {
   }
 }
 
-const STORE_URL = 'https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon';
+const STORE_URL = 'https://xtil.ai';
 
 export async function copyToClipboard(summary: SummaryDocument, content: ExtractedContent | null, containerEl: HTMLElement | null) {
   const md = summaryToMarkdown(summary, content);

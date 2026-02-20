@@ -6,7 +6,7 @@ import { markdownToNotionBlocks } from './markdown-to-notion';
 
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
-const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/pikdhogjjbaakcpedmahckhmajdgdeon';
+const CHROME_STORE_URL = 'https://xtil.ai';
 
 export class NotionAdapter implements ExportAdapter {
   readonly id = 'notion';
