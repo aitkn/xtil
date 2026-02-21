@@ -89,11 +89,16 @@ export class NotionAdapter implements ExportAdapter {
     // Build page content blocks
     const children = this.buildContentBlocks(summary, content, thumbnailRef);
 
+    // Notion API limits children to 100 blocks per request.
+    // Send the first batch with page creation, then append the rest.
+    const firstBatch = children.slice(0, 100);
+    const remaining = children.slice(100);
+
     // Create page
     const body: Record<string, unknown> = {
       parent: { database_id: databaseId },
       properties,
-      children,
+      children: firstBatch,
     };
 
     // Set thumbnail as cover image
@@ -112,6 +117,19 @@ export class NotionAdapter implements ExportAdapter {
     }
 
     const page = await response.json();
+
+    // Append remaining blocks in batches of 100
+    for (let i = 0; i < remaining.length; i += 100) {
+      const batch = remaining.slice(i, i + 100);
+      const appendResp = await this.notionFetch(`/blocks/${page.id}/children`, {
+        method: 'PATCH',
+        body: JSON.stringify({ children: batch }),
+      });
+      if (!appendResp.ok) {
+        throw new Error(`Notion page was created but is incomplete — failed to append block batch ${i / 100 + 2} (${appendResp.status})`);
+      }
+    }
+
     return { url: page.url, databaseId, databaseName };
   }
 
@@ -397,8 +415,7 @@ export class NotionAdapter implements ExportAdapter {
       },
     );
 
-    // Notion API limits children to 100 blocks per request
-    return blocks.slice(0, 100);
+    return blocks;
   }
 
   /**

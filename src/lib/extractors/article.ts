@@ -50,11 +50,13 @@ export const articleExtractor: ContentExtractor = {
       .filter(Boolean);
     const richImages = extractRichImages(tempDiv);
 
-    // Hero image: og:image, twitter:image, or best article image (skip tiny icons)
+    // Hero image: og:image, twitter:image, or best article/page image (skip tiny icons)
+    // Fall back to full document when Readability strips sidebar/hero images
     const thumbnailUrl =
       doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
       doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
       pickThumbnail(tempDiv, images) ||
+      (doc.body ? pickThumbnail(doc.body, Array.from(doc.querySelectorAll('img')).map((img) => img.src).filter(Boolean)) : undefined) ||
       undefined;
 
     return {

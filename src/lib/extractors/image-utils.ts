@@ -84,19 +84,26 @@ export function pickThumbnail(container: HTMLElement, candidates: string[]): str
     measured.push({ url, w, h });
   }
 
-  // Filter: reject anything below the absolute minimum
-  const aboveMin = measured.filter(
-    (m) => !m.w || !m.h || (m.w >= MIN_THUMBNAIL_SOLO && m.h >= MIN_THUMBNAIL_SOLO),
-  );
-  if (aboveMin.length === 0) return undefined;
+  // Split into measured (known dimensions) and unmeasured (0x0 — unloaded or broken)
+  const known = measured.filter((m) => m.w > 0 && m.h > 0);
+  const unknown = measured.filter((m) => !m.w || !m.h);
 
-  // If multiple candidates, raise the bar
+  // Filter known images: reject anything below the absolute minimum
+  const aboveMin = known.filter(
+    (m) => m.w >= MIN_THUMBNAIL_SOLO && m.h >= MIN_THUMBNAIL_SOLO,
+  );
+
+  // Prefer known-size images; fall back to unmeasured only if no measured candidates
+  const pool = aboveMin.length > 0 ? aboveMin : unknown;
+  if (pool.length === 0) return undefined;
+
+  // If multiple measured candidates, raise the bar
   if (aboveMin.length > 1) {
     const aboveAlt = aboveMin.filter(
-      (m) => !m.w || !m.h || (m.w >= MIN_THUMBNAIL_WITH_ALT && m.h >= MIN_THUMBNAIL_WITH_ALT),
+      (m) => m.w >= MIN_THUMBNAIL_WITH_ALT && m.h >= MIN_THUMBNAIL_WITH_ALT,
     );
     if (aboveAlt.length > 0) return aboveAlt[0].url;
   }
 
-  return aboveMin[0].url;
+  return pool[0].url;
 }
