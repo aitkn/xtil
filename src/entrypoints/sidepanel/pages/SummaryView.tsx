@@ -200,8 +200,8 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
                 href={`https://www.google.com/search?q=${encodeURIComponent(topic)}`}
                 style={{
                   display: 'inline-block',
-                  backgroundColor: '#e8edf8',
-                  color: '#1a3c8a',
+                  backgroundColor: 'var(--md-sys-color-secondary-container)',
+                  color: 'var(--md-sys-color-on-secondary-container)',
                   padding: '4px 12px',
                   borderRadius: '8px',
                   fontSize: '13px',
@@ -223,8 +223,8 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           {summary.tags.map((tag, i) => (
             <span key={i} style={{
               display: 'inline-block',
-              backgroundColor: '#e8e8ec',
-              color: '#5f6066',
+              backgroundColor: 'var(--md-sys-color-surface-container-highest)',
+              color: 'var(--md-sys-color-on-surface-variant)',
               padding: '2px 10px',
               borderRadius: '6px',
               fontSize: '12px',

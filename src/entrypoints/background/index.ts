@@ -607,7 +607,6 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
       });
       result.llmProvider = providerName;
       result.llmModel = llmConfig.model;
-      console.log('[debug] handleSummarize returning — conversationLog:', lastConversation.length, 'msgs, requestBody:', !!lastRequestBody, 'responseBody:', !!lastResponseBody);
       return { type: 'SUMMARY_RESULT', success: true, data: result, rawResponses, systemPrompt: actualSystemPrompt, conversationLog: lastConversation, rollingSummary: rollingSummaryText || undefined, lastRequestBody: lastRequestBody || undefined, lastResponseBody: lastResponseBody || undefined };
     } catch (err) {
       // Round-trip: LLM requested additional images

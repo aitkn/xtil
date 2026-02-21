@@ -332,13 +332,17 @@ async function fetchYouTubeTranscript(
   let captionsRenderer = data?.captions?.playerCaptionsTracklistRenderer;
   let tracks: CaptionTrack[] = captionsRenderer?.captionTracks;
 
-  // Retry once after 1s — during SPA navigation the API sometimes returns
-  // empty caption tracks before YouTube's backend has fully resolved the video.
+  // Retry with progressive delays — during SPA navigation the API sometimes
+  // returns empty caption tracks before YouTube's backend has fully resolved
+  // the video.  Three retries (1s, 2s, 3s) give up to ~6s total.
   if (!tracks || tracks.length === 0) {
-    await new Promise(r => setTimeout(r, 1000));
-    data = await fetchPlayerData(videoId, hintLang);
-    captionsRenderer = data?.captions?.playerCaptionsTracklistRenderer;
-    tracks = captionsRenderer?.captionTracks;
+    for (const delay of [1000, 2000, 3000]) {
+      await new Promise(r => setTimeout(r, delay));
+      data = await fetchPlayerData(videoId, hintLang);
+      captionsRenderer = data?.captions?.playerCaptionsTracklistRenderer;
+      tracks = captionsRenderer?.captionTracks;
+      if (tracks && tracks.length > 0) break;
+    }
   }
 
   if (!tracks || tracks.length === 0) throw new Error('No caption tracks available');

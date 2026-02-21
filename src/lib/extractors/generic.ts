@@ -1,5 +1,5 @@
 import type { ContentExtractor, ExtractedContent } from './types';
-import { extractRichImages } from './image-utils';
+import { extractRichImages, pickThumbnail } from './image-utils';
 import { extractTitle } from './title-utils';
 
 export const genericExtractor: ContentExtractor = {
@@ -29,6 +29,16 @@ export const genericExtractor: ContentExtractor = {
     const wordCount = content.split(/\s+/).filter(Boolean).length;
     const richImages = contentRoot ? extractRichImages(contentRoot) : [];
 
+    // Hero image: og:image, twitter:image, or best content image
+    const images = contentRoot
+      ? Array.from(contentRoot.querySelectorAll('img')).map((img) => img.src).filter(Boolean)
+      : [];
+    const thumbnailUrl =
+      doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+      doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
+      (contentRoot ? pickThumbnail(contentRoot, images) : undefined) ||
+      undefined;
+
     return {
       type: 'generic',
       url,
@@ -38,6 +48,7 @@ export const genericExtractor: ContentExtractor = {
       content,
       wordCount,
       estimatedReadingTime: Math.ceil(wordCount / 200),
+      thumbnailUrl,
       richImages,
     };
   },
