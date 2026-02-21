@@ -126,8 +126,7 @@ export class NotionAdapter implements ExportAdapter {
         body: JSON.stringify({ children: batch }),
       });
       if (!appendResp.ok) {
-        console.warn(`[xTil] Failed to append block batch ${i / 100 + 2} to Notion page`);
-        break;
+        throw new Error(`Notion page was created but is incomplete — failed to append block batch ${i / 100 + 2} (${appendResp.status})`);
       }
     }
 

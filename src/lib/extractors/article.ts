@@ -52,14 +52,11 @@ export const articleExtractor: ContentExtractor = {
 
     // Hero image: og:image, twitter:image, or best article/page image (skip tiny icons)
     // Fall back to full document when Readability strips sidebar/hero images
-    const docImages = Array.from(doc.querySelectorAll('img'))
-      .map((img) => img.src)
-      .filter(Boolean);
     const thumbnailUrl =
       doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
       doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
       pickThumbnail(tempDiv, images) ||
-      (doc.body ? pickThumbnail(doc.body, docImages) : undefined) ||
+      (doc.body ? pickThumbnail(doc.body, Array.from(doc.querySelectorAll('img')).map((img) => img.src).filter(Boolean)) : undefined) ||
       undefined;
 
     return {

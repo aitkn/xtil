@@ -30,13 +30,10 @@ export const genericExtractor: ContentExtractor = {
     const richImages = contentRoot ? extractRichImages(contentRoot) : [];
 
     // Hero image: og:image, twitter:image, or best content image
-    const images = contentRoot
-      ? Array.from(contentRoot.querySelectorAll('img')).map((img) => img.src).filter(Boolean)
-      : [];
     const thumbnailUrl =
       doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
       doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
-      (contentRoot ? pickThumbnail(contentRoot, images) : undefined) ||
+      (contentRoot ? pickThumbnail(contentRoot, Array.from(contentRoot.querySelectorAll('img')).map((img) => img.src).filter(Boolean)) : undefined) ||
       undefined;
 
     return {
