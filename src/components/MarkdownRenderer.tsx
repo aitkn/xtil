@@ -501,6 +501,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             btn.className = 'dismiss-media-btn no-print';
             btn.textContent = '\u00d7';
             btn.title = 'Remove diagram';
+            btn.setAttribute('aria-label', 'Remove diagram');
             btn.addEventListener('click', (e) => { e.stopPropagation(); el.remove(); });
             el.appendChild(btn);
           }
@@ -540,6 +541,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       btn.className = 'dismiss-media-btn no-print';
       btn.textContent = '\u00d7';
       btn.title = 'Remove image';
+      btn.setAttribute('aria-label', 'Remove image');
       btn.addEventListener('click', (e) => { e.stopPropagation(); wrapper.remove(); });
       wrapper.appendChild(btn);
     });

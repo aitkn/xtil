@@ -1,11 +1,24 @@
 import { DEFAULT_SETTINGS, type Settings, type ProviderConfig } from './types';
 
-const STORAGE_KEY = 'tldr_settings';
+const STORAGE_KEY = 'xtil_settings';
+const OLD_STORAGE_KEY = 'tldr_settings';
 const chromeStorage = (globalThis as unknown as { chrome: { storage: typeof chrome.storage } }).chrome.storage;
 
 export async function getSettings(): Promise<Settings> {
   const result = await chromeStorage.local.get(STORAGE_KEY);
-  const stored = result[STORAGE_KEY] as Record<string, unknown> | undefined;
+  let stored = result[STORAGE_KEY] as Record<string, unknown> | undefined;
+
+  // One-time migration from old key
+  if (!stored) {
+    const oldResult = await chromeStorage.local.get(OLD_STORAGE_KEY);
+    const oldStored = oldResult[OLD_STORAGE_KEY] as Record<string, unknown> | undefined;
+    if (oldStored) {
+      stored = oldStored;
+      await chromeStorage.local.set({ [STORAGE_KEY]: stored });
+      await chromeStorage.local.remove(OLD_STORAGE_KEY);
+    }
+  }
+
   if (!stored) return { ...DEFAULT_SETTINGS };
 
   // Migration: old format had `llm: ProviderConfig` instead of providerConfigs/activeProviderId

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import type { ThemeMode } from '@/lib/storage/types';
 
-const STORAGE_KEY = 'tldr-theme';
+const STORAGE_KEY = 'xtil-theme';
+const OLD_STORAGE_KEY = 'tldr-theme';
 
 function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
   if (mode === 'system') {
@@ -12,7 +13,16 @@ function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
 
 export function useTheme() {
   const [mode, setModeState] = useState<ThemeMode>(() => {
-    return (localStorage.getItem(STORAGE_KEY) as ThemeMode) || 'system';
+    const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
+    if (saved) return saved;
+    // Migrate from old key
+    const old = localStorage.getItem(OLD_STORAGE_KEY) as ThemeMode | null;
+    if (old) {
+      localStorage.setItem(STORAGE_KEY, old);
+      localStorage.removeItem(OLD_STORAGE_KEY);
+      return old;
+    }
+    return 'system';
   });
   const [resolved, setResolved] = useState<'light' | 'dark'>(() => resolveTheme(mode));
 
