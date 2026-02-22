@@ -523,6 +523,11 @@ export function App() {
   // Step-by-step mermaid fix state (when debug panel is open)
   const [pendingFix, setPendingFix] = useState<PendingMermaidFix | null>(null);
 
+  // Streaming preview state (shows LLM output as it arrives)
+  const [streamingText, setStreamingText] = useState('');
+  const [streamingProgress, setStreamingProgress] = useState<{ chunk: number; total: number } | null>(null);
+  const [chatStreamingText, setChatStreamingText] = useState('');
+
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const skipScrollRef = useRef(false);
@@ -914,7 +919,18 @@ export function App() {
     };
 
     const onMessage = (message: unknown, sender: chrome.runtime.MessageSender) => {
-      const msg = message as { type?: string };
+      const msg = message as { type?: string; chunk?: string; chunkIndex?: number; totalChunks?: number };
+      if (msg?.type === 'SUMMARY_CHUNK') {
+        setStreamingText(msg.chunk || '');
+        if (msg.totalChunks != null && msg.totalChunks > 1) {
+          setStreamingProgress({ chunk: (msg.chunkIndex ?? 0) + 1, total: msg.totalChunks });
+        }
+        return;
+      }
+      if (msg?.type === 'CHAT_CHUNK') {
+        setChatStreamingText(msg.chunk || '');
+        return;
+      }
       if (msg?.type !== 'CONTENT_CHANGED') return;
       if (sender.tab?.id != null && sender.tab.id !== activeTabIdRef.current) return;
       if (spaTimer) clearTimeout(spaTimer);
@@ -1041,6 +1057,8 @@ export function App() {
   const handleSummarize = useCallback(async (userInstructions?: string) => {
     const originTabId = activeTabIdRef.current;
     setLoading(true);
+    setStreamingText('');
+    setStreamingProgress(null);
     setNotionUrl(null);
     setRawResponses([]);
     setActualSystemPrompt('');
@@ -1161,6 +1179,8 @@ export function App() {
     } finally {
       if (activeTabIdRef.current === originTabId) {
         setLoading(false);
+        setStreamingText('');
+        setStreamingProgress(null);
       } else if (originTabId != null) {
         const saved = tabStatesRef.current.get(originTabId);
         if (saved) saved.loading = false;
@@ -1383,6 +1403,7 @@ export function App() {
       didUpdateSummary: false, // will be patched after we know
     }]);
     setChatLoading(true);
+    setChatStreamingText('');
 
     try {
       const allMessages: ChatMessage[] = chatMessages.map((m) => ({
@@ -1496,6 +1517,7 @@ export function App() {
     } finally {
       if (activeTabIdRef.current === originTabId) {
         setChatLoading(false);
+        setChatStreamingText('');
       } else if (originTabId != null) {
         const saved = tabStatesRef.current.get(originTabId);
         if (saved) saved.chatLoading = false;
@@ -1752,10 +1774,34 @@ export function App() {
           </div>
         )}
 
-        {/* Loading summary spinner */}
+        {/* Loading summary spinner + streaming preview */}
         {loading && (
           <div style={{ padding: '0 16px 16px' }}>
-            <Spinner label={mermaidFixStatus ? `Fixing diagram (attempt ${mermaidFixStatus.attempt}/${mermaidFixStatus.total})...` : 'Generating summary...'} />
+            <Spinner label={
+              mermaidFixStatus
+                ? `Fixing diagram (attempt ${mermaidFixStatus.attempt}/${mermaidFixStatus.total})...`
+                : streamingProgress
+                  ? `Processing chunk ${streamingProgress.chunk} of ${streamingProgress.total}...`
+                  : 'Generating summary...'
+            } />
+            {streamingText && !mermaidFixStatus && (
+              <div style={{
+                marginTop: '8px',
+                maxHeight: '300px',
+                overflow: 'auto',
+                padding: '12px',
+                borderRadius: 'var(--md-sys-shape-corner-medium)',
+                backgroundColor: 'var(--md-sys-color-surface-container)',
+                font: 'var(--md-sys-typescale-body-small)',
+                color: 'var(--md-sys-color-on-surface-variant)',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                lineHeight: 1.5,
+                opacity: 0.8,
+              }}>
+                {streamingText}
+              </div>
+            )}
           </div>
         )}
 
@@ -1834,8 +1880,29 @@ export function App() {
               />
             ))}
             {chatLoading && (
-              <div style={{ padding: '8px 12px', font: 'var(--md-sys-typescale-body-medium)', color: 'var(--md-sys-color-on-surface-variant)' }}>
-                Thinking...
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: 'var(--md-sys-shape-corner-medium)',
+                backgroundColor: 'var(--md-sys-color-surface-container-high)',
+                marginBottom: '8px',
+                maxWidth: '90%',
+              }}>
+                {chatStreamingText ? (
+                  <div style={{
+                    font: 'var(--md-sys-typescale-body-medium)',
+                    color: 'var(--md-sys-color-on-surface)',
+                    lineHeight: 1.5,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    opacity: 0.85,
+                  }}>
+                    {chatStreamingText}
+                  </div>
+                ) : (
+                  <div style={{ font: 'var(--md-sys-typescale-body-medium)', color: 'var(--md-sys-color-on-surface-variant)' }}>
+                    Thinking...
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -34,6 +34,12 @@ async function getCachedImages(): Promise<{ images: ImageContent[]; urls: { url:
 // Per-tab AbortController registry for in-flight summarizations
 const activeSummarizations = new Map<number, AbortController>();
 
+/** Broadcast a fire-and-forget message to all extension views (sidepanel, popup). */
+function broadcastMessage(msg: Record<string, unknown>): void {
+  const chromeRT = (globalThis as unknown as { chrome: { runtime: typeof chrome.runtime } }).chrome.runtime;
+  try { chromeRT.sendMessage(msg, () => { chromeRT.lastError; }); } catch { /* no listeners */ }
+}
+
 // Per-tab iframe comment storage (Disqus, Giscus, Utterances)
 const iframeComments = new Map<number, ExtractedComment[]>();
 
@@ -592,6 +598,22 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
     const onRequestBody = (b: string) => { lastRequestBody = b; };
     const onResponseBody = (b: string) => { lastResponseBody = b; };
 
+    // Streaming: broadcast SUMMARY_CHUNK messages as LLM text arrives
+    let currentChunkIndex: number | undefined;
+    let currentTotalChunks: number | undefined;
+    let lastStreamPush = 0;
+    const STREAM_THROTTLE_MS = 150;
+    const onStreamChunk = (accumulated: string) => {
+      const now = Date.now();
+      if (now - lastStreamPush < STREAM_THROTTLE_MS) return;
+      lastStreamPush = now;
+      broadcastMessage({ type: 'SUMMARY_CHUNK', chunk: accumulated, chunkIndex: currentChunkIndex, totalChunks: currentTotalChunks });
+    };
+    const onChunkProgress = (chunkIndex: number, totalChunks: number) => {
+      currentChunkIndex = chunkIndex;
+      currentTotalChunks = totalChunks;
+    };
+
     try {
       const result = await summarize(provider, content, {
         detailLevel: settings.summaryDetailLevel,
@@ -609,6 +631,8 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         onRollingSummary,
         onRequestBody,
         onResponseBody,
+        onStreamChunk,
+        onChunkProgress,
       });
       result.llmProvider = providerName;
       result.llmModel = llmConfig.model;
@@ -647,6 +671,8 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
           onConversation,
           onRequestBody,
           onResponseBody,
+          onStreamChunk,
+          onChunkProgress,
         });
         result.llmProvider = providerName;
         result.llmModel = llmConfig.model;
@@ -791,7 +817,23 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
     const chatOpts: ChatOptions = schemaEnforced
       ? { jsonSchema: RESPONSE_SCHEMA, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } }
       : { jsonMode: true, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } };
-    const response = await provider.sendChat(chatMessages, chatOpts);
+
+    // Stream the chat response so the user sees typing in real-time
+    let accumulated = '';
+    let lastChatPush = 0;
+    const CHAT_THROTTLE_MS = 150;
+    const generator = provider.streamChat(chatMessages, chatOpts);
+    for await (const chunk of generator) {
+      accumulated += chunk;
+      const now = Date.now();
+      if (now - lastChatPush >= CHAT_THROTTLE_MS) {
+        lastChatPush = now;
+        broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated });
+      }
+    }
+    // Final flush
+    broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated });
+    const response = accumulated;
     rawResponses.push(response);
 
     const conversationLog = [
