@@ -978,8 +978,9 @@ export function App() {
     };
 
     const onMessage = (message: unknown, sender: chrome.runtime.MessageSender) => {
-      const msg = message as { type?: string; chunk?: string; chunkIndex?: number; totalChunks?: number };
+      const msg = message as { type?: string; chunk?: string; chunkIndex?: number; totalChunks?: number; tabId?: number };
       if (msg?.type === 'SUMMARY_CHUNK') {
+        if (msg.tabId != null && msg.tabId !== activeTabIdRef.current) return;
         setStreamingText(msg.chunk || '');
         if (msg.totalChunks != null && msg.totalChunks > 1) {
           setStreamingProgress({ chunk: (msg.chunkIndex ?? 0) + 1, total: msg.totalChunks });
@@ -987,6 +988,7 @@ export function App() {
         return;
       }
       if (msg?.type === 'CHAT_CHUNK') {
+        if (msg.tabId != null && msg.tabId !== activeTabIdRef.current) return;
         setChatStreamingText(msg.chunk || '');
         return;
       }
@@ -1491,6 +1493,7 @@ export function App() {
         messages: allMessages,
         summary: summary || emptySummary,
         content,
+        tabId: originTabId ?? undefined,
       }) as ChatResponseMessage;
 
       if (!response.success || !response.message) {

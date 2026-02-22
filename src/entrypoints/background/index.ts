@@ -191,7 +191,7 @@ async function handleMessage(message: Message): Promise<Message> {
       return { type: 'CANCEL_SUMMARIZE', success: true } as Message;
     }
     case 'CHAT_MESSAGE':
-      return handleChatMessage(message.messages, message.summary, message.content);
+      return handleChatMessage(message.messages, message.summary, message.content, message.tabId);
     case 'EXPORT':
       return handleExport(message.adapterId, message.summary, message.content, message.replacePageId);
     case 'CHECK_NOTION_DUPLICATE':
@@ -607,7 +607,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
       const now = Date.now();
       if (now - lastStreamPush < STREAM_THROTTLE_MS) return;
       lastStreamPush = now;
-      broadcastMessage({ type: 'SUMMARY_CHUNK', chunk: accumulated, chunkIndex: currentChunkIndex, totalChunks: currentTotalChunks });
+      broadcastMessage({ type: 'SUMMARY_CHUNK', chunk: accumulated, chunkIndex: currentChunkIndex, totalChunks: currentTotalChunks, tabId });
     };
     const onChunkProgress = (chunkIndex: number, totalChunks: number) => {
       currentChunkIndex = chunkIndex;
@@ -701,6 +701,7 @@ async function handleChatMessage(
   messages: ChatMessage[],
   summary: SummaryDocument,
   content: ExtractedContent,
+  tabId?: number,
 ): Promise<ChatResponseMessage> {
   try {
     const settings = await getSettings();
@@ -830,11 +831,11 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
       const now = Date.now();
       if (now - lastChatPush >= CHAT_THROTTLE_MS) {
         lastChatPush = now;
-        broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated });
+        broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });
       }
     }
     // Final flush
-    broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated });
+    broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });
     const response = accumulated;
     rawResponses.push(response);
 
