@@ -184,13 +184,12 @@ export class NotionAdapter implements ExportAdapter {
       properties: NotionAdapter.DB_PROPERTIES,
     };
 
-    // Find a standalone page (not a database row) to host the new database.
-    // Sort ascending so older pages (likely the user's root page) come first.
+    // Find a standalone page whose title contains "xTil" to host the new database.
     const parentId = await this.findStandalonePage();
     if (!parentId) {
       throw new Error(
-        'No suitable parent page found. Open Notion, create a top-level page named "xTil", ' +
-        'click "..." (top-right) → "Connections" → add your integration. Then retry.',
+        'No parent page found. Create a Notion page with "xTil" in the title, ' +
+        'then click "..." → "Connections" → add your integration and retry.',
       );
     }
 
@@ -419,41 +418,11 @@ export class NotionAdapter implements ExportAdapter {
   }
 
   /**
-   * Find a standalone page (not a database row) to use as parent for a new database.
-   * 1. Fast path: search for a page named "xTil" (single API call).
-   * 2. Fallback: paginated search through all pages, oldest-edited first.
+   * Find a standalone page named "xTil" to use as parent for a new database.
+   * Single API call — no fallback scan.
    */
   private async findStandalonePage(): Promise<string | null> {
-    // Fast path — search by name (Notion full-text matches title)
-    const named = await this.searchStandalonePage('xTil');
-    if (named) return named;
-
-    // Fallback — scan all pages, oldest-edited first
-    let cursor: string | undefined;
-    const MAX_BATCHES = 5; // 5 × 100 = 500 results max
-    for (let i = 0; i < MAX_BATCHES; i++) {
-      const body: Record<string, unknown> = {
-        filter: { value: 'page', property: 'object' },
-        sort: { direction: 'ascending', timestamp: 'last_edited_time' },
-        page_size: 100,
-      };
-      if (cursor) body.start_cursor = cursor;
-
-      const resp = await this.notionFetch('/search', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-      if (!resp.ok) break;
-
-      const data = await resp.json();
-      const results = (data.results ?? []) as Array<{ id: string; parent?: { type: string } }>;
-      const match = results.find((p) => p.parent?.type !== 'database_id');
-      if (match) return match.id;
-
-      if (!data.has_more) break;
-      cursor = data.next_cursor;
-    }
-    return null;
+    return this.searchStandalonePage('xTil');
   }
 
   /** Search for a standalone page matching a query string. */

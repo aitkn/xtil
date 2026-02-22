@@ -236,6 +236,81 @@ function buildFileMap(files: { path: string; url: string }[]): { comment: string
   return { comment, listing };
 }
 
+// ~50K tokens — enough for substantial diffs without overwhelming the LLM
+const DIFF_BUDGET_CHARS = 200_000;
+
+/**
+ * Extract per-file diffs from a GitHub diff page within a character budget.
+ * Extracts lazily — truncates individual file diffs when budget runs low
+ * rather than omitting entire files, so every file gets some representation.
+ */
+function extractBudgetedDiff(doc: Document): string {
+  const fileContainers = doc.querySelectorAll('.file');
+  if (fileContainers.length === 0) {
+    // Fallback: no .file containers (DOM changed?) — grab all diff lines with a hard cap
+    const diffEls = doc.querySelectorAll('.blob-code-inner');
+    let raw = '';
+    for (const el of diffEls) {
+      raw += (el.textContent || '') + '\n';
+      if (raw.length > DIFF_BUDGET_CHARS) break;
+    }
+    raw = raw.trimEnd();
+    if (!raw) return '';
+    if (raw.length > DIFF_BUDGET_CHARS) raw = raw.slice(0, DIFF_BUDGET_CHARS) + '\n[...truncated]';
+    return '## Diff\n\n```\n' + raw + '\n```\n';
+  }
+
+  const lines: string[] = ['## Diff\n'];
+  let used = 10; // account for header
+  let truncatedCount = 0;
+
+  for (const container of fileContainers) {
+    const pathEl = container.querySelector('[data-file-path]');
+    const path = pathEl?.getAttribute('data-file-path')
+      || container.querySelector('.file-header [title], .file-info a[title]')?.getAttribute('title')
+      || 'unknown';
+
+    const header = `### \`${path}\`\n\`\`\`\n`;
+    const footer = '\n```\n';
+    const wrapLen = header.length + footer.length;
+    const remaining = DIFF_BUDGET_CHARS - used;
+
+    // Not enough room even for the header — skip remaining files
+    if (remaining <= wrapLen) {
+      truncatedCount++;
+      continue;
+    }
+
+    // Extract diff lazily, stop reading DOM once we have enough
+    const maxDiffChars = remaining - wrapLen;
+    const codeEls = container.querySelectorAll('.blob-code-inner');
+    let diff = '';
+    for (const el of codeEls) {
+      diff += (el.textContent || '') + '\n';
+      if (diff.length > maxDiffChars) break;
+    }
+    diff = diff.trimEnd();
+    if (!diff) continue;
+
+    if (diff.length > maxDiffChars) {
+      diff = diff.slice(0, maxDiffChars) + '\n[...truncated]';
+      truncatedCount++;
+    }
+
+    const entry = header + diff + footer;
+    lines.push(entry);
+    used += entry.length;
+  }
+
+  if (lines.length === 1) return ''; // only header, no diffs
+
+  if (truncatedCount > 0) {
+    lines.push(`*${truncatedCount} file diff(s) truncated (content budget reached)*\n`);
+  }
+
+  return lines.join('\n');
+}
+
 /** Format timeline comments into markdown */
 function formatComments(comments: TimelineComment[]): string {
   if (comments.length === 0) return '';
@@ -651,13 +726,6 @@ function extractCommit(url: string, doc: Document): ExtractedContent {
 
   const { comment: fileMapComment, listing: fileListing } = buildFileMap(files);
 
-  // Full diff content
-  const diffEls = doc.querySelectorAll('.blob-code-inner');
-  let diffContent = '';
-  for (const el of diffEls) {
-    diffContent += (el.textContent || '') + '\n';
-  }
-
   // Publish date
   const timeEl = doc.querySelector('relative-time, time[datetime]');
   const publishDate = timeEl?.getAttribute('datetime') || undefined;
@@ -677,12 +745,8 @@ function extractCommit(url: string, doc: Document): ExtractedContent {
     lines.push('');
   }
 
-  if (diffContent.trim()) {
-    lines.push('## Diff\n');
-    lines.push('```');
-    lines.push(diffContent.trim());
-    lines.push('```');
-  }
+  const budgetedDiff = extractBudgetedDiff(doc);
+  if (budgetedDiff) lines.push(budgetedDiff);
 
   return buildResult(url, 'commit', commitTitle, lines.join('\n'), {
     author,
@@ -730,13 +794,6 @@ function extractPRDiff(url: string, doc: Document): ExtractedContent {
 
   const { comment: fileMapComment, listing: fileListing } = buildFileMap(files);
 
-  // Diff content
-  const diffEls = doc.querySelectorAll('.blob-code-inner');
-  let diffContent = '';
-  for (const el of diffEls) {
-    diffContent += (el.textContent || '') + '\n';
-  }
-
   // Review comments (inline review threads)
   const reviewBodies = doc.querySelectorAll('.markdown-body');
   const reviewComments: string[] = [];
@@ -775,13 +832,8 @@ function extractPRDiff(url: string, doc: Document): ExtractedContent {
     lines.push('');
   }
 
-  if (diffContent.trim()) {
-    lines.push('## Diff\n');
-    lines.push('```');
-    lines.push(diffContent.trim());
-    lines.push('```');
-    lines.push('');
-  }
+  const budgetedDiff = extractBudgetedDiff(doc);
+  if (budgetedDiff) lines.push(budgetedDiff);
 
   if (reviewComments.length > 0) {
     lines.push('## Review Comments\n');
