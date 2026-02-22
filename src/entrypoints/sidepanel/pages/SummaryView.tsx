@@ -565,6 +565,8 @@ function Section({ title, defaultOpen = false, onDelete, onMore, onLess, childre
       <button
         onClick={toggle}
         title={open ? `Collapse ${title}` : `Expand ${title}`}
+        aria-expanded={open}
+        aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
         class="section-toggle"
         style={{
           background: 'none',
@@ -592,13 +594,13 @@ function Section({ title, defaultOpen = false, onDelete, onMore, onLess, childre
       {hasToolbar && (
         <div class="section-toolbar no-print">
           {onMore && (
-            <button onClick={(e) => { e.stopPropagation(); onMore(); }} title="Elaborate more">+</button>
+            <button onClick={(e) => { e.stopPropagation(); onMore(); }} title="Elaborate more" aria-label="Elaborate more">+</button>
           )}
           {onLess && (
-            <button onClick={(e) => { e.stopPropagation(); onLess(); }} title="Make shorter">&minus;</button>
+            <button onClick={(e) => { e.stopPropagation(); onLess(); }} title="Make shorter" aria-label="Make shorter">&minus;</button>
           )}
           {onDelete && (
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} class="section-toolbar-delete" title={`Remove ${title}`}>&#215;</button>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} class="section-toolbar-delete" title={`Remove ${title}`} aria-label={`Remove ${title}`}>&#215;</button>
           )}
         </div>
       )}

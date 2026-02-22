@@ -809,7 +809,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             const nbsp = '\u00A0';
             const maxNameLen = Math.max(...currentModels.map((m) => m.name.length), 0);
             return currentModels.map((m) => {
-              const price = estimateArticlePrice(m.inputPrice, m.outputPrice);
+              const price = estimateArticlePrice(m.inputPrice, m.outputPrice, local.summaryDetailLevel);
               const pad = nbsp.repeat(maxNameLen - m.name.length + 2);
               const label = price != null ? `${m.name}${pad}${formatArticlePriceFixed(price)}` : m.name;
               return <option key={m.id} value={m.id}>{label}</option>;
@@ -818,7 +818,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         </select>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
           <span style={{ font: 'var(--md-sys-typescale-label-small)', color: 'var(--md-sys-color-on-surface-variant)', fontStyle: 'italic' }}>
-            Prices are approximate, per 5,000-word article
+            Prices are approximate, per 5k-word article ({local.summaryDetailLevel} level)
           </span>
           <Button onClick={() => doFetchModels()} loading={loadingModels} size="sm" variant="ghost" title="Refresh model list">
             Refresh

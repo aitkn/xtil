@@ -21,7 +21,7 @@ export interface PersistedTabState {
   rollingSummary?: string;
 }
 
-const PREFIX = 'tldr_tab_';
+const PREFIX = 'xtil_tab_';
 
 const chromeStorage = () =>
   (globalThis as unknown as { chrome: { storage: typeof chrome.storage } }).chrome.storage;

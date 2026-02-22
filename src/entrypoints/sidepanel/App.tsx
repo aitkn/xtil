@@ -240,6 +240,7 @@ async function autoFixMermaid(
   setChatMessages: (fn: (prev: DisplayMessage[]) => DisplayMessage[]) => void,
   setRawResponses: (fn: (prev: string[]) => string[]) => void,
   setConversationLog?: (log: { role: string; content: string }[]) => void,
+  onFixProgress?: (status: { attempt: number; total: number } | null) => void,
 ): Promise<AutoFixResult> {
   let finalSummary = summary;
   const fixMessages: DisplayMessage[] = [];
@@ -248,6 +249,8 @@ async function autoFixMermaid(
   for (let attempt = 1; attempt <= 5; attempt++) {
     const errors = await findMermaidErrors(finalSummary);
     if (errors.length === 0) break;
+
+    onFixProgress?.({ attempt, total: 5 });
 
     const strippedSummary = stripBrokenFromSummary(finalSummary, errors.map(e => e.source));
     setSummary(strippedSummary);
@@ -261,6 +264,7 @@ async function autoFixMermaid(
     } else break;
   }
 
+  onFixProgress?.(null);
   const remainingErrors = await findMermaidErrors(finalSummary);
   return finalizeMermaidFix(finalSummary, initialChartCount, remainingErrors);
 }
@@ -391,7 +395,8 @@ export function App() {
 
   // CSS zoom (Ctrl+Plus / Ctrl+Minus / Ctrl+0)
   useEffect(() => {
-    const ZOOM_KEY = 'tldr-zoom';
+    const ZOOM_KEY = 'xtil-zoom';
+    const OLD_ZOOM_KEY = 'tldr-zoom';
     const STEP = 0.1;
     const MIN = 0.5;
     const MAX = 2.0;
@@ -401,8 +406,16 @@ export function App() {
       localStorage.setItem(ZOOM_KEY, String(z));
     };
 
-    // Restore saved zoom
-    const saved = parseFloat(localStorage.getItem(ZOOM_KEY) || '1');
+    // Restore saved zoom (migrate from old key if needed)
+    let savedZoom = localStorage.getItem(ZOOM_KEY);
+    if (!savedZoom) {
+      savedZoom = localStorage.getItem(OLD_ZOOM_KEY);
+      if (savedZoom) {
+        localStorage.setItem(ZOOM_KEY, savedZoom);
+        localStorage.removeItem(OLD_ZOOM_KEY);
+      }
+    }
+    const saved = parseFloat(savedZoom || '1');
     if (saved !== 1) apply(saved);
 
     const handler = (e: KeyboardEvent) => {
@@ -503,6 +516,9 @@ export function App() {
   const [debugOpen, setDebugOpen] = useState(false);
   const debugOpenRef = useRef(false);
   debugOpenRef.current = debugOpen;
+
+  // Mermaid fix progress (shown in spinner)
+  const [mermaidFixStatus, setMermaidFixStatus] = useState<{ attempt: number; total: number } | null>(null);
 
   // Step-by-step mermaid fix state (when debug panel is open)
   const [pendingFix, setPendingFix] = useState<PendingMermaidFix | null>(null);
@@ -1082,7 +1098,7 @@ export function App() {
       }
 
       // Validate mermaid diagrams and auto-fix via chat round-trip (spinner stays active)
-      const { summary: finalSummary } = debugOpenRef.current
+      const { summary: finalSummary, chartsRemoved } = debugOpenRef.current
         ? await autoFixMermaidStepped(
             summaryResponse.data, extractedContent, resolvedTheme,
             (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses,
@@ -1091,7 +1107,12 @@ export function App() {
         : await autoFixMermaid(
             summaryResponse.data, extractedContent, resolvedTheme,
             (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses, setConversationLog,
+            setMermaidFixStatus,
           );
+
+      if (chartsRemoved > 0) {
+        setToast({ message: `${chartsRemoved} diagram${chartsRemoved > 1 ? 's' : ''} could not be rendered and ${chartsRemoved > 1 ? 'were' : 'was'} removed`, type: 'info' });
+      }
 
       if (activeTabIdRef.current === originTabId) {
         resetSectionState();
@@ -1417,7 +1438,7 @@ export function App() {
       const fixResult = updatedSummary
         ? debugOpenRef.current
           ? await autoFixMermaidStepped(updatedSummary, content, resolvedTheme, (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses, setPendingFix, setConversationLog, conversationLogRef.current)
-          : await autoFixMermaid(updatedSummary, content, resolvedTheme, (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses, setConversationLog)
+          : await autoFixMermaid(updatedSummary, content, resolvedTheme, (s) => setSummary(s), chatMessagesRef.current, setChatMessages, setRawResponses, setConversationLog, setMermaidFixStatus)
         : null;
       const fixedJson = fixResult?.summary ?? null;
 
@@ -1734,7 +1755,7 @@ export function App() {
         {/* Loading summary spinner */}
         {loading && (
           <div style={{ padding: '0 16px 16px' }}>
-            <Spinner label="Generating summary..." />
+            <Spinner label={mermaidFixStatus ? `Fixing diagram (attempt ${mermaidFixStatus.attempt}/${mermaidFixStatus.total})...` : 'Generating summary...'} />
           </div>
         )}
 

@@ -9,10 +9,11 @@ interface ButtonProps {
   onClick?: () => void;
   style?: JSX.CSSProperties;
   title?: string;
+  ariaLabel?: string;
   children?: preact.ComponentChildren;
 }
 
-export function Button({ variant = 'primary', size = 'md', loading, children, disabled, style, title, onClick }: ButtonProps) {
+export function Button({ variant = 'primary', size = 'md', loading, children, disabled, style, title, ariaLabel, onClick }: ButtonProps) {
   const [hovered, setHovered] = useState(false);
 
   const baseStyle: JSX.CSSProperties = {
@@ -48,6 +49,7 @@ export function Button({ variant = 'primary', size = 'md', loading, children, di
       disabled={disabled || loading}
       onClick={onClick}
       title={title}
+      aria-label={ariaLabel}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
