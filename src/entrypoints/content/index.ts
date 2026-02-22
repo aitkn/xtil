@@ -331,7 +331,7 @@ async function fetchYouTubeTranscript(
   // Retry with progressive delays — during SPA navigation or cold start the
   // innertube API may throw (network not ready) or return empty caption tracks
   // before YouTube's backend has fully resolved the video.
-  let data: ReturnType<typeof fetchPlayerData> extends Promise<infer T> ? T : never;
+  let data: Awaited<ReturnType<typeof fetchPlayerData>>;
   let captionsRenderer: { captionTracks?: CaptionTrack[]; audioTracks?: { defaultCaptionTrackIndex?: number }[] } | undefined;
   let tracks: CaptionTrack[] | undefined;
   let lastError: unknown;

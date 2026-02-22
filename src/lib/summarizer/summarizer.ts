@@ -106,7 +106,7 @@ async function streamChatCollect(
   try {
     for await (const chunk of generator) {
       if (signal?.aborted) {
-        generator.return(undefined as unknown as string);
+        generator.return();
         throw new Error('Summarization cancelled');
       }
       accumulated += chunk;

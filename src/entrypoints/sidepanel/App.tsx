@@ -1749,28 +1749,26 @@ export function App() {
         onDetailLevelCycle={handleDetailLevelCycle}
         debugOpen={debugOpen}
         onToggleDebug={() => {
-          setDebugOpen((v) => {
-            if (!v) {
-              // Re-extract content when opening the debug panel so it reflects
-              // the latest DOM state (async-loaded content, lazy images, etc.)
-              // Preserve existing comments from polling (which includes iframe
-              // comments that EXTRACT_CONTENT alone can't reach).
-              sendMessage({ type: 'EXTRACT_CONTENT' }).then((resp) => {
-                const r = resp as ExtractResultMessage;
-                if (r.success && r.data) {
-                  setContent(prev => {
-                    const fresh = r.data!;
-                    // Keep the richer comment set — polling accumulates iframe comments
-                    if (prev?.comments?.length && (!fresh.comments?.length || prev.comments.length > fresh.comments.length)) {
-                      fresh.comments = prev.comments;
-                    }
-                    return fresh;
-                  });
-                }
-              }).catch(console.error);
-            }
-            return !v;
-          });
+          if (!debugOpen) {
+            // Re-extract content when opening the debug panel so it reflects
+            // the latest DOM state (async-loaded content, lazy images, etc.)
+            // Preserve existing comments from polling (which includes iframe
+            // comments that EXTRACT_CONTENT alone can't reach).
+            sendMessage({ type: 'EXTRACT_CONTENT' }).then((resp) => {
+              const r = resp as ExtractResultMessage;
+              if (r.success && r.data) {
+                setContent(prev => {
+                  const fresh = r.data!;
+                  // Keep the richer comment set — polling accumulates iframe comments
+                  if (prev?.comments?.length && (!fresh.comments?.length || prev.comments.length > fresh.comments.length)) {
+                    fresh.comments = prev.comments;
+                  }
+                  return fresh;
+                });
+              }
+            }).catch(console.error);
+          }
+          setDebugOpen(!debugOpen);
         }}
         onPrint={summary ? () => printSummary(scrollAreaRef.current) : undefined}
       />
@@ -2356,7 +2354,7 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
             }
           }
           if ('text' in parsed || updates) {
-            return { updates, text: updates ? text : (raw.slice(0, braceIdx) + raw.slice(braceEnd + 1)).trim() };
+            return { updates, text: text || (updates ? '' : (raw.slice(0, braceIdx) + raw.slice(braceEnd + 1)).trim()) };
           }
         }
         // Legacy format: {tldr, summary, ...}
