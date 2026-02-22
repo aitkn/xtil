@@ -36,8 +36,8 @@ const activeSummarizations = new Map<number, AbortController>();
 
 /** Broadcast a fire-and-forget message to all extension views (sidepanel, popup). */
 function broadcastMessage(msg: Record<string, unknown>): void {
-  const chromeRT = (globalThis as unknown as { chrome: { runtime: typeof chrome.runtime } }).chrome.runtime;
-  try { chromeRT.sendMessage(msg, () => { chromeRT.lastError; }); } catch { /* no listeners */ }
+  const chromeRT = (globalThis as unknown as { chrome: typeof chrome }).chrome.runtime;
+  try { chromeRT.sendMessage(msg, () => { void chromeRT.lastError; }); } catch { /* no listeners */ }
 }
 
 // Per-tab iframe comment storage (Disqus, Giscus, Utterances)
