@@ -240,8 +240,9 @@ function buildFileMap(files: { path: string; url: string }[]): { comment: string
 const DIFF_BUDGET_CHARS = 200_000;
 
 /**
- * Extract per-file diffs from a GitHub diff page and format within a character budget.
- * Files that fit within the budget get full diffs; the rest are listed as omitted.
+ * Extract per-file diffs from a GitHub diff page within a character budget.
+ * Extracts lazily — truncates individual file diffs when budget runs low
+ * rather than omitting entire files, so every file gets some representation.
  */
 function extractBudgetedDiff(doc: Document): string {
   const fileContainers = doc.querySelectorAll('.file');
@@ -255,45 +256,56 @@ function extractBudgetedDiff(doc: Document): string {
     }
     raw = raw.trimEnd();
     if (!raw) return '';
-    const truncated = raw.length >= DIFF_BUDGET_CHARS;
-    return '## Diff\n\n```\n' + raw + '\n```' + (truncated ? '\n\n*Diff truncated (content budget reached)*\n' : '') + '\n';
+    if (raw.length > DIFF_BUDGET_CHARS) raw = raw.slice(0, DIFF_BUDGET_CHARS) + '\n[...truncated]';
+    return '## Diff\n\n```\n' + raw + '\n```\n';
   }
 
-  // Collect per-file diffs
-  const fileDiffs: { path: string; diff: string }[] = [];
+  const lines: string[] = ['## Diff\n'];
+  let used = 10; // account for header
+  let truncatedCount = 0;
+
   for (const container of fileContainers) {
     const pathEl = container.querySelector('[data-file-path]');
     const path = pathEl?.getAttribute('data-file-path')
       || container.querySelector('.file-header [title], .file-info a[title]')?.getAttribute('title')
       || 'unknown';
 
+    const header = `### \`${path}\`\n\`\`\`\n`;
+    const footer = '\n```\n';
+    const wrapLen = header.length + footer.length;
+    const remaining = DIFF_BUDGET_CHARS - used;
+
+    // Not enough room even for the header — skip remaining files
+    if (remaining <= wrapLen) {
+      truncatedCount++;
+      continue;
+    }
+
+    // Extract diff lazily, stop reading DOM once we have enough
+    const maxDiffChars = remaining - wrapLen;
     const codeEls = container.querySelectorAll('.blob-code-inner');
     let diff = '';
     for (const el of codeEls) {
       diff += (el.textContent || '') + '\n';
+      if (diff.length > maxDiffChars) break;
     }
     diff = diff.trimEnd();
-    if (diff) fileDiffs.push({ path, diff });
-  }
+    if (!diff) continue;
 
-  if (fileDiffs.length === 0) return '';
-
-  const lines: string[] = ['## Diff\n'];
-  let used = 0;
-  let omitted = 0;
-
-  for (const fd of fileDiffs) {
-    const entry = `### \`${fd.path}\`\n\`\`\`\n${fd.diff}\n\`\`\`\n`;
-    if (used + entry.length <= DIFF_BUDGET_CHARS) {
-      lines.push(entry);
-      used += entry.length;
-    } else {
-      omitted++;
+    if (diff.length > maxDiffChars) {
+      diff = diff.slice(0, maxDiffChars) + '\n[...truncated]';
+      truncatedCount++;
     }
+
+    const entry = header + diff + footer;
+    lines.push(entry);
+    used += entry.length;
   }
 
-  if (omitted > 0) {
-    lines.push(`*${omitted} file diff(s) omitted (content budget reached)*\n`);
+  if (lines.length === 1) return ''; // only header, no diffs
+
+  if (truncatedCount > 0) {
+    lines.push(`*${truncatedCount} file diff(s) truncated (content budget reached)*\n`);
   }
 
   return lines.join('\n');
