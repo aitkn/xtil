@@ -1,7 +1,7 @@
 import { getSettings, saveSettings } from '@/lib/storage/settings';
 import { getActiveProviderConfig } from '@/lib/storage/types';
 import { createProvider, getProviderDefinition } from '@/lib/llm/registry';
-import { fetchModels } from '@/lib/llm/models';
+import { fetchModels, getCatalogEntry } from '@/lib/llm/models';
 import { summarize, ImageRequestError } from '@/lib/summarizer/summarizer';
 import { getSystemPrompt } from '@/lib/summarizer/prompts';
 import { fetchImages } from '@/lib/images/fetcher';
@@ -145,6 +145,11 @@ async function getModelVision(
   if (cached && cached.vision !== 'unknown' && Date.now() - cached.probedAt < 30 * 86400000) {
     return cached.vision;
   }
+
+  // Skip probe if model catalog already knows the answer
+  const catalogEntry = getCatalogEntry(providerId, model);
+  if (catalogEntry?.vision === true) return 'url';
+  if (catalogEntry?.vision === false) return 'none';
 
   const vision = await probeVision(provider);
 

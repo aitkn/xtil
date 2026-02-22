@@ -23,7 +23,7 @@ interface Catalog {
 
 const catalog = catalogData as Catalog;
 
-function getCatalogEntry(providerId: string, modelId: string): CatalogEntry | undefined {
+export function getCatalogEntry(providerId: string, modelId: string): CatalogEntry | undefined {
   return catalog.providers?.[providerId]?.models?.[modelId];
 }
 

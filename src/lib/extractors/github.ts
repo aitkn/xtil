@@ -236,6 +236,69 @@ function buildFileMap(files: { path: string; url: string }[]): { comment: string
   return { comment, listing };
 }
 
+// ~50K tokens — enough for substantial diffs without overwhelming the LLM
+const DIFF_BUDGET_CHARS = 200_000;
+
+/**
+ * Extract per-file diffs from a GitHub diff page and format within a character budget.
+ * Files that fit within the budget get full diffs; the rest are listed as omitted.
+ */
+function extractBudgetedDiff(doc: Document): string {
+  const fileContainers = doc.querySelectorAll('.file');
+  if (fileContainers.length === 0) {
+    // Fallback: no .file containers (DOM changed?) — grab all diff lines with a hard cap
+    const diffEls = doc.querySelectorAll('.blob-code-inner');
+    let raw = '';
+    for (const el of diffEls) {
+      raw += (el.textContent || '') + '\n';
+      if (raw.length > DIFF_BUDGET_CHARS) break;
+    }
+    raw = raw.trimEnd();
+    if (!raw) return '';
+    const truncated = raw.length >= DIFF_BUDGET_CHARS;
+    return '## Diff\n\n```\n' + raw + '\n```' + (truncated ? '\n\n*Diff truncated (content budget reached)*\n' : '') + '\n';
+  }
+
+  // Collect per-file diffs
+  const fileDiffs: { path: string; diff: string }[] = [];
+  for (const container of fileContainers) {
+    const pathEl = container.querySelector('[data-file-path]');
+    const path = pathEl?.getAttribute('data-file-path')
+      || container.querySelector('.file-header [title], .file-info a[title]')?.getAttribute('title')
+      || 'unknown';
+
+    const codeEls = container.querySelectorAll('.blob-code-inner');
+    let diff = '';
+    for (const el of codeEls) {
+      diff += (el.textContent || '') + '\n';
+    }
+    diff = diff.trimEnd();
+    if (diff) fileDiffs.push({ path, diff });
+  }
+
+  if (fileDiffs.length === 0) return '';
+
+  const lines: string[] = ['## Diff\n'];
+  let used = 0;
+  let omitted = 0;
+
+  for (const fd of fileDiffs) {
+    const entry = `### \`${fd.path}\`\n\`\`\`\n${fd.diff}\n\`\`\`\n`;
+    if (used + entry.length <= DIFF_BUDGET_CHARS) {
+      lines.push(entry);
+      used += entry.length;
+    } else {
+      omitted++;
+    }
+  }
+
+  if (omitted > 0) {
+    lines.push(`*${omitted} file diff(s) omitted (content budget reached)*\n`);
+  }
+
+  return lines.join('\n');
+}
+
 /** Format timeline comments into markdown */
 function formatComments(comments: TimelineComment[]): string {
   if (comments.length === 0) return '';
@@ -651,13 +714,6 @@ function extractCommit(url: string, doc: Document): ExtractedContent {
 
   const { comment: fileMapComment, listing: fileListing } = buildFileMap(files);
 
-  // Full diff content
-  const diffEls = doc.querySelectorAll('.blob-code-inner');
-  let diffContent = '';
-  for (const el of diffEls) {
-    diffContent += (el.textContent || '') + '\n';
-  }
-
   // Publish date
   const timeEl = doc.querySelector('relative-time, time[datetime]');
   const publishDate = timeEl?.getAttribute('datetime') || undefined;
@@ -677,12 +733,8 @@ function extractCommit(url: string, doc: Document): ExtractedContent {
     lines.push('');
   }
 
-  if (diffContent.trim()) {
-    lines.push('## Diff\n');
-    lines.push('```');
-    lines.push(diffContent.trim());
-    lines.push('```');
-  }
+  const budgetedDiff = extractBudgetedDiff(doc);
+  if (budgetedDiff) lines.push(budgetedDiff);
 
   return buildResult(url, 'commit', commitTitle, lines.join('\n'), {
     author,
@@ -730,13 +782,6 @@ function extractPRDiff(url: string, doc: Document): ExtractedContent {
 
   const { comment: fileMapComment, listing: fileListing } = buildFileMap(files);
 
-  // Diff content
-  const diffEls = doc.querySelectorAll('.blob-code-inner');
-  let diffContent = '';
-  for (const el of diffEls) {
-    diffContent += (el.textContent || '') + '\n';
-  }
-
   // Review comments (inline review threads)
   const reviewBodies = doc.querySelectorAll('.markdown-body');
   const reviewComments: string[] = [];
@@ -775,13 +820,8 @@ function extractPRDiff(url: string, doc: Document): ExtractedContent {
     lines.push('');
   }
 
-  if (diffContent.trim()) {
-    lines.push('## Diff\n');
-    lines.push('```');
-    lines.push(diffContent.trim());
-    lines.push('```');
-    lines.push('');
-  }
+  const budgetedDiff = extractBudgetedDiff(doc);
+  if (budgetedDiff) lines.push(budgetedDiff);
 
   if (reviewComments.length > 0) {
     lines.push('## Review Comments\n');
