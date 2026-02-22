@@ -62,7 +62,9 @@ export interface SummarizeMessage {
 
 export interface SummaryChunkMessage {
   type: 'SUMMARY_CHUNK';
-  chunk: string;
+  chunk: string;           // accumulated text so far
+  chunkIndex?: number;     // which content chunk (for rolling context)
+  totalChunks?: number;    // total content chunks
 }
 
 export interface SummaryResultMessage {
