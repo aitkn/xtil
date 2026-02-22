@@ -1,5 +1,36 @@
-import type { ExtractedContent } from '../extractors/types';
+import type { ExtractedContent, ExtractedComment } from '../extractors/types';
 import { MERMAID_ESSENTIAL_RULES } from '../mermaid-rules';
+
+/** Max comments to include in the prompt, by detail level. */
+export const COMMENT_LIMITS: Record<string, number> = { brief: 50, standard: 200, detailed: 1000 };
+
+/**
+ * Format comments for inclusion in a prompt.
+ * Sorts by likes (most-liked first), caps to a detail-level-dependent limit,
+ * and appends a note when some comments were omitted.
+ */
+export function formatCommentsBlock(
+  comments: ExtractedComment[],
+  detailLevel: 'brief' | 'standard' | 'detailed',
+): string {
+  const limit = COMMENT_LIMITS[detailLevel] ?? 50;
+  // Sort: comments with likes first (desc), then the rest in original order
+  const sorted = [...comments].sort((a, b) => (b.likes ?? -1) - (a.likes ?? -1));
+  const selected = sorted.slice(0, limit);
+
+  let block = '';
+  for (const comment of selected) {
+    const author = comment.author ? `**${comment.author}**` : 'Anonymous';
+    const likes = comment.likes ? ` (${comment.likes} likes)` : '';
+    block += `- ${author}${likes}: ${comment.text}\n`;
+  }
+
+  if (comments.length > limit) {
+    block += `\n*(${comments.length - limit} more comments omitted — ${comments.length} total)*\n`;
+  }
+
+  return block;
+}
 
 const LANGUAGE_NAMES: Record<string, string> = {
   en: 'English', es: 'Spanish', fr: 'French', de: 'German',
@@ -408,12 +439,8 @@ export function getSummarizationPrompt(content: ExtractedContent, detailLevel: '
 
   // For discussion types, comments are already embedded in the content
   if (!isDiscussion && content.comments && content.comments.length > 0) {
-    prompt += `\n---\n\n**User Comments:**\n\n`;
-    for (const comment of content.comments.slice(0, 20)) {
-      const author = comment.author ? `**${comment.author}**` : 'Anonymous';
-      const likes = comment.likes ? ` (${comment.likes} likes)` : '';
-      prompt += `- ${author}${likes}: ${comment.text}\n`;
-    }
+    prompt += `\n---\n\n**User Comments (${content.comments.length}):**\n\n`;
+    prompt += formatCommentsBlock(content.comments, detailLevel);
   }
 
   return prompt;

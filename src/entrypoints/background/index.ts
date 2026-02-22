@@ -765,7 +765,9 @@ async function handleChatMessage(
 - "text": your conversational response. Markdown supported. Use "" if only updating.
 - "updates": partial changes — only include fields you want to change. "__DELETE__" removes a field. extraSections is deep-merged by key.
 - "summary": full summary replacement (all fields). Use when regenerating the entire summary.
-- Use "updates" or "summary", not both. Use neither if just answering a question.`
+- Use "updates" or "summary", not both. Use neither if just answering a question.
+- To add a new section, use "extraSections" with a plain-text title key and markdown string value, e.g. {"updates":{"extraSections":{"Comment Highlights":"- Great video!\\n- Love this series"}}}. Do NOT invent new top-level camelCase field names — always use "extraSections" for custom sections.
+- To delete a specific extra section: {"updates":{"extraSections":{"Section Title":"__DELETE__"}}}. To delete ALL extra sections: {"updates":{"extraSections":"__DELETE__"}}. To delete any other field: {"updates":{"fieldName":"__DELETE__"}}.`
       + (schemaEnforced ? '' : '\n- IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.');
 
     const rulesSystem = `${summarizationPrompt}

@@ -37,7 +37,7 @@ import { ChatInputBar } from '@/components/ChatInputBar';
 import type { SummarizeVariant } from '@/components/ChatInputBar';
 import { useTheme } from '@/hooks/useTheme';
 import { buildSummarizationSystemPrompt, replacePlaceholders, buildPlaceholders, extractSummaryFields } from '@/lib/summarizer/summarizer';
-import { getSummarizationPrompt } from '@/lib/summarizer/prompts';
+import { getSummarizationPrompt, COMMENT_LIMITS } from '@/lib/summarizer/prompts';
 
 interface TabState {
   content: ExtractedContent | null;
@@ -843,6 +843,10 @@ export function App() {
     setChatMessages([]);
     setRawResponses([]);
     setActualSystemPrompt('');
+    setConversationLog([]);
+    setRollingSummary('');
+    setLastRequestBody('');
+    setLastResponseBody('');
     setNotionUrl(null);
     setPendingResummarize(false);
     extractContent();
@@ -1132,7 +1136,7 @@ export function App() {
         }
         extractedContent = extractResponse.data;
         if (activeTabIdRef.current === originTabId) {
-          setContent(extractedContent);
+          setContent(extractResponse.data);
         }
       }
 
@@ -1507,7 +1511,17 @@ export function App() {
       }
 
       // Never show raw JSON — use chat text if available, otherwise a status message
-      let displayText = chatText || (updatedSummary ? 'Summary updated.' : 'Failed to update summary — please try again.');
+      let displayText: string;
+      if (chatText) {
+        displayText = chatText;
+      } else if (updates) {
+        const changedFields = Object.keys(updates);
+        displayText = changedFields.length > 0
+          ? `Updated: ${changedFields.join(', ')}.`
+          : 'Failed to update summary — please try again.';
+      } else {
+        displayText = 'Failed to update summary — please try again.';
+      }
 
       // Auto-fix broken mermaid diagrams in the updated summary
       const fixResult = updatedSummary
@@ -1723,7 +1737,30 @@ export function App() {
         detailLevel={settings.summaryDetailLevel}
         onDetailLevelCycle={handleDetailLevelCycle}
         debugOpen={debugOpen}
-        onToggleDebug={() => setDebugOpen((v) => !v)}
+        onToggleDebug={() => {
+          setDebugOpen((v) => {
+            if (!v) {
+              // Re-extract content when opening the debug panel so it reflects
+              // the latest DOM state (async-loaded content, lazy images, etc.)
+              // Preserve existing comments from polling (which includes iframe
+              // comments that EXTRACT_CONTENT alone can't reach).
+              sendMessage({ type: 'EXTRACT_CONTENT' }).then((resp) => {
+                const r = resp as ExtractResultMessage;
+                if (r.success && r.data) {
+                  setContent(prev => {
+                    const fresh = r.data!;
+                    // Keep the richer comment set — polling accumulates iframe comments
+                    if (prev?.comments?.length && (!fresh.comments?.length || prev.comments.length > fresh.comments.length)) {
+                      fresh.comments = prev.comments;
+                    }
+                    return fresh;
+                  });
+                }
+              }).catch(() => {});
+            }
+            return !v;
+          });
+        }}
         onPrint={summary ? () => printSummary(scrollAreaRef.current) : undefined}
       />
 
@@ -2072,8 +2109,69 @@ export function App() {
   );
 }
 
+/** Coerce commentsHighlights from LLM — accepts "commentsHighlights" or "comments" alias,
+ *  and converts a single string into a one-element array. */
+function coerceCommentsHighlights(parsed: Record<string, unknown>): string[] | undefined {
+  const raw = parsed.commentsHighlights ?? parsed.comments;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim()) return [raw];
+  return undefined;
+}
+
+/** Known SummaryDocument fields — anything else with string/array content is an extra section. */
+const KNOWN_FIELDS = new Set([
+  'tldr', 'keyTakeaways', 'summary', 'notableQuotes', 'conclusion',
+  'prosAndCons', 'factCheck', 'commentsHighlights', 'comments',
+  'extraSections', 'relatedTopics', 'tags',
+  'sourceLanguage', 'summaryLanguage', 'translatedTitle',
+  'inferredTitle', 'inferredAuthor', 'inferredPublishDate',
+  'llmProvider', 'llmModel',
+  'text', 'noContent', 'noSummary', 'requestedImages', 'message', 'reason', 'updates',
+]);
+
+/** Collect unknown fields from a parsed LLM object into extraSections. */
+function collectUnknownAsExtra(parsed: Record<string, unknown>, existing?: Record<string, string>): Record<string, string> | undefined {
+  const extra: Record<string, string> = existing ? { ...existing } : {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (KNOWN_FIELDS.has(key)) continue;
+    let content: string | undefined;
+    if (typeof value === 'string' && value.trim()) {
+      content = value;
+    } else if (Array.isArray(value) && value.length > 0) {
+      content = value.map(item => {
+        if (typeof item === 'string') return `- ${item}`;
+        if (item && typeof item === 'object') {
+          // Convert object entries to readable text, e.g. {author:"X", comment:"Y"} → "**X**: Y"
+          const obj = item as Record<string, unknown>;
+          const parts = Object.entries(obj)
+            .filter(([, v]) => v != null && v !== '')
+            .map(([k, v]) => `${k}: ${String(v)}`);
+          return `- ${parts.join(' | ')}`;
+        }
+        return `- ${String(item)}`;
+      }).join('\n');
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      // Plain object — format entries as key: value lines
+      const obj = value as Record<string, unknown>;
+      const lines = Object.entries(obj)
+        .filter(([, v]) => v != null && v !== '')
+        .map(([k, v]) => `**${k}**: ${String(v)}`);
+      if (lines.length > 0) content = lines.join('\n');
+    }
+    if (content) {
+      const label = key
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+      extra[label] = content;
+    }
+  }
+  return Object.keys(extra).length > 0 ? extra : undefined;
+}
+
 function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
   const pc = parsed.prosAndCons as { pros?: unknown; cons?: unknown } | undefined;
+  const explicitExtra = coerceExtraSections(parsed.extraSections);
   return {
     tldr: (parsed.tldr as string) || '',
     keyTakeaways: Array.isArray(parsed.keyTakeaways) ? parsed.keyTakeaways : [],
@@ -2081,8 +2179,8 @@ function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
     notableQuotes: Array.isArray(parsed.notableQuotes) ? parsed.notableQuotes : [],
     conclusion: (parsed.conclusion as string) || '',
     prosAndCons: pc ? { pros: Array.isArray(pc.pros) ? pc.pros : [], cons: Array.isArray(pc.cons) ? pc.cons : [] } : undefined,
-    commentsHighlights: Array.isArray(parsed.commentsHighlights) ? parsed.commentsHighlights : undefined,
-    extraSections: coerceExtraSections(parsed.extraSections),
+    commentsHighlights: coerceCommentsHighlights(parsed),
+    extraSections: collectUnknownAsExtra(parsed, explicitExtra ?? undefined),
     relatedTopics: Array.isArray(parsed.relatedTopics) ? parsed.relatedTopics : [],
     tags: Array.isArray(parsed.tags) ? parsed.tags : [],
     sourceLanguage: (parsed.sourceLanguage as string) || undefined,
@@ -2094,6 +2192,28 @@ function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
 }
 
 const DELETE_SENTINEL = '__DELETE__';
+
+/**
+ * Unwrap and sanitize an "updates" object from the LLM.
+ * Handles both flat updates ({"conclusion": "..."}) and the nested pattern
+ * where the LLM wraps them in a "summary" key ({"summary": {"conclusion": "..."}}).
+ */
+function unwrapAndSanitize(raw: Record<string, unknown>): Partial<SummaryDocument> | null {
+  // Unwrap {"summary": {...fields...}} → {...fields...}
+  if (raw.summary && typeof raw.summary === 'object' && !Array.isArray(raw.summary)) {
+    const inner = raw.summary as Record<string, unknown>;
+    // Only unwrap if it looks like summary fields, not a full replacement
+    if (!inner.tldr || typeof inner.summary !== 'string') {
+      // Merge any sibling keys (e.g. updates had both "summary" and "tags")
+      const merged = { ...inner };
+      for (const [k, v] of Object.entries(raw)) {
+        if (k !== 'summary') merged[k] = v;
+      }
+      return sanitizePartialUpdate(merged);
+    }
+  }
+  return sanitizePartialUpdate(raw);
+}
 
 /** Process partial update from LLM — validate/coerce each field, strip app-managed keys. */
 function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDocument> | null {
@@ -2113,8 +2233,13 @@ function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDoc
         if (typeof value === 'string') result[key] = value;
         break;
       case 'keyTakeaways': case 'notableQuotes': case 'relatedTopics':
-      case 'tags': case 'commentsHighlights':
+      case 'tags':
         if (Array.isArray(value)) result[key] = value;
+        break;
+      case 'commentsHighlights': case 'comments':
+        // Accept array or string; normalize alias "comments" → "commentsHighlights"
+        if (Array.isArray(value)) result['commentsHighlights'] = value;
+        else if (typeof value === 'string' && value.trim()) result['commentsHighlights'] = [value];
         break;
       case 'prosAndCons': {
         const pc = value as { pros?: unknown; cons?: unknown } | undefined;
@@ -2127,11 +2252,43 @@ function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDoc
         break;
       }
       case 'extraSections': {
-        // Coerce both object and legacy array formats; strip markdown bold from keys
-        const coerced = coerceExtraSections(value);
-        if (coerced) result[key] = coerced;
+        if (value === DELETE_SENTINEL) {
+          // Delete the entire extraSections field
+          result[key] = undefined;
+          break;
+        }
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          const raw = value as Record<string, unknown>;
+          // Check if the LLM sent {"__DELETE__": true} meaning "delete all extra sections"
+          if (raw['__DELETE__'] === true || raw['__DELETE__'] === DELETE_SENTINEL) {
+            result[key] = undefined;
+            break;
+          }
+          // Coerce values, preserving __DELETE__ sentinels for individual keys
+          const coerced: Record<string, string> = {};
+          for (const [k, v] of Object.entries(raw)) {
+            const cleanKey = k.replace(/^\*\*(.+)\*\*$/, '$1').replace(/^__(.+)__$/, '$1').trim();
+            if (v === DELETE_SENTINEL) {
+              coerced[cleanKey] = DELETE_SENTINEL;
+            } else {
+              const md = typeof v === 'string' ? v : undefined;
+              if (md) coerced[cleanKey] = md;
+            }
+          }
+          if (Object.keys(coerced).length > 0) result[key] = coerced;
+        }
         break;
       }
+      default:
+        // Unknown field — collect into extraSections
+        if (!KNOWN_FIELDS.has(key)) {
+          const extras = collectUnknownAsExtra(
+            { [key]: value },
+            (result['extraSections'] as Record<string, string>) ?? undefined,
+          );
+          if (extras) result['extraSections'] = extras;
+        }
+        break;
     }
   }
   const keys = Object.keys(result);
@@ -2174,8 +2331,10 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
       cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
     }
     const parsed = parseJsonSafe(cleaned) as Record<string, unknown> | null;
-    if (parsed && typeof parsed === 'object' && 'text' in parsed) {
+    if (parsed && typeof parsed === 'object') {
       const text = typeof parsed.text === 'string' ? parsed.text : '';
+      const hasText = 'text' in parsed;
+
       // "summary" = full replacement (takes priority); "updates" = partial merge
       let updates: Partial<SummaryDocument> | null = null;
       const fullSummary = parsed.summary;
@@ -2183,7 +2342,7 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
         const s = fullSummary as Record<string, unknown>;
         if (s.tldr && s.summary) updates = normalizeSummary(s);
       } else if (parsed.updates && typeof parsed.updates === 'object') {
-        updates = sanitizePartialUpdate(parsed.updates as Record<string, unknown>);
+        updates = unwrapAndSanitize(parsed.updates as Record<string, unknown>);
       }
 
       // Fallback: model stuffed JSON into "text" instead of using updates/summary
@@ -2199,11 +2358,14 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
         }
       }
 
-      return { updates, text };
-    }
-    // Also handle a flat summary object (has tldr+summary but no text field)
-    if (parsed && typeof parsed === 'object' && (parsed as Record<string, unknown>).tldr && (parsed as Record<string, unknown>).summary) {
-      return { updates: normalizeSummary(parsed as Record<string, unknown>), text: '' };
+      if (hasText || updates) {
+        return { updates, text };
+      }
+
+      // Flat summary object (has tldr+summary but no text field)
+      if ((parsed as Record<string, unknown>).tldr && (parsed as Record<string, unknown>).summary) {
+        return { updates: normalizeSummary(parsed as Record<string, unknown>), text: '' };
+      }
     }
   }
 
@@ -2238,19 +2400,21 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
       const parsed = parseJsonSafe(raw.slice(braceIdx, braceEnd + 1)) as Record<string, unknown> | null;
       if (parsed && typeof parsed === 'object') {
         // New chat format: {"text": "...", "updates": ...}
-        if ('text' in parsed) {
+        if ('text' in parsed || 'updates' in parsed) {
           const text = typeof parsed.text === 'string' ? parsed.text : '';
           const source = parsed.updates ?? parsed.summary;
           let updates: Partial<SummaryDocument> | null = null;
           if (source && typeof source === 'object') {
             if (parsed.updates) {
-              updates = sanitizePartialUpdate(source as Record<string, unknown>);
+              updates = unwrapAndSanitize(source as Record<string, unknown>);
             } else {
               const s = source as Record<string, unknown>;
               if (s.tldr && s.summary) updates = normalizeSummary(s);
             }
           }
-          return { updates, text };
+          if ('text' in parsed || updates) {
+            return { updates, text: updates ? text : (raw.slice(0, braceIdx) + raw.slice(braceEnd + 1)).trim() };
+          }
         }
         // Legacy format: {tldr, summary, ...}
         if (parsed.tldr && parsed.summary) {
@@ -2299,9 +2463,19 @@ function ContentIndicators({ content, settings }: { content: ExtractedContent; s
       ) : (
         <IndicatorChip icon={'\u2713'} label={`${content.wordCount.toLocaleString()} words`} variant="success" />
       )}
-      {commentCount > 0 && (
-        <IndicatorChip icon={String.fromCodePoint(0x1F4AC)} label={`${commentCount} comments \u00B7 ${commentWords.toLocaleString()} words`} variant="success" />
-      )}
+      {commentCount > 0 && (() => {
+        const limit = COMMENT_LIMITS[settings.summaryDetailLevel] ?? 200;
+        const clipped = commentCount > limit;
+        return (
+          <IndicatorChip
+            icon={String.fromCodePoint(0x1F4AC)}
+            label={clipped
+              ? `${commentCount} comments \u00B7 ${limit} sent \u00B7 ${commentWords.toLocaleString()} words`
+              : `${commentCount} comments \u00B7 ${commentWords.toLocaleString()} words`}
+            variant={clipped ? 'warning' : 'success'}
+          />
+        );
+      })()}
       {imageCount > 0 && (
         <IndicatorChip
           icon={String.fromCodePoint(0x1F5BC)}
