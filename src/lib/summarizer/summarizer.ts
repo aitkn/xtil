@@ -375,7 +375,7 @@ function parseSummaryResponse(response: string, imageAnalysisEnabled = false): S
   throw new LLMTextResponse(cleaned);
 }
 
-function extractSummaryFields(parsed: Record<string, unknown>): SummaryDocument {
+export function extractSummaryFields(parsed: Record<string, unknown>): SummaryDocument {
   const pc = parsed.prosAndCons as Record<string, unknown> | undefined;
   return {
     tldr: (parsed.tldr as string) || '',

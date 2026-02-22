@@ -5,7 +5,7 @@ import type { ChatMessage, VisionSupport } from '@/lib/llm/types';
 import type { Settings } from '@/lib/storage/types';
 import { getActiveProviderConfig } from '@/lib/storage/types';
 import { DEFAULT_SETTINGS } from '@/lib/storage/types';
-import { parseJsonSafe, findMatchingBrace } from '@/lib/json-repair';
+import { parseJsonSafe, findMatchingBrace, closeTruncatedJson } from '@/lib/json-repair';
 import { sendMessage } from '@/lib/messaging/bridge';
 import { savePersistedTabState, getPersistedTabState, deletePersistedTabState, type DisplayMessage, type PersistedTabState } from '@/lib/storage/tab-state';
 import type {
@@ -36,7 +36,7 @@ import { SettingsDrawer } from '@/components/SettingsDrawer';
 import { ChatInputBar } from '@/components/ChatInputBar';
 import type { SummarizeVariant } from '@/components/ChatInputBar';
 import { useTheme } from '@/hooks/useTheme';
-import { buildSummarizationSystemPrompt, replacePlaceholders, buildPlaceholders } from '@/lib/summarizer/summarizer';
+import { buildSummarizationSystemPrompt, replacePlaceholders, buildPlaceholders, extractSummaryFields } from '@/lib/summarizer/summarizer';
 import { getSummarizationPrompt } from '@/lib/summarizer/prompts';
 
 interface TabState {
@@ -57,6 +57,60 @@ interface TabState {
   scrollTop: number;
 }
 
+/** Strip markdown code fences (```json ... ```) that LLMs often wrap around JSON responses. */
+function stripCodeFence(raw: string): string {
+  let s = raw.trim();
+  if (s.startsWith('```')) {
+    s = s.replace(/^```(?:json)?\s*\n?/, '');
+    // Only strip closing fence if present (during streaming it won't be)
+    s = s.replace(/\n?```\s*$/, '');
+  }
+  return s;
+}
+
+/** Try to parse streaming JSON into a partial SummaryDocument for live preview. */
+function tryParseStreamingSummary(raw: string): SummaryDocument | null {
+  try {
+    const stripped = stripCodeFence(raw);
+    const closed = closeTruncatedJson(stripped);
+    const parsed = parseJsonSafe(closed);
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    const obj = parsed as Record<string, unknown>;
+
+    // Envelope format: { summary: { tldr, ... }, ... }
+    const summaryObj = obj.summary;
+    if (summaryObj && typeof summaryObj === 'object' && !Array.isArray(summaryObj)) {
+      const fields = extractSummaryFields(summaryObj as Record<string, unknown>);
+      // Only return if there's at least some content
+      if (fields.tldr || fields.summary || fields.keyTakeaways.length > 0) return fields;
+    }
+
+    // Flat format: { tldr, keyTakeaways, ... }
+    if (typeof obj.tldr === 'string') {
+      const fields = extractSummaryFields(obj);
+      if (fields.tldr || fields.summary || fields.keyTakeaways.length > 0) return fields;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Try to extract the conversational `text` field from streaming chat JSON. */
+function tryExtractStreamingChatText(raw: string): string | null {
+  try {
+    const stripped = stripCodeFence(raw);
+    const closed = closeTruncatedJson(stripped);
+    const parsed = parseJsonSafe(closed);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const text = (parsed as Record<string, unknown>).text;
+    return typeof text === 'string' && text.length > 0 ? text : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Count total mermaid code blocks across all summary text fields. */
 function countMermaidBlocks(summary: SummaryDocument): number {
@@ -1784,24 +1838,17 @@ export function App() {
                   ? `Processing chunk ${streamingProgress.chunk} of ${streamingProgress.total}...`
                   : 'Generating summary...'
             } />
-            {streamingText && !mermaidFixStatus && (
-              <div style={{
-                marginTop: '8px',
-                maxHeight: '300px',
-                overflow: 'auto',
-                padding: '12px',
-                borderRadius: 'var(--md-sys-shape-corner-medium)',
-                backgroundColor: 'var(--md-sys-color-surface-container)',
-                font: 'var(--md-sys-typescale-body-small)',
-                color: 'var(--md-sys-color-on-surface-variant)',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                lineHeight: 1.5,
-                opacity: 0.8,
-              }}>
-                {streamingText}
-              </div>
-            )}
+            {streamingText && !mermaidFixStatus && (() => {
+              const streamingSummary = tryParseStreamingSummary(streamingText);
+              return streamingSummary ? (
+                <div style={{ marginTop: '8px', opacity: 0.6 }}>
+                  <SummaryContent
+                    summary={streamingSummary}
+                    content={content}
+                  />
+                </div>
+              ) : null;
+            })()}
           </div>
         )}
 
@@ -1887,22 +1934,27 @@ export function App() {
                 marginBottom: '8px',
                 maxWidth: '90%',
               }}>
-                {chatStreamingText ? (
-                  <div style={{
-                    font: 'var(--md-sys-typescale-body-medium)',
-                    color: 'var(--md-sys-color-on-surface)',
-                    lineHeight: 1.5,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    opacity: 0.85,
-                  }}>
-                    {chatStreamingText}
-                  </div>
-                ) : (
-                  <div style={{ font: 'var(--md-sys-typescale-body-medium)', color: 'var(--md-sys-color-on-surface-variant)' }}>
-                    Thinking...
-                  </div>
-                )}
+                {(() => {
+                  const chatDisplayText = chatStreamingText
+                    ? tryExtractStreamingChatText(chatStreamingText)
+                    : null;
+                  return chatDisplayText ? (
+                    <div style={{
+                      font: 'var(--md-sys-typescale-body-medium)',
+                      color: 'var(--md-sys-color-on-surface)',
+                      lineHeight: 1.5,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      opacity: 0.85,
+                    }}>
+                      {chatDisplayText}
+                    </div>
+                  ) : (
+                    <div style={{ font: 'var(--md-sys-typescale-body-medium)', color: 'var(--md-sys-color-on-surface-variant)' }}>
+                      Thinking...
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
