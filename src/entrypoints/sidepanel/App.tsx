@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import { coerceExtraSections, type SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent } from '@/lib/extractors/types';
 import type { ChatMessage, VisionSupport } from '@/lib/llm/types';
@@ -38,6 +38,7 @@ import type { SummarizeVariant } from '@/components/ChatInputBar';
 import { useTheme } from '@/hooks/useTheme';
 import { buildSummarizationSystemPrompt, replacePlaceholders, buildPlaceholders, extractSummaryFields } from '@/lib/summarizer/summarizer';
 import { getSummarizationPrompt, COMMENT_LIMITS } from '@/lib/summarizer/prompts';
+import { coerceCommentsHighlights, KNOWN_FIELDS, collectUnknownAsExtra } from '@/lib/summarizer/normalize';
 
 interface TabState {
   content: ExtractedContent | null;
@@ -1112,6 +1113,16 @@ export function App() {
     return 'amber';
   })();
 
+  // Memoized streaming preview computations (avoid re-parsing on every render)
+  const streamingSummary = useMemo(
+    () => (streamingText && !mermaidFixStatus) ? tryParseStreamingSummary(streamingText) : null,
+    [streamingText, mermaidFixStatus],
+  );
+  const chatDisplayText = useMemo(
+    () => chatStreamingText ? tryExtractStreamingChatText(chatStreamingText) : null,
+    [chatStreamingText],
+  );
+
   const handleSummarize = useCallback(async (userInstructions?: string) => {
     const originTabId = activeTabIdRef.current;
     setLoading(true);
@@ -1756,7 +1767,7 @@ export function App() {
                     return fresh;
                   });
                 }
-              }).catch(() => {});
+              }).catch(console.error);
             }
             return !v;
           });
@@ -1875,17 +1886,14 @@ export function App() {
                   ? `Processing chunk ${streamingProgress.chunk} of ${streamingProgress.total}...`
                   : 'Generating summary...'
             } />
-            {streamingText && !mermaidFixStatus && (() => {
-              const streamingSummary = tryParseStreamingSummary(streamingText);
-              return streamingSummary ? (
-                <div style={{ marginTop: '8px', opacity: 0.6 }}>
-                  <SummaryContent
-                    summary={streamingSummary}
-                    content={content}
-                  />
-                </div>
-              ) : null;
-            })()}
+            {streamingSummary && (
+              <div style={{ marginTop: '8px', opacity: 0.6 }}>
+                <SummaryContent
+                  summary={streamingSummary}
+                  content={content}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -1971,27 +1979,22 @@ export function App() {
                 marginBottom: '8px',
                 maxWidth: '90%',
               }}>
-                {(() => {
-                  const chatDisplayText = chatStreamingText
-                    ? tryExtractStreamingChatText(chatStreamingText)
-                    : null;
-                  return chatDisplayText ? (
-                    <div style={{
-                      font: 'var(--md-sys-typescale-body-medium)',
-                      color: 'var(--md-sys-color-on-surface)',
-                      lineHeight: 1.5,
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      opacity: 0.85,
-                    }}>
-                      {chatDisplayText}
-                    </div>
-                  ) : (
-                    <div style={{ font: 'var(--md-sys-typescale-body-medium)', color: 'var(--md-sys-color-on-surface-variant)' }}>
-                      Thinking...
-                    </div>
-                  );
-                })()}
+                {chatDisplayText ? (
+                  <div style={{
+                    font: 'var(--md-sys-typescale-body-medium)',
+                    color: 'var(--md-sys-color-on-surface)',
+                    lineHeight: 1.5,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    opacity: 0.85,
+                  }}>
+                    {chatDisplayText}
+                  </div>
+                ) : (
+                  <div style={{ font: 'var(--md-sys-typescale-body-medium)', color: 'var(--md-sys-color-on-surface-variant)' }}>
+                    Thinking...
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2107,66 +2110,6 @@ export function App() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
-}
-
-/** Coerce commentsHighlights from LLM — accepts "commentsHighlights" or "comments" alias,
- *  and converts a single string into a one-element array. */
-function coerceCommentsHighlights(parsed: Record<string, unknown>): string[] | undefined {
-  const raw = parsed.commentsHighlights ?? parsed.comments;
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === 'string' && raw.trim()) return [raw];
-  return undefined;
-}
-
-/** Known SummaryDocument fields — anything else with string/array content is an extra section. */
-const KNOWN_FIELDS = new Set([
-  'tldr', 'keyTakeaways', 'summary', 'notableQuotes', 'conclusion',
-  'prosAndCons', 'factCheck', 'commentsHighlights', 'comments',
-  'extraSections', 'relatedTopics', 'tags',
-  'sourceLanguage', 'summaryLanguage', 'translatedTitle',
-  'inferredTitle', 'inferredAuthor', 'inferredPublishDate',
-  'llmProvider', 'llmModel',
-  'text', 'noContent', 'noSummary', 'requestedImages', 'message', 'reason', 'updates',
-]);
-
-/** Collect unknown fields from a parsed LLM object into extraSections. */
-function collectUnknownAsExtra(parsed: Record<string, unknown>, existing?: Record<string, string>): Record<string, string> | undefined {
-  const extra: Record<string, string> = existing ? { ...existing } : {};
-  for (const [key, value] of Object.entries(parsed)) {
-    if (KNOWN_FIELDS.has(key)) continue;
-    let content: string | undefined;
-    if (typeof value === 'string' && value.trim()) {
-      content = value;
-    } else if (Array.isArray(value) && value.length > 0) {
-      content = value.map(item => {
-        if (typeof item === 'string') return `- ${item}`;
-        if (item && typeof item === 'object') {
-          // Convert object entries to readable text, e.g. {author:"X", comment:"Y"} → "**X**: Y"
-          const obj = item as Record<string, unknown>;
-          const parts = Object.entries(obj)
-            .filter(([, v]) => v != null && v !== '')
-            .map(([k, v]) => `${k}: ${String(v)}`);
-          return `- ${parts.join(' | ')}`;
-        }
-        return `- ${String(item)}`;
-      }).join('\n');
-    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
-      // Plain object — format entries as key: value lines
-      const obj = value as Record<string, unknown>;
-      const lines = Object.entries(obj)
-        .filter(([, v]) => v != null && v !== '')
-        .map(([k, v]) => `**${k}**: ${String(v)}`);
-      if (lines.length > 0) content = lines.join('\n');
-    }
-    if (content) {
-      const label = key
-        .replace(/([a-z])([A-Z])/g, '$1 $2')
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
-      extra[label] = content;
-    }
-  }
-  return Object.keys(extra).length > 0 ? extra : undefined;
 }
 
 function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
@@ -2452,6 +2395,9 @@ function ContentIndicators({ content, settings }: { content: ExtractedContent; s
     willAnalyze = !!((settings.enableImageAnalysis ?? true) && (vision === 'base64' || vision === 'url'));
   }
 
+  const commentLimit = COMMENT_LIMITS[settings.summaryDetailLevel] ?? 200;
+  const commentsClipped = commentCount > commentLimit;
+
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
       {isYouTube ? (
@@ -2463,19 +2409,15 @@ function ContentIndicators({ content, settings }: { content: ExtractedContent; s
       ) : (
         <IndicatorChip icon={'\u2713'} label={`${content.wordCount.toLocaleString()} words`} variant="success" />
       )}
-      {commentCount > 0 && (() => {
-        const limit = COMMENT_LIMITS[settings.summaryDetailLevel] ?? 200;
-        const clipped = commentCount > limit;
-        return (
-          <IndicatorChip
-            icon={String.fromCodePoint(0x1F4AC)}
-            label={clipped
-              ? `${commentCount} comments \u00B7 ${limit} sent \u00B7 ${commentWords.toLocaleString()} words`
-              : `${commentCount} comments \u00B7 ${commentWords.toLocaleString()} words`}
-            variant={clipped ? 'warning' : 'success'}
-          />
-        );
-      })()}
+      {commentCount > 0 && (
+        <IndicatorChip
+          icon={String.fromCodePoint(0x1F4AC)}
+          label={commentsClipped
+            ? `${commentCount} comments \u00B7 ${commentLimit} sent \u00B7 ${commentWords.toLocaleString()} words`
+            : `${commentCount} comments \u00B7 ${commentWords.toLocaleString()} words`}
+          variant={commentsClipped ? 'warning' : 'success'}
+        />
+      )}
       {imageCount > 0 && (
         <IndicatorChip
           icon={String.fromCodePoint(0x1F5BC)}
