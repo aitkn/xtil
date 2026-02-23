@@ -4,6 +4,15 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.0.4
+
+**Streaming responses & real-time preview**
+
+- Real-time streaming — see summaries and chat responses as they're generated, with live preview
+- Streaming progress indicator for multi-chunk summarization
+- Chat can now add and remove custom sections reliably
+- Fixed YouTube transcript not loading on first visit
+
 ## 1.0.3
 
 **Gmail support, pricing in model selector & UX improvements**
