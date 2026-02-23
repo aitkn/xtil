@@ -62,7 +62,10 @@ export interface SummarizeMessage {
 
 export interface SummaryChunkMessage {
   type: 'SUMMARY_CHUNK';
-  chunk: string;
+  chunk: string;           // accumulated text so far
+  chunkIndex?: number;     // which content chunk (for rolling context)
+  totalChunks?: number;    // total content chunks
+  tabId?: number;          // target tab ID to prevent cross-tab leakage
 }
 
 export interface SummaryResultMessage {
@@ -87,6 +90,7 @@ export interface ChatMessageRequest {
   messages: ChatMessage[];
   summary: SummaryDocument;
   content: ExtractedContent;
+  tabId?: number;
 }
 
 export interface ChatResponseMessage {
@@ -107,6 +111,7 @@ export interface ChatResponseMessage {
 export interface ChatChunkMessage {
   type: 'CHAT_CHUNK';
   chunk: string;
+  tabId?: number;          // target tab ID to prevent cross-tab leakage
 }
 
 export interface ExportMessage {

@@ -10,6 +10,7 @@ import {
   getSummarizationPrompt,
   getRollingContextPrompt,
   getFinalChunkPrompt,
+  formatCommentsBlock,
 } from './prompts';
 
 /** Thrown when the LLM returns a text response instead of structured JSON (e.g. refusal). Not retryable. */
@@ -59,6 +60,10 @@ export interface SummarizeOptions {
   onRequestBody?: (body: string) => void;
   /** Called with the full HTTP response body (JSON) from the LLM API. */
   onResponseBody?: (body: string) => void;
+  /** Called with accumulated streaming text as it arrives from the LLM. */
+  onStreamChunk?: (accumulated: string) => void;
+  /** Called when rolling context starts processing a new content chunk. */
+  onChunkProgress?: (chunkIndex: number, totalChunks: number) => void;
 }
 
 /** Build the full system prompt for summarization (includes skill catalog when appropriate). */
@@ -81,12 +86,53 @@ export function buildSummarizationSystemPrompt(
   return systemPrompt;
 }
 
+/**
+ * Stream an LLM response via provider.streamChat(), accumulating text and
+ * calling onStreamChunk periodically (~100ms throttle). Returns the full
+ * accumulated response string (same contract as provider.sendChat()).
+ */
+async function streamChatCollect(
+  provider: LLMProvider,
+  messages: ChatMessage[],
+  chatOpts: ChatOptions,
+  onStreamChunk?: (accumulated: string) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  let accumulated = '';
+  let lastPush = 0;
+  const THROTTLE_MS = 100;
+
+  const generator = provider.streamChat(messages, chatOpts);
+  try {
+    for await (const chunk of generator) {
+      if (signal?.aborted) {
+        generator.return();
+        throw new Error('Summarization cancelled');
+      }
+      accumulated += chunk;
+      const now = Date.now();
+      if (onStreamChunk && now - lastPush >= THROTTLE_MS) {
+        lastPush = now;
+        onStreamChunk(accumulated);
+      }
+    }
+  } catch (err) {
+    // Re-throw but still flush the final chunk if we have content
+    if (accumulated && onStreamChunk) onStreamChunk(accumulated);
+    throw err;
+  }
+
+  // Final flush
+  if (onStreamChunk) onStreamChunk(accumulated);
+  return accumulated;
+}
+
 export async function summarize(
   provider: LLMProvider,
   content: ExtractedContent,
   options: SummarizeOptions,
 ): Promise<SummaryDocument> {
-  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, providerId, userInstructions, fetchedImages, imageUrlList, signal, onRawResponse, onSystemPrompt, onConversation, onRollingSummary, onRequestBody, onResponseBody } = options;
+  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, providerId, userInstructions, fetchedImages, imageUrlList, signal, onRawResponse, onSystemPrompt, onConversation, onRollingSummary, onRequestBody, onResponseBody, onStreamChunk, onChunkProgress } = options;
   const imageContents: ImageContent[] | undefined = fetchedImages?.map((fi) => ({
     base64: fi.base64,
     mimeType: fi.mimeType,
@@ -111,9 +157,9 @@ export async function summarize(
     if (signal?.aborted) throw new Error('Summarization cancelled');
     try {
       if (chunks.length === 1) {
-        return await oneShotSummarize(provider, content, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRequestBody, onResponseBody);
+        return await oneShotSummarize(provider, content, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRequestBody, onResponseBody, onStreamChunk);
       } else {
-        return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRollingSummary, onRequestBody, onResponseBody);
+        return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRollingSummary, onRequestBody, onResponseBody, onStreamChunk, onChunkProgress);
       }
     } catch (err) {
       // Don't retry cancellation, text responses, no-content, or image requests
@@ -144,6 +190,7 @@ async function oneShotSummarize(
   onConversation?: (messages: ChatMessage[]) => void,
   onRequestBody?: (body: string) => void,
   onResponseBody?: (body: string) => void,
+  onStreamChunk?: (accumulated: string) => void,
 ): Promise<SummaryDocument> {
   let userPrompt = getSummarizationPrompt(content, detailLevel);
   if (images?.length && imageUrlList?.length) {
@@ -159,7 +206,7 @@ async function oneShotSummarize(
   const chatOpts: ChatOptions = providerId && SCHEMA_ENFORCED_PROVIDERS.has(providerId)
     ? { maxTokens: 8192, jsonSchema: RESPONSE_SCHEMA, signal, onRequestBody, onResponseBody }
     : { maxTokens: 8192, jsonMode: true, signal, onRequestBody, onResponseBody };
-  const response = await provider.sendChat(messages, chatOpts);
+  const response = await streamChatCollect(provider, messages, chatOpts, onStreamChunk, signal);
   onRawResponse?.(response);
   return replacePlaceholders(parseSummaryResponse(response, !!images?.length), buildPlaceholders(content, imageUrlList));
 }
@@ -180,11 +227,14 @@ async function rollingContextSummarize(
   onRollingSummary?: (summary: string) => void,
   onRequestBody?: (body: string) => void,
   onResponseBody?: (body: string) => void,
+  onStreamChunk?: (accumulated: string) => void,
+  onChunkProgress?: (chunkIndex: number, totalChunks: number) => void,
 ): Promise<SummaryDocument> {
   let rollingSummary = '';
 
   for (let i = 0; i < chunks.length; i++) {
     if (signal?.aborted) throw new Error('Summarization cancelled');
+    onChunkProgress?.(i, chunks.length);
     const isLast = i === chunks.length - 1;
 
     // Build a modified content object with just this chunk
@@ -210,11 +260,8 @@ async function rollingContextSummarize(
       userPrompt += `**Content (part ${i + 1} of ${chunks.length}):**\n\n${chunks[i]}`;
 
       if (isLast && content.comments && content.comments.length > 0) {
-        userPrompt += `\n\n**User Comments:**\n\n`;
-        for (const comment of content.comments.slice(0, 20)) {
-          const author = comment.author ? `**${comment.author}**` : 'Anonymous';
-          userPrompt += `- ${author}: ${comment.text}\n`;
-        }
+        userPrompt += `\n\n**User Comments (${content.comments.length}):**\n\n`;
+        userPrompt += formatCommentsBlock(content.comments, detailLevel);
       }
     }
 
@@ -230,7 +277,7 @@ async function rollingContextSummarize(
         ? { maxTokens: 8192, jsonSchema: RESPONSE_SCHEMA, signal, onRequestBody, onResponseBody }
         : { maxTokens: 8192, jsonMode: true, signal, onRequestBody, onResponseBody })
       : { maxTokens: 8192, signal, onRequestBody, onResponseBody };
-    const response = await provider.sendChat(messages, chatOpts);
+    const response = await streamChatCollect(provider, messages, chatOpts, onStreamChunk, signal);
     onRawResponse?.(response);
 
     if (isLast) {
@@ -326,8 +373,12 @@ function parseSummaryResponse(response: string, imageAnalysisEnabled = false): S
   throw new LLMTextResponse(cleaned);
 }
 
-function extractSummaryFields(parsed: Record<string, unknown>): SummaryDocument {
+// Shared normalization helpers — see normalize.ts
+import { coerceCommentsHighlights, collectUnknownAsExtra } from './normalize';
+
+export function extractSummaryFields(parsed: Record<string, unknown>): SummaryDocument {
   const pc = parsed.prosAndCons as Record<string, unknown> | undefined;
+  const explicitExtra = coerceExtraSections(parsed.extraSections);
   return {
     tldr: (parsed.tldr as string) || '',
     keyTakeaways: Array.isArray(parsed.keyTakeaways) ? parsed.keyTakeaways : [],
@@ -336,8 +387,8 @@ function extractSummaryFields(parsed: Record<string, unknown>): SummaryDocument 
     conclusion: (parsed.conclusion as string) || '',
     prosAndCons: pc ? { pros: Array.isArray(pc.pros) ? pc.pros : [], cons: Array.isArray(pc.cons) ? pc.cons : [] } : undefined,
     factCheck: typeof parsed.factCheck === 'string' ? parsed.factCheck : undefined,
-    commentsHighlights: Array.isArray(parsed.commentsHighlights) ? parsed.commentsHighlights : undefined,
-    extraSections: coerceExtraSections(parsed.extraSections),
+    commentsHighlights: coerceCommentsHighlights(parsed),
+    extraSections: collectUnknownAsExtra(parsed, explicitExtra ?? undefined),
     relatedTopics: Array.isArray(parsed.relatedTopics) ? parsed.relatedTopics : [],
     tags: Array.isArray(parsed.tags) ? parsed.tags : [],
     sourceLanguage: (parsed.sourceLanguage as string) || undefined,

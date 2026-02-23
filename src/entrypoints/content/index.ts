@@ -328,24 +328,29 @@ async function fetchYouTubeTranscript(
   // - Page context provides YouTube cookies (avoids 403 from service worker)
   // - Returns fresh caption URLs (unlike ytInitialPlayerResponse which has expired tokens)
 
-  let data = await fetchPlayerData(videoId, hintLang);
-  let captionsRenderer = data?.captions?.playerCaptionsTracklistRenderer;
-  let tracks: CaptionTrack[] = captionsRenderer?.captionTracks;
+  // Retry with progressive delays — during SPA navigation or cold start the
+  // innertube API may throw (network not ready) or return empty caption tracks
+  // before YouTube's backend has fully resolved the video.
+  let data: Awaited<ReturnType<typeof fetchPlayerData>>;
+  let captionsRenderer: { captionTracks?: CaptionTrack[]; audioTracks?: { defaultCaptionTrackIndex?: number }[] } | undefined;
+  let tracks: CaptionTrack[] | undefined;
+  let lastError: unknown;
 
-  // Retry with progressive delays — during SPA navigation the API sometimes
-  // returns empty caption tracks before YouTube's backend has fully resolved
-  // the video.  Three retries (1s, 2s, 3s) give up to ~6s total.
-  if (!tracks || tracks.length === 0) {
-    for (const delay of [1000, 2000, 3000]) {
-      await new Promise(r => setTimeout(r, delay));
+  for (const delay of [0, 1000, 2000, 3000]) {
+    if (delay > 0) await new Promise(r => setTimeout(r, delay));
+    try {
       data = await fetchPlayerData(videoId, hintLang);
       captionsRenderer = data?.captions?.playerCaptionsTracklistRenderer;
       tracks = captionsRenderer?.captionTracks;
       if (tracks && tracks.length > 0) break;
+    } catch (err) {
+      lastError = err;
     }
   }
 
-  if (!tracks || tracks.length === 0) throw new Error('No caption tracks available');
+  if (!tracks || tracks.length === 0) {
+    throw lastError ?? new Error('No caption tracks available');
+  }
 
   // Extract original language and YouTube's default track index
   const originalLang: string | undefined = data?.videoDetails?.defaultAudioLanguage;

@@ -34,6 +34,12 @@ async function getCachedImages(): Promise<{ images: ImageContent[]; urls: { url:
 // Per-tab AbortController registry for in-flight summarizations
 const activeSummarizations = new Map<number, AbortController>();
 
+/** Broadcast a fire-and-forget message to all extension views (sidepanel, popup). */
+function broadcastMessage(msg: Record<string, unknown>): void {
+  const chromeRT = (globalThis as unknown as { chrome: typeof chrome }).chrome.runtime;
+  try { chromeRT.sendMessage(msg, () => { void chromeRT.lastError; }); } catch { /* no listeners */ }
+}
+
 // Per-tab iframe comment storage (Disqus, Giscus, Utterances)
 const iframeComments = new Map<number, ExtractedComment[]>();
 
@@ -185,7 +191,7 @@ async function handleMessage(message: Message): Promise<Message> {
       return { type: 'CANCEL_SUMMARIZE', success: true } as Message;
     }
     case 'CHAT_MESSAGE':
-      return handleChatMessage(message.messages, message.summary, message.content);
+      return handleChatMessage(message.messages, message.summary, message.content, message.tabId);
     case 'EXPORT':
       return handleExport(message.adapterId, message.summary, message.content, message.replacePageId);
     case 'CHECK_NOTION_DUPLICATE':
@@ -592,6 +598,22 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
     const onRequestBody = (b: string) => { lastRequestBody = b; };
     const onResponseBody = (b: string) => { lastResponseBody = b; };
 
+    // Streaming: broadcast SUMMARY_CHUNK messages as LLM text arrives
+    let currentChunkIndex: number | undefined;
+    let currentTotalChunks: number | undefined;
+    let lastStreamPush = 0;
+    const STREAM_THROTTLE_MS = 150;
+    const onStreamChunk = (accumulated: string) => {
+      const now = Date.now();
+      if (now - lastStreamPush < STREAM_THROTTLE_MS) return;
+      lastStreamPush = now;
+      broadcastMessage({ type: 'SUMMARY_CHUNK', chunk: accumulated, chunkIndex: currentChunkIndex, totalChunks: currentTotalChunks, tabId });
+    };
+    const onChunkProgress = (chunkIndex: number, totalChunks: number) => {
+      currentChunkIndex = chunkIndex;
+      currentTotalChunks = totalChunks;
+    };
+
     try {
       const result = await summarize(provider, content, {
         detailLevel: settings.summaryDetailLevel,
@@ -609,6 +631,8 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         onRollingSummary,
         onRequestBody,
         onResponseBody,
+        onStreamChunk,
+        onChunkProgress,
       });
       result.llmProvider = providerName;
       result.llmModel = llmConfig.model;
@@ -647,6 +671,8 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
           onConversation,
           onRequestBody,
           onResponseBody,
+          onStreamChunk,
+          onChunkProgress,
         });
         result.llmProvider = providerName;
         result.llmModel = llmConfig.model;
@@ -675,6 +701,7 @@ async function handleChatMessage(
   messages: ChatMessage[],
   summary: SummaryDocument,
   content: ExtractedContent,
+  tabId?: number,
 ): Promise<ChatResponseMessage> {
   try {
     const settings = await getSettings();
@@ -739,7 +766,9 @@ async function handleChatMessage(
 - "text": your conversational response. Markdown supported. Use "" if only updating.
 - "updates": partial changes — only include fields you want to change. "__DELETE__" removes a field. extraSections is deep-merged by key.
 - "summary": full summary replacement (all fields). Use when regenerating the entire summary.
-- Use "updates" or "summary", not both. Use neither if just answering a question.`
+- Use "updates" or "summary", not both. Use neither if just answering a question.
+- To add a new section, use "extraSections" with a plain-text title key and markdown string value, e.g. {"updates":{"extraSections":{"Comment Highlights":"- Great video!\\n- Love this series"}}}. Do NOT invent new top-level camelCase field names — always use "extraSections" for custom sections.
+- To delete a specific extra section: {"updates":{"extraSections":{"Section Title":"__DELETE__"}}}. To delete ALL extra sections: {"updates":{"extraSections":"__DELETE__"}}. To delete any other field: {"updates":{"fieldName":"__DELETE__"}}.`
       + (schemaEnforced ? '' : '\n- IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.');
 
     const rulesSystem = `${summarizationPrompt}
@@ -791,7 +820,23 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
     const chatOpts: ChatOptions = schemaEnforced
       ? { jsonSchema: RESPONSE_SCHEMA, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } }
       : { jsonMode: true, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } };
-    const response = await provider.sendChat(chatMessages, chatOpts);
+
+    // Stream the chat response so the user sees typing in real-time
+    let accumulated = '';
+    let lastChatPush = 0;
+    const CHAT_THROTTLE_MS = 150;
+    const generator = provider.streamChat(chatMessages, chatOpts);
+    for await (const chunk of generator) {
+      accumulated += chunk;
+      const now = Date.now();
+      if (now - lastChatPush >= CHAT_THROTTLE_MS) {
+        lastChatPush = now;
+        broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });
+      }
+    }
+    // Final flush
+    broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });
+    const response = accumulated;
     rawResponses.push(response);
 
     const conversationLog = [

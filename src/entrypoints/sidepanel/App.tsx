@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import { coerceExtraSections, type SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent } from '@/lib/extractors/types';
 import type { ChatMessage, VisionSupport } from '@/lib/llm/types';
 import type { Settings } from '@/lib/storage/types';
 import { getActiveProviderConfig } from '@/lib/storage/types';
 import { DEFAULT_SETTINGS } from '@/lib/storage/types';
-import { parseJsonSafe, findMatchingBrace } from '@/lib/json-repair';
+import { parseJsonSafe, findMatchingBrace, closeTruncatedJson } from '@/lib/json-repair';
 import { sendMessage } from '@/lib/messaging/bridge';
 import { savePersistedTabState, getPersistedTabState, deletePersistedTabState, type DisplayMessage, type PersistedTabState } from '@/lib/storage/tab-state';
 import type {
@@ -36,8 +36,9 @@ import { SettingsDrawer } from '@/components/SettingsDrawer';
 import { ChatInputBar } from '@/components/ChatInputBar';
 import type { SummarizeVariant } from '@/components/ChatInputBar';
 import { useTheme } from '@/hooks/useTheme';
-import { buildSummarizationSystemPrompt, replacePlaceholders, buildPlaceholders } from '@/lib/summarizer/summarizer';
-import { getSummarizationPrompt } from '@/lib/summarizer/prompts';
+import { buildSummarizationSystemPrompt, replacePlaceholders, buildPlaceholders, extractSummaryFields } from '@/lib/summarizer/summarizer';
+import { getSummarizationPrompt, COMMENT_LIMITS } from '@/lib/summarizer/prompts';
+import { coerceCommentsHighlights, KNOWN_FIELDS, collectUnknownAsExtra } from '@/lib/summarizer/normalize';
 
 interface TabState {
   content: ExtractedContent | null;
@@ -57,6 +58,60 @@ interface TabState {
   scrollTop: number;
 }
 
+/** Strip markdown code fences (```json ... ```) that LLMs often wrap around JSON responses. */
+function stripCodeFence(raw: string): string {
+  let s = raw.trim();
+  if (s.startsWith('```')) {
+    s = s.replace(/^```(?:json)?\s*\n?/, '');
+    // Only strip closing fence if present (during streaming it won't be)
+    s = s.replace(/\n?```\s*$/, '');
+  }
+  return s;
+}
+
+/** Try to parse streaming JSON into a partial SummaryDocument for live preview. */
+function tryParseStreamingSummary(raw: string): SummaryDocument | null {
+  try {
+    const stripped = stripCodeFence(raw);
+    const closed = closeTruncatedJson(stripped);
+    const parsed = parseJsonSafe(closed);
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    const obj = parsed as Record<string, unknown>;
+
+    // Envelope format: { summary: { tldr, ... }, ... }
+    const summaryObj = obj.summary;
+    if (summaryObj && typeof summaryObj === 'object' && !Array.isArray(summaryObj)) {
+      const fields = extractSummaryFields(summaryObj as Record<string, unknown>);
+      // Only return if there's at least some content
+      if (fields.tldr || fields.summary || fields.keyTakeaways.length > 0) return fields;
+    }
+
+    // Flat format: { tldr, keyTakeaways, ... }
+    if (typeof obj.tldr === 'string') {
+      const fields = extractSummaryFields(obj);
+      if (fields.tldr || fields.summary || fields.keyTakeaways.length > 0) return fields;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Try to extract the conversational `text` field from streaming chat JSON. */
+function tryExtractStreamingChatText(raw: string): string | null {
+  try {
+    const stripped = stripCodeFence(raw);
+    const closed = closeTruncatedJson(stripped);
+    const parsed = parseJsonSafe(closed);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const text = (parsed as Record<string, unknown>).text;
+    return typeof text === 'string' && text.length > 0 ? text : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Count total mermaid code blocks across all summary text fields. */
 function countMermaidBlocks(summary: SummaryDocument): number {
@@ -523,6 +578,11 @@ export function App() {
   // Step-by-step mermaid fix state (when debug panel is open)
   const [pendingFix, setPendingFix] = useState<PendingMermaidFix | null>(null);
 
+  // Streaming preview state (shows LLM output as it arrives)
+  const [streamingText, setStreamingText] = useState('');
+  const [streamingProgress, setStreamingProgress] = useState<{ chunk: number; total: number } | null>(null);
+  const [chatStreamingText, setChatStreamingText] = useState('');
+
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const skipScrollRef = useRef(false);
@@ -784,6 +844,10 @@ export function App() {
     setChatMessages([]);
     setRawResponses([]);
     setActualSystemPrompt('');
+    setConversationLog([]);
+    setRollingSummary('');
+    setLastRequestBody('');
+    setLastResponseBody('');
     setNotionUrl(null);
     setPendingResummarize(false);
     extractContent();
@@ -914,7 +978,20 @@ export function App() {
     };
 
     const onMessage = (message: unknown, sender: chrome.runtime.MessageSender) => {
-      const msg = message as { type?: string };
+      const msg = message as { type?: string; chunk?: string; chunkIndex?: number; totalChunks?: number; tabId?: number };
+      if (msg?.type === 'SUMMARY_CHUNK') {
+        if (msg.tabId != null && msg.tabId !== activeTabIdRef.current) return;
+        setStreamingText(msg.chunk || '');
+        if (msg.totalChunks != null && msg.totalChunks > 1) {
+          setStreamingProgress({ chunk: (msg.chunkIndex ?? 0) + 1, total: msg.totalChunks });
+        }
+        return;
+      }
+      if (msg?.type === 'CHAT_CHUNK') {
+        if (msg.tabId != null && msg.tabId !== activeTabIdRef.current) return;
+        setChatStreamingText(msg.chunk || '');
+        return;
+      }
       if (msg?.type !== 'CONTENT_CHANGED') return;
       if (sender.tab?.id != null && sender.tab.id !== activeTabIdRef.current) return;
       if (spaTimer) clearTimeout(spaTimer);
@@ -1038,9 +1115,21 @@ export function App() {
     return 'amber';
   })();
 
+  // Memoized streaming preview computations (avoid re-parsing on every render)
+  const streamingSummary = useMemo(
+    () => (streamingText && !mermaidFixStatus) ? tryParseStreamingSummary(streamingText) : null,
+    [streamingText, mermaidFixStatus],
+  );
+  const chatDisplayText = useMemo(
+    () => chatStreamingText ? tryExtractStreamingChatText(chatStreamingText) : null,
+    [chatStreamingText],
+  );
+
   const handleSummarize = useCallback(async (userInstructions?: string) => {
     const originTabId = activeTabIdRef.current;
     setLoading(true);
+    setStreamingText('');
+    setStreamingProgress(null);
     setNotionUrl(null);
     setRawResponses([]);
     setActualSystemPrompt('');
@@ -1060,7 +1149,7 @@ export function App() {
         }
         extractedContent = extractResponse.data;
         if (activeTabIdRef.current === originTabId) {
-          setContent(extractedContent);
+          setContent(extractResponse.data);
         }
       }
 
@@ -1161,6 +1250,8 @@ export function App() {
     } finally {
       if (activeTabIdRef.current === originTabId) {
         setLoading(false);
+        setStreamingText('');
+        setStreamingProgress(null);
       } else if (originTabId != null) {
         const saved = tabStatesRef.current.get(originTabId);
         if (saved) saved.loading = false;
@@ -1383,6 +1474,7 @@ export function App() {
       didUpdateSummary: false, // will be patched after we know
     }]);
     setChatLoading(true);
+    setChatStreamingText('');
 
     try {
       const allMessages: ChatMessage[] = chatMessages.map((m) => ({
@@ -1401,6 +1493,7 @@ export function App() {
         messages: allMessages,
         summary: summary || emptySummary,
         content,
+        tabId: originTabId ?? undefined,
       }) as ChatResponseMessage;
 
       if (!response.success || !response.message) {
@@ -1432,7 +1525,17 @@ export function App() {
       }
 
       // Never show raw JSON — use chat text if available, otherwise a status message
-      let displayText = chatText || (updatedSummary ? 'Summary updated.' : 'Failed to update summary — please try again.');
+      let displayText: string;
+      if (chatText) {
+        displayText = chatText;
+      } else if (updates) {
+        const changedFields = Object.keys(updates);
+        displayText = changedFields.length > 0
+          ? `Updated: ${changedFields.join(', ')}.`
+          : 'Failed to update summary — please try again.';
+      } else {
+        displayText = 'Failed to update summary — please try again.';
+      }
 
       // Auto-fix broken mermaid diagrams in the updated summary
       const fixResult = updatedSummary
@@ -1496,6 +1599,7 @@ export function App() {
     } finally {
       if (activeTabIdRef.current === originTabId) {
         setChatLoading(false);
+        setChatStreamingText('');
       } else if (originTabId != null) {
         const saved = tabStatesRef.current.get(originTabId);
         if (saved) saved.chatLoading = false;
@@ -1647,7 +1751,28 @@ export function App() {
         detailLevel={settings.summaryDetailLevel}
         onDetailLevelCycle={handleDetailLevelCycle}
         debugOpen={debugOpen}
-        onToggleDebug={() => setDebugOpen((v) => !v)}
+        onToggleDebug={() => {
+          if (!debugOpen) {
+            // Re-extract content when opening the debug panel so it reflects
+            // the latest DOM state (async-loaded content, lazy images, etc.)
+            // Preserve existing comments from polling (which includes iframe
+            // comments that EXTRACT_CONTENT alone can't reach).
+            sendMessage({ type: 'EXTRACT_CONTENT' }).then((resp) => {
+              const r = resp as ExtractResultMessage;
+              if (r.success && r.data) {
+                setContent(prev => {
+                  const fresh = r.data!;
+                  // Keep the richer comment set — polling accumulates iframe comments
+                  if (prev?.comments?.length && (!fresh.comments?.length || prev.comments.length > fresh.comments.length)) {
+                    fresh.comments = prev.comments;
+                  }
+                  return fresh;
+                });
+              }
+            }).catch(console.error);
+          }
+          setDebugOpen(!debugOpen);
+        }}
         onPrint={summary ? () => printSummary(scrollAreaRef.current) : undefined}
       />
 
@@ -1752,10 +1877,24 @@ export function App() {
           </div>
         )}
 
-        {/* Loading summary spinner */}
+        {/* Loading summary spinner + streaming preview */}
         {loading && (
           <div style={{ padding: '0 16px 16px' }}>
-            <Spinner label={mermaidFixStatus ? `Fixing diagram (attempt ${mermaidFixStatus.attempt}/${mermaidFixStatus.total})...` : 'Generating summary...'} />
+            <Spinner label={
+              mermaidFixStatus
+                ? `Fixing diagram (attempt ${mermaidFixStatus.attempt}/${mermaidFixStatus.total})...`
+                : streamingProgress
+                  ? `Processing chunk ${streamingProgress.chunk} of ${streamingProgress.total}...`
+                  : 'Generating summary...'
+            } />
+            {streamingSummary && (
+              <div style={{ marginTop: '8px', opacity: 0.6 }}>
+                <SummaryContent
+                  summary={streamingSummary}
+                  content={content}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -1834,8 +1973,29 @@ export function App() {
               />
             ))}
             {chatLoading && (
-              <div style={{ padding: '8px 12px', font: 'var(--md-sys-typescale-body-medium)', color: 'var(--md-sys-color-on-surface-variant)' }}>
-                Thinking...
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: 'var(--md-sys-shape-corner-medium)',
+                backgroundColor: 'var(--md-sys-color-surface-container-high)',
+                marginBottom: '8px',
+                maxWidth: '90%',
+              }}>
+                {chatDisplayText ? (
+                  <div style={{
+                    font: 'var(--md-sys-typescale-body-medium)',
+                    color: 'var(--md-sys-color-on-surface)',
+                    lineHeight: 1.5,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    opacity: 0.85,
+                  }}>
+                    {chatDisplayText}
+                  </div>
+                ) : (
+                  <div style={{ font: 'var(--md-sys-typescale-body-medium)', color: 'var(--md-sys-color-on-surface-variant)' }}>
+                    Thinking...
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1955,6 +2115,7 @@ export function App() {
 
 function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
   const pc = parsed.prosAndCons as { pros?: unknown; cons?: unknown } | undefined;
+  const explicitExtra = coerceExtraSections(parsed.extraSections);
   return {
     tldr: (parsed.tldr as string) || '',
     keyTakeaways: Array.isArray(parsed.keyTakeaways) ? parsed.keyTakeaways : [],
@@ -1962,8 +2123,8 @@ function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
     notableQuotes: Array.isArray(parsed.notableQuotes) ? parsed.notableQuotes : [],
     conclusion: (parsed.conclusion as string) || '',
     prosAndCons: pc ? { pros: Array.isArray(pc.pros) ? pc.pros : [], cons: Array.isArray(pc.cons) ? pc.cons : [] } : undefined,
-    commentsHighlights: Array.isArray(parsed.commentsHighlights) ? parsed.commentsHighlights : undefined,
-    extraSections: coerceExtraSections(parsed.extraSections),
+    commentsHighlights: coerceCommentsHighlights(parsed),
+    extraSections: collectUnknownAsExtra(parsed, explicitExtra ?? undefined),
     relatedTopics: Array.isArray(parsed.relatedTopics) ? parsed.relatedTopics : [],
     tags: Array.isArray(parsed.tags) ? parsed.tags : [],
     sourceLanguage: (parsed.sourceLanguage as string) || undefined,
@@ -1975,6 +2136,28 @@ function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
 }
 
 const DELETE_SENTINEL = '__DELETE__';
+
+/**
+ * Unwrap and sanitize an "updates" object from the LLM.
+ * Handles both flat updates ({"conclusion": "..."}) and the nested pattern
+ * where the LLM wraps them in a "summary" key ({"summary": {"conclusion": "..."}}).
+ */
+function unwrapAndSanitize(raw: Record<string, unknown>): Partial<SummaryDocument> | null {
+  // Unwrap {"summary": {...fields...}} → {...fields...}
+  if (raw.summary && typeof raw.summary === 'object' && !Array.isArray(raw.summary)) {
+    const inner = raw.summary as Record<string, unknown>;
+    // Only unwrap if it looks like summary fields, not a full replacement
+    if (!inner.tldr || typeof inner.summary !== 'string') {
+      // Merge any sibling keys (e.g. updates had both "summary" and "tags")
+      const merged = { ...inner };
+      for (const [k, v] of Object.entries(raw)) {
+        if (k !== 'summary') merged[k] = v;
+      }
+      return sanitizePartialUpdate(merged);
+    }
+  }
+  return sanitizePartialUpdate(raw);
+}
 
 /** Process partial update from LLM — validate/coerce each field, strip app-managed keys. */
 function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDocument> | null {
@@ -1994,8 +2177,13 @@ function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDoc
         if (typeof value === 'string') result[key] = value;
         break;
       case 'keyTakeaways': case 'notableQuotes': case 'relatedTopics':
-      case 'tags': case 'commentsHighlights':
+      case 'tags':
         if (Array.isArray(value)) result[key] = value;
+        break;
+      case 'commentsHighlights': case 'comments':
+        // Accept array or string; normalize alias "comments" → "commentsHighlights"
+        if (Array.isArray(value)) result['commentsHighlights'] = value;
+        else if (typeof value === 'string' && value.trim()) result['commentsHighlights'] = [value];
         break;
       case 'prosAndCons': {
         const pc = value as { pros?: unknown; cons?: unknown } | undefined;
@@ -2008,11 +2196,43 @@ function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDoc
         break;
       }
       case 'extraSections': {
-        // Coerce both object and legacy array formats; strip markdown bold from keys
-        const coerced = coerceExtraSections(value);
-        if (coerced) result[key] = coerced;
+        if (value === DELETE_SENTINEL) {
+          // Delete the entire extraSections field
+          result[key] = undefined;
+          break;
+        }
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          const raw = value as Record<string, unknown>;
+          // Check if the LLM sent {"__DELETE__": true} meaning "delete all extra sections"
+          if (raw['__DELETE__'] === true || raw['__DELETE__'] === DELETE_SENTINEL) {
+            result[key] = undefined;
+            break;
+          }
+          // Coerce values, preserving __DELETE__ sentinels for individual keys
+          const coerced: Record<string, string> = {};
+          for (const [k, v] of Object.entries(raw)) {
+            const cleanKey = k.replace(/^\*\*(.+)\*\*$/, '$1').replace(/^__(.+)__$/, '$1').trim();
+            if (v === DELETE_SENTINEL) {
+              coerced[cleanKey] = DELETE_SENTINEL;
+            } else {
+              const md = typeof v === 'string' ? v : undefined;
+              if (md) coerced[cleanKey] = md;
+            }
+          }
+          if (Object.keys(coerced).length > 0) result[key] = coerced;
+        }
         break;
       }
+      default:
+        // Unknown field — collect into extraSections
+        if (!KNOWN_FIELDS.has(key)) {
+          const extras = collectUnknownAsExtra(
+            { [key]: value },
+            (result['extraSections'] as Record<string, string>) ?? undefined,
+          );
+          if (extras) result['extraSections'] = extras;
+        }
+        break;
     }
   }
   const keys = Object.keys(result);
@@ -2055,8 +2275,10 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
       cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
     }
     const parsed = parseJsonSafe(cleaned) as Record<string, unknown> | null;
-    if (parsed && typeof parsed === 'object' && 'text' in parsed) {
+    if (parsed && typeof parsed === 'object') {
       const text = typeof parsed.text === 'string' ? parsed.text : '';
+      const hasText = 'text' in parsed;
+
       // "summary" = full replacement (takes priority); "updates" = partial merge
       let updates: Partial<SummaryDocument> | null = null;
       const fullSummary = parsed.summary;
@@ -2064,7 +2286,7 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
         const s = fullSummary as Record<string, unknown>;
         if (s.tldr && s.summary) updates = normalizeSummary(s);
       } else if (parsed.updates && typeof parsed.updates === 'object') {
-        updates = sanitizePartialUpdate(parsed.updates as Record<string, unknown>);
+        updates = unwrapAndSanitize(parsed.updates as Record<string, unknown>);
       }
 
       // Fallback: model stuffed JSON into "text" instead of using updates/summary
@@ -2080,11 +2302,14 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
         }
       }
 
-      return { updates, text };
-    }
-    // Also handle a flat summary object (has tldr+summary but no text field)
-    if (parsed && typeof parsed === 'object' && (parsed as Record<string, unknown>).tldr && (parsed as Record<string, unknown>).summary) {
-      return { updates: normalizeSummary(parsed as Record<string, unknown>), text: '' };
+      if (hasText || updates) {
+        return { updates, text };
+      }
+
+      // Flat summary object (has tldr+summary but no text field)
+      if ((parsed as Record<string, unknown>).tldr && (parsed as Record<string, unknown>).summary) {
+        return { updates: normalizeSummary(parsed as Record<string, unknown>), text: '' };
+      }
     }
   }
 
@@ -2119,19 +2344,21 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
       const parsed = parseJsonSafe(raw.slice(braceIdx, braceEnd + 1)) as Record<string, unknown> | null;
       if (parsed && typeof parsed === 'object') {
         // New chat format: {"text": "...", "updates": ...}
-        if ('text' in parsed) {
+        if ('text' in parsed || 'updates' in parsed) {
           const text = typeof parsed.text === 'string' ? parsed.text : '';
           const source = parsed.updates ?? parsed.summary;
           let updates: Partial<SummaryDocument> | null = null;
           if (source && typeof source === 'object') {
             if (parsed.updates) {
-              updates = sanitizePartialUpdate(source as Record<string, unknown>);
+              updates = unwrapAndSanitize(source as Record<string, unknown>);
             } else {
               const s = source as Record<string, unknown>;
               if (s.tldr && s.summary) updates = normalizeSummary(s);
             }
           }
-          return { updates, text };
+          if ('text' in parsed || updates) {
+            return { updates, text: text || (updates ? '' : (raw.slice(0, braceIdx) + raw.slice(braceEnd + 1)).trim()) };
+          }
         }
         // Legacy format: {tldr, summary, ...}
         if (parsed.tldr && parsed.summary) {
@@ -2169,6 +2396,9 @@ function ContentIndicators({ content, settings }: { content: ExtractedContent; s
     willAnalyze = !!((settings.enableImageAnalysis ?? true) && (vision === 'base64' || vision === 'url'));
   }
 
+  const commentLimit = COMMENT_LIMITS[settings.summaryDetailLevel] ?? 200;
+  const commentsClipped = commentCount > commentLimit;
+
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
       {isYouTube ? (
@@ -2181,7 +2411,13 @@ function ContentIndicators({ content, settings }: { content: ExtractedContent; s
         <IndicatorChip icon={'\u2713'} label={`${content.wordCount.toLocaleString()} words`} variant="success" />
       )}
       {commentCount > 0 && (
-        <IndicatorChip icon={String.fromCodePoint(0x1F4AC)} label={`${commentCount} comments \u00B7 ${commentWords.toLocaleString()} words`} variant="success" />
+        <IndicatorChip
+          icon={String.fromCodePoint(0x1F4AC)}
+          label={commentsClipped
+            ? `${commentCount} comments \u00B7 ${commentLimit} sent \u00B7 ${commentWords.toLocaleString()} words`
+            : `${commentCount} comments \u00B7 ${commentWords.toLocaleString()} words`}
+          variant={commentsClipped ? 'warning' : 'success'}
+        />
       )}
       {imageCount > 0 && (
         <IndicatorChip

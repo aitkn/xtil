@@ -90,6 +90,10 @@ export class AnthropicProvider implements LLMProvider {
   async *streamChat(messages: ChatMessage[], options?: ChatOptions): AsyncGenerator<string> {
     const { system, userMessages } = splitMessages(messages);
 
+    // Note: tool_use (jsonSchema) is NOT used here — Anthropic tool_use streaming
+    // sends input_json_delta in large batches rather than incrementally, defeating
+    // the purpose of streaming. Text streaming works well; the response is parsed
+    // the same way via closeTruncatedJson + parseJsonSafe on the UI side.
     const body: Record<string, unknown> = {
       model: this.config.model,
       messages: userMessages,
@@ -99,6 +103,9 @@ export class AnthropicProvider implements LLMProvider {
     };
     if (system) body.system = system;
 
+    const bodyJson = JSON.stringify(body);
+    options?.onRequestBody?.(bodyJson);
+
     const response = await fetch(`${this.endpoint}/v1/messages`, {
       method: 'POST',
       headers: {
@@ -107,7 +114,7 @@ export class AnthropicProvider implements LLMProvider {
         'anthropic-version': API_VERSION,
         'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify(body),
+      body: bodyJson,
     });
 
     if (!response.ok) {
@@ -120,6 +127,7 @@ export class AnthropicProvider implements LLMProvider {
 
     const decoder = new TextDecoder();
     let buffer = '';
+    let accumulated = '';
 
     try {
       while (true) {
@@ -138,6 +146,7 @@ export class AnthropicProvider implements LLMProvider {
           try {
             const parsed = JSON.parse(data);
             if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              accumulated += parsed.delta.text;
               yield parsed.delta.text;
             }
           } catch {
@@ -147,6 +156,9 @@ export class AnthropicProvider implements LLMProvider {
       }
     } finally {
       reader.releaseLock();
+      if (accumulated) {
+        options?.onResponseBody?.(JSON.stringify({ content: [{ type: 'text', text: accumulated }] }));
+      }
     }
   }
 

@@ -104,13 +104,24 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
   async *streamChat(messages: ChatMessage[], options?: ChatOptions): AsyncGenerator<string> {
     const url = `${this.endpoint}/v1/chat/completions`;
-    const body = {
+    const body: Record<string, unknown> = {
       model: this.config.model,
       messages: messages.map((m) => this.formatMessage(m)),
       temperature: options?.temperature ?? 0.3,
       ...this.tokenLimitParam(options?.maxTokens ?? 4096),
       stream: true,
     };
+    if (options?.jsonSchema && this.isOpenAI) {
+      body.response_format = {
+        type: 'json_schema',
+        json_schema: { name: options.jsonSchema.name, schema: options.jsonSchema.schema, strict: false },
+      };
+    } else if (options?.jsonSchema || options?.jsonMode) {
+      body.response_format = { type: 'json_object' };
+    }
+
+    const bodyJson = JSON.stringify(body);
+    options?.onRequestBody?.(bodyJson);
 
     const response = await fetch(url, {
       method: 'POST',
@@ -118,7 +129,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.config.apiKey}`,
       },
-      body: JSON.stringify(body),
+      body: bodyJson,
     });
 
     if (!response.ok) {
@@ -126,7 +137,17 @@ export class OpenAICompatibleProvider implements LLMProvider {
       throw new Error(`LLM API error (${response.status}): ${errorText}`);
     }
 
-    yield* parseSSEStream(response);
+    let accumulated = '';
+    try {
+      for await (const chunk of parseSSEStream(response)) {
+        accumulated += chunk;
+        yield chunk;
+      }
+    } finally {
+      if (accumulated) {
+        options?.onResponseBody?.(JSON.stringify({ choices: [{ message: { content: accumulated } }] }));
+      }
+    }
   }
 
   async testConnection(): Promise<boolean> {

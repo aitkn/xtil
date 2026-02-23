@@ -83,7 +83,10 @@ export class GoogleProvider implements LLMProvider {
       temperature: options?.temperature ?? 0.3,
       maxOutputTokens: options?.maxTokens ?? 4096,
     };
-    if (options?.jsonMode) {
+    // Note: responseSchema is NOT used for streaming — Gemini's streamGenerateContent
+    // can produce broken responses with strict schema enforcement. jsonMode (just
+    // responseMimeType) works reliably; the response is parsed on the UI side.
+    if (options?.jsonSchema || options?.jsonMode) {
       streamGenConfig.responseMimeType = 'application/json';
     }
 
@@ -92,10 +95,13 @@ export class GoogleProvider implements LLMProvider {
       body.systemInstruction = systemInstruction;
     }
 
+    const bodyJson = JSON.stringify(body);
+    options?.onRequestBody?.(bodyJson);
+
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: bodyJson,
     });
 
     if (!response.ok) {
@@ -108,6 +114,7 @@ export class GoogleProvider implements LLMProvider {
 
     const decoder = new TextDecoder();
     let buffer = '';
+    let accumulated = '';
 
     try {
       while (true) {
@@ -126,7 +133,10 @@ export class GoogleProvider implements LLMProvider {
           try {
             const parsed = JSON.parse(data);
             const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) yield text;
+            if (text) {
+              accumulated += text;
+              yield text;
+            }
           } catch {
             // skip
           }
@@ -134,6 +144,9 @@ export class GoogleProvider implements LLMProvider {
       }
     } finally {
       reader.releaseLock();
+      if (accumulated) {
+        options?.onResponseBody?.(JSON.stringify({ candidates: [{ content: { parts: [{ text: accumulated }] } }] }));
+      }
     }
   }
 
