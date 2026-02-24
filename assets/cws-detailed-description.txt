@@ -17,6 +17,7 @@ Every platform gets special treatment:
 • Twitter/X — Thread reconstruction with engagement data and notable replies
 • Google Docs — Reads content directly from your authenticated session
 • Facebook — Extracts posts from feed overlays with reaction counts
+• LinkedIn — Summarize posts from feed or direct URLs with engagement metrics
 • Gmail — Summarize emails and threaded conversations from the reading pane
 
 ────────────────────────────────────────
