@@ -269,6 +269,8 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
   const skipComments = gComments === 'Set to null.';
   const skipExtraSections = gExtraSections === 'Set to null.';
 
+  const today = new Date().toISOString().slice(0, 10);
+
   // factCheck rules — shared body for standard/detailed, null for brief, skipped for GitHub
   const factCheckPreamble = d.factCheck === 'detailed'
     ? 'Actively look for verifiable factual claims to analyze. Include when'
@@ -282,13 +284,13 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
   - **"Crime dropped 77% in Memphis"** — 🔍 Unverifiable; no public data supports this specific figure
   - **"Maduro indicted by SDNY in 2020"** — ✅ Verified; real indictment for narco-terrorism
   Focus on the most significant claims (5-8 max). Do NOT just echo mainstream consensus; focus on verifiable facts. Flag unsupported generalizations, cherry-picked data, or missing important context.
-  CRITICAL — source attribution and verdict integrity: ALWAYS name the source and note their stake. The verdict MUST reflect source quality — do NOT mark ✅ Verified and then note the source is biased; that is contradictory. Rules:
-  - ✅ Verified = ONLY for indisputable objective facts: mathematical truths, directly observable physical events, verbatim public records anyone can look up (e.g. "X was indicted" = court filing exists; "law was passed on date Y" = public record). This is the HIGHEST bar. If you have to cite WHO says it's true, it probably isn't ✅.
-  - ⚠️ Contested/Partial = the DEFAULT for any claim involving politics, intelligence, military, geopolitics, or institutional narratives. Use this whenever sources have ANY stake. This includes: intelligence assessments (they are probabilistic analyses by agencies with geopolitical interests, not proof), indictment allegations (accusations, not verdicts — prosecutors have conviction incentives), government technical reports about adversaries, forensic attribution by firms hired by a party to the dispute, and any claim where "multiple sources" all trace back to the same original interested party. Always note who contests and why.
-  - ❌ False = you have definitive contradicting knowledge (e.g. "17 agencies" when it was actually 3 + ODNI coordinator).
-  - 🔍 Unverifiable = no information to confirm or deny, especially recent events beyond knowledge cutoff.
-  SELF-CHECK: Before writing ✅, ask: "Could a reasonable, informed skeptic dispute this using publicly available information?" If yes, use ⚠️. Be skeptical of ALL official narratives regardless of which government or institution produces them. If later investigations, whistleblowers, or declassified documents challenged a narrative, mention that.
-  CRITICAL — knowledge cutoff rule: Use ❌ False ONLY when you have definitive knowledge that contradicts the claim (e.g. wrong date for a historical event, misattributed quote, incorrect scientific fact). If a claim describes an event you have NO information about — especially anything recent — you MUST use 🔍 Unverifiable, NEVER ❌ False. "I have no record of this" does NOT mean it didn't happen. Absence of evidence is not evidence of absence. When in doubt, always default to 🔍 Unverifiable.`;
+  Source attribution: ALWAYS name the source and note their stake. The verdict MUST reflect source quality — do NOT mark ✅ Verified and then note the source is biased; that is contradictory. Verdict rules:
+  - ✅ Verified = indisputable objective facts you can confirm from training data: mathematical truths, directly observable physical events, verbatim public records anyone can look up (e.g. "X was indicted" = court filing exists; "law was passed on date Y" = public record). This is the HIGHEST bar. If you have to cite WHO says it's true, it probably isn't ✅.
+  - ⚠️ Contested/Partial = use when: (a) sources have a stake — politics, intelligence, military, geopolitics, institutional narratives; (b) a compound claim mixes verifiable and unverifiable parts. For (a): intelligence assessments, indictment allegations, government technical reports about adversaries, forensic attribution by hired firms, claims where "multiple sources" trace back to one interested party — always note who contests and why. For (b): split the claim — confirm what you know, flag what you cannot verify, e.g. "Title stripping confirmed (2022 public record); arrest not in training data — may be a recent development."
+  - ❌ False = ONLY when you have definitive knowledge that DIRECTLY CONTRADICTS the claim (e.g. "17 agencies" when it was actually 3 + ODNI coordinator, wrong date for a well-documented historical event, misattributed quote). NEVER use ❌ False just because you have no record of an event — that is 🔍 Unverifiable.
+  - 🔍 Unverifiable = you have ZERO relevant information — the claim is entirely outside your training data. Use for claims about events, people, or outcomes you have no knowledge of at all.
+  CRITICAL — knowledge cutoff (today is ${today}): Your training data does NOT cover everything up to today. When you encounter an event you have no record of, that means your data likely predates it — NOT that it didn't happen. The cardinal rule: "I have no record of this" → 🔍 Unverifiable or ⚠️ Partial (if other parts are verifiable), NEVER → ❌ False. But DO still use ✅ and ⚠️ for facts you genuinely DO know — do not mark everything 🔍 out of caution.
+  SELF-CHECK: Before writing ✅, ask: "Could a reasonable, informed skeptic dispute this?" If yes → ⚠️. Before writing ❌, ask: "Can I name the specific contradicting fact, or am I just unaware?" If unaware → 🔍. Before writing 🔍, ask: "Do I actually have partial knowledge here?" If yes → ⚠️ Partial and explain what you know vs. don't. Be skeptical of ALL official narratives. If later investigations, whistleblowers, or declassified documents challenged a narrative, mention that.`;
 
   // Quotes extra instructions (translation + timestamps) — only when quotes are included
   const quotesExtra = (skipQuotes || d.quotes === 'Set to null.') ? '' : ' When the summary language differs from the source language, append a translation in parentheses after each quote, e.g. "Original quote" (Translation). If you include a timestamp, always make it a clickable markdown link — never a bare number.';
@@ -299,8 +301,6 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
     : detailLevel === 'brief'
     ? `- ${d.mermaid}`
     : `- ${d.mermaid}\n${MERMAID_ESSENTIAL_RULES}`;
-
-  const today = new Date().toISOString().slice(0, 10);
 
   // Build JSON schema — omit fields that are always null for the content type
   const schema: string[] = [
@@ -365,7 +365,7 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
 
   const role = isGitHub ? 'an expert software engineer and content summarizer' : 'an expert content summarizer';
 
-  return `You are ${role}. Today's date is ${today}. ${langInstruction}
+  return `You are ${role}. Today's date is ${today}. Your training data has a knowledge cutoff — many events, laws, announcements, personnel changes, and developments have occurred since then that you have NO information about. ${langInstruction}
 
 Content: ~${wordCount.toLocaleString()} words → classified as "${size}" (thresholds: short <500, medium 500-3000, long 3000+). The ranges below are tuned for this size tier. If the content is near a threshold boundary, blend smoothly — do not produce drastically different output for 490 vs 510 words.
 

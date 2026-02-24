@@ -26,6 +26,7 @@ import type { ModelInfo } from '@/lib/llm/types';
 import { SummaryContent, MetadataHeader, downloadMarkdown, resetSectionState, copyToClipboard } from './pages/SummaryView';
 import { SettingsView } from './pages/SettingsView';
 import { getProviderDefinition } from '@/lib/llm/registry';
+import { getCatalogEntry } from '@/lib/llm/models';
 import { Toast } from '@/components/Toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Spinner } from '@/components/Spinner';
@@ -563,6 +564,8 @@ export function App() {
   const [lastResponseBody, setLastResponseBody] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [searchedSections, setSearchedSections] = useState<Set<string>>(new Set());
+  const [activeSectionActions, setActiveSectionActions] = useState<Map<string, 'search' | 'more' | 'less'>>(new Map());
 
   // Settings drawer
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1131,6 +1134,8 @@ export function App() {
     setStreamingText('');
     setStreamingProgress(null);
     setNotionUrl(null);
+    setSearchedSections(new Set());
+    setActiveSectionActions(new Map());
     setRawResponses([]);
     setActualSystemPrompt('');
 
@@ -1458,8 +1463,8 @@ export function App() {
     doExport();
   }, [summary, content, exporting, doExport]);
 
-  const handleChatSend = useCallback(async (text: string, opts?: { internal?: boolean }) => {
-    if (!content) return;
+  const handleChatSend = useCallback(async (text: string, opts?: { internal?: boolean; webSearch?: boolean }): Promise<boolean> => {
+    if (!content) return false;
     const originTabId = activeTabIdRef.current;
     const isInternal = opts?.internal ?? false;
 
@@ -1494,6 +1499,7 @@ export function App() {
         summary: summary || emptySummary,
         content,
         tabId: originTabId ?? undefined,
+        webSearch: opts?.webSearch || undefined,
       }) as ChatResponseMessage;
 
       if (!response.success || !response.message) {
@@ -1570,7 +1576,7 @@ export function App() {
         if (fixedJson) {
           setSummary(fixedJson);
           setNotionUrl(null);
-          if (!isInternal) setToast({ message: 'Summary updated', type: 'success' });
+          setToast({ message: isInternal ? 'Section updated' : 'Summary updated', type: 'success' });
         }
         setChatMessages((prev) => [...prev, { role: 'assistant', content: displayText, internal: isInternal }]);
       } else if (originTabId != null) {
@@ -1585,9 +1591,11 @@ export function App() {
           saved.chatLoading = false;
         }
       }
+      return true;
     } catch (err) {
       const errMsg = `Error: ${err instanceof Error ? err.message : String(err)}`;
       if (activeTabIdRef.current === originTabId) {
+        if (isInternal) setToast({ message: errMsg, type: 'error' });
         setChatMessages((prev) => [...prev, { role: 'assistant', content: errMsg, internal: isInternal }]);
       } else if (originTabId != null) {
         const saved = tabStatesRef.current.get(originTabId);
@@ -1596,6 +1604,7 @@ export function App() {
           saved.chatLoading = false;
         }
       }
+      return false;
     } finally {
       if (activeTabIdRef.current === originTabId) {
         setChatLoading(false);
@@ -1940,12 +1949,51 @@ export function App() {
                   return next;
                 });
               }}
-              onAdjustSection={(sectionTitle, direction) => {
+              onAdjustSection={async (sectionTitle, direction) => {
+                const action = direction === 'more' ? 'more' as const : 'less' as const;
+                setActiveSectionActions(prev => new Map(prev).set(sectionTitle, action));
                 const prompt = direction === 'more'
                   ? `Elaborate more on the "${sectionTitle}" section. Add more detail and depth while keeping the same structure.`
                   : `Make the "${sectionTitle}" section shorter and more concise. Keep only the most important points.`;
-                handleChatSend(prompt, { internal: true });
+                await handleChatSend(prompt, { internal: true });
+                setActiveSectionActions(prev => { const next = new Map(prev); next.delete(sectionTitle); return next; });
               }}
+              onWebSearch={(() => {
+                const cfg = getActiveProviderConfig(settings);
+                const modelEntry = getCatalogEntry(settings.activeProviderId, cfg.model);
+                if (modelEntry?.webSearch) return async (sectionTitle: string) => {
+                  setActiveSectionActions(prev => new Map(prev).set(sectionTitle, 'search'));
+                  const today = new Date().toISOString().slice(0, 10);
+                  let prompt: string;
+                  if (sectionTitle === 'Fact Check') {
+                    prompt = `Today is ${today}. Search the web for the LATEST news (as of ${today}) about each claim in the "${sectionTitle}" section. Search each claim individually by name and recent dates.
+
+IMPORTANT: Your job is to UPDATE verdicts based ONLY on what web search results say. Ignore your training data — trust the search results.
+- If multiple independent sources confirm a claim → ✅ Verified
+- If sources contradict a claim → ❌ False
+- If only one source or unclear → ⚠️ Partial, explain what's confirmed and what isn't
+- If no search results found → keep the existing verdict unchanged
+For politically sensitive topics, prefer sources without a stake in the outcome over official/government sources.
+Cite each source with name and date.`;
+                  } else if (sectionTitle === 'Notable Quotes') {
+                    prompt = `Today is ${today}. Search the web to verify the quotes in the "${sectionTitle}" section. Check attribution accuracy and add context about any recent developments related to the quoted statements. Cite sources with dates.`;
+                  } else {
+                    prompt = `Today is ${today}. Search the web for the latest developments (as of ${today}) related to the "${sectionTitle}" section. Update with any new information, correct anything outdated, and add recent context. Cite sources with dates.`;
+                  }
+                  const ok = await handleChatSend(prompt, { internal: true, webSearch: true });
+                  if (ok) setSearchedSections(prev => new Set(prev).add(sectionTitle));
+                  setActiveSectionActions(prev => { const next = new Map(prev); next.delete(sectionTitle); return next; });
+                };
+                return undefined;
+              })()}
+              webSearchDisabledReason={(() => {
+                const cfg = getActiveProviderConfig(settings);
+                const modelEntry = getCatalogEntry(settings.activeProviderId, cfg.model);
+                if (modelEntry?.webSearch) return undefined;
+                return `Web search not available for ${modelEntry?.name || cfg.model}. Select a model that supports web search.`;
+              })()}
+              searchedSections={searchedSections}
+              activeSectionActions={activeSectionActions}
             />
           </div>
         )}
@@ -2325,6 +2373,14 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
         const parsed = parseJsonSafe(raw.slice(jsonStart, jsonEnd + 1)) as Record<string, unknown> | null;
         if (parsed && parsed.tldr && parsed.summary) {
           updates = normalizeSummary(parsed);
+        } else if (parsed && parsed.updates && typeof parsed.updates === 'object') {
+          updates = unwrapAndSanitize(parsed.updates as Record<string, unknown>);
+        } else if (parsed && ('text' in parsed || 'summary' in parsed)) {
+          const source = parsed.updates ?? parsed.summary;
+          if (source && typeof source === 'object') {
+            const s = source as Record<string, unknown>;
+            updates = (s.tldr && s.summary) ? normalizeSummary(s) : unwrapAndSanitize(s);
+          }
         }
       }
       // Always strip the ```json block from chat text

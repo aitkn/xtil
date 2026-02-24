@@ -10,6 +10,8 @@ interface CatalogEntry {
   outputPrice?: number;
   vision?: boolean;
   textGeneration?: boolean;
+  reasoning?: boolean;
+  webSearch?: boolean;
 }
 
 interface CatalogProvider {
@@ -96,6 +98,8 @@ export function getCatalogModels(providerId: string): ModelInfo[] {
       outputPrice: e.outputPrice,
       vision: e.vision,
       textGeneration: e.textGeneration,
+      reasoning: e.reasoning,
+      webSearch: e.webSearch,
     }));
   return filterChatModels(models);
 }
@@ -179,6 +183,8 @@ async function fetchOpenAIModels(
       outputPrice: entry?.outputPrice,
       vision: entry?.vision,
       textGeneration: entry?.textGeneration,
+      reasoning: entry?.reasoning,
+      webSearch: entry?.webSearch,
     };
   });
 }
@@ -216,6 +222,8 @@ async function fetchAnthropicModels(
       outputPrice: entry?.outputPrice,
       vision: entry?.vision,
       textGeneration: entry?.textGeneration,
+      reasoning: entry?.reasoning,
+      webSearch: entry?.webSearch,
     };
   });
 }
@@ -259,6 +267,8 @@ async function fetchGoogleModels(
         outputPrice: entry?.outputPrice,
         vision: entry?.vision,
         textGeneration: entry?.textGeneration,
+        reasoning: entry?.reasoning,
+        webSearch: entry?.webSearch,
       };
     });
 }

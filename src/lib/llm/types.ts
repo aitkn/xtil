@@ -30,6 +30,8 @@ export interface ChatOptions {
   jsonMode?: boolean;
   /** When set, enforce a specific JSON schema on the response (provider-specific mechanism). */
   jsonSchema?: JsonSchema;
+  /** Enable web search / grounding for providers that support it (Google, OpenAI, xAI). */
+  webSearch?: boolean;
   /** External abort signal to cancel the request (e.g. user navigated away). */
   signal?: AbortSignal;
   /** Called with the full HTTP request body (JSON string) before sending. */
@@ -64,6 +66,10 @@ export interface ModelInfo {
   vision?: boolean;
   /** false for image/video-only models that can't do text chat */
   textGeneration?: boolean;
+  /** Reasoning model (o-series, gpt-5+) — doesn't support temperature */
+  reasoning?: boolean;
+  /** Model supports web search / grounding */
+  webSearch?: boolean;
 }
 
 export interface ProviderDefinition {

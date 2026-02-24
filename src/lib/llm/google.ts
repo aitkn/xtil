@@ -22,16 +22,23 @@ export class GoogleProvider implements LLMProvider {
       temperature: options?.temperature ?? 0.3,
       maxOutputTokens: options?.maxTokens ?? 4096,
     };
-    if (options?.jsonSchema) {
-      generationConfig.responseMimeType = 'application/json';
-      generationConfig.responseSchema = convertToGeminiSchema(options.jsonSchema.schema);
-    } else if (options?.jsonMode) {
-      generationConfig.responseMimeType = 'application/json';
+    // Skip JSON response format when webSearch is active — Gemini doesn't allow
+    // combining tools with responseMimeType/responseSchema.
+    if (!options?.webSearch) {
+      if (options?.jsonSchema) {
+        generationConfig.responseMimeType = 'application/json';
+        generationConfig.responseSchema = convertToGeminiSchema(options.jsonSchema.schema);
+      } else if (options?.jsonMode) {
+        generationConfig.responseMimeType = 'application/json';
+      }
     }
 
     const body: Record<string, unknown> = { contents, generationConfig };
     if (systemInstruction) {
       body.systemInstruction = systemInstruction;
+    }
+    if (options?.webSearch) {
+      body.tools = [{ googleSearch: {} }];
     }
 
     const timeoutController = new AbortController();
@@ -86,13 +93,18 @@ export class GoogleProvider implements LLMProvider {
     // Note: responseSchema is NOT used for streaming — Gemini's streamGenerateContent
     // can produce broken responses with strict schema enforcement. jsonMode (just
     // responseMimeType) works reliably; the response is parsed on the UI side.
-    if (options?.jsonSchema || options?.jsonMode) {
+    // Also skip responseMimeType when webSearch is active — Gemini doesn't allow
+    // combining tools with JSON response format.
+    if (!options?.webSearch && (options?.jsonSchema || options?.jsonMode)) {
       streamGenConfig.responseMimeType = 'application/json';
     }
 
     const body: Record<string, unknown> = { contents, generationConfig: streamGenConfig };
     if (systemInstruction) {
       body.systemInstruction = systemInstruction;
+    }
+    if (options?.webSearch) {
+      body.tools = [{ googleSearch: {} }];
     }
 
     const bodyJson = JSON.stringify(body);
