@@ -722,6 +722,7 @@ async function handleChatMessage(
     const contentLabel = content.type === 'youtube' ? 'YouTube video'
       : content.type === 'reddit' ? 'Reddit discussion'
       : content.type === 'twitter' ? 'X thread'
+      : content.type === 'linkedin' ? 'LinkedIn post'
       : content.type === 'github' ? 'GitHub page'
       : 'web page';
 

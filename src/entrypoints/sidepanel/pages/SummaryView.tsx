@@ -345,6 +345,7 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
     reddit: { bg: '#FFE0B2', text: '#E65100' },
     twitter: { bg: '#E3F2FD', text: '#1565C0' },
     github: { bg: '#e1e4e8', text: '#24292e' },
+    linkedin: { bg: '#dce6f1', text: '#0a66c2' },
     generic: { bg: 'var(--md-sys-color-surface-container-highest)', text: 'var(--md-sys-color-on-surface-variant)' },
   };
   const badge = badgeColors[content.type] || badgeColors.generic;
@@ -363,7 +364,7 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
         fontWeight: 600,
         textTransform: 'uppercase',
       }}>
-        {content.type === 'youtube' ? 'YouTube' : content.type === 'facebook' ? 'Facebook' : content.type === 'reddit' ? 'Reddit' : content.type === 'twitter' ? 'X' : content.type === 'github' ? 'GitHub' : content.type}
+        {content.type === 'youtube' ? 'YouTube' : content.type === 'facebook' ? 'Facebook' : content.type === 'reddit' ? 'Reddit' : content.type === 'twitter' ? 'X' : content.type === 'github' ? 'GitHub' : content.type === 'linkedin' ? 'LinkedIn' : content.type}
       </span>
       {content.type !== 'github' && content.estimatedReadingTime > 0 && (
         <span style={{ color: 'var(--md-sys-color-on-surface-variant)', font: 'var(--md-sys-typescale-label-small)' }}>

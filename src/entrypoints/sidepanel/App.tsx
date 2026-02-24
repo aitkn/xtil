@@ -1032,7 +1032,7 @@ export function App() {
   useEffect(() => {
     if (!content) return;
 
-    const isSocial = content.type === 'youtube' || content.type === 'facebook' || content.type === 'twitter';
+    const isSocial = ['youtube', 'facebook', 'twitter', 'linkedin'].includes(content.type);
     const maxStable = isSocial ? 10 : 3;
     const interval = isSocial ? 5000 : 4000;
     // Keep polling longer when no comments found yet (AJAX may still be loading)

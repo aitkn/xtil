@@ -9,6 +9,8 @@ export function extractComments(doc: Document, url: string): ExtractedComment[] 
   if (/(?:twitter|x)\.com/.test(url)) return [];
   // GitHub comments are embedded by the GitHub extractor
   if (/github\.com/.test(url)) return [];
+  // LinkedIn comments are extracted by the LinkedIn extractor
+  if (/linkedin\.com/.test(url)) return [];
 
   if (/youtube\.com|youtu\.be/.test(url)) {
     return extractYouTubeComments(doc);
