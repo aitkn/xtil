@@ -30,10 +30,47 @@ function findPostModal(doc: Document): Element | null {
   return null;
 }
 
-/** Check if the current context is a Facebook post (URL-based or modal). */
+/** Find top-level post articles in the feed (not comment/reply articles). */
+function findFeedPosts(doc: Document): Element[] {
+  const articles = doc.querySelectorAll('[role="article"]');
+  const posts: Element[] = [];
+  for (const article of articles) {
+    const label = article.getAttribute('aria-label') || '';
+    if (label.startsWith('Comment by') || label.startsWith('Reply by')) continue;
+    // Skip articles nested inside another post article (e.g. shared post inside a post)
+    const parentArticle = article.parentElement?.closest('[role="article"]');
+    if (parentArticle) continue;
+    posts.push(article);
+  }
+  return posts;
+}
+
+/** Pick the post with the largest visible viewport area. */
+function pickMostVisiblePost(posts: Element[]): Element {
+  const viewportHeight = window.innerHeight;
+  let best = posts[0];
+  let bestArea = 0;
+
+  for (const el of posts) {
+    const rect = el.getBoundingClientRect();
+    const visibleTop = Math.max(rect.top, 0);
+    const visibleBottom = Math.min(rect.bottom, viewportHeight);
+    const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+    const area = visibleHeight * rect.width;
+
+    if (area > bestArea) {
+      bestArea = area;
+      best = el;
+    }
+  }
+
+  return best;
+}
+
+/** Check if the current context is a Facebook post (URL-based, modal, or feed). */
 export function isFacebookPostContext(url: string, doc: Document): boolean {
   if (!/(^|\.)facebook\.com$/.test(new URL(url).hostname)) return false;
-  return FB_POST_URL_RE.test(url) || findPostModal(doc) !== null;
+  return FB_POST_URL_RE.test(url) || findPostModal(doc) !== null || findFeedPosts(doc).length > 0;
 }
 
 export const facebookExtractor: ContentExtractor = {
@@ -42,13 +79,20 @@ export const facebookExtractor: ContentExtractor = {
   },
 
   extract(url: string, doc: Document): ExtractedContent {
-    // Scope extraction to the post modal if present (feed overlay case)
+    // Scope extraction: modal > feed post (most visible) > full document
     const modal = findPostModal(doc);
+    let feedPost: Element | null = null;
+    if (!modal && !FB_POST_URL_RE.test(url)) {
+      const feedPosts = findFeedPosts(doc);
+      if (feedPosts.length > 0) {
+        feedPost = pickMostVisiblePost(feedPosts);
+      }
+    }
 
     // Click "See more" on main post to reveal full text
-    clickSeeMoreOnPost(doc, modal);
+    clickSeeMoreOnPost(doc, modal || feedPost);
 
-    const scope = modal || doc;
+    const scope = modal || feedPost || doc;
     const permalink = extractPermalink(url, scope);
     const author = extractAuthor(doc, scope);
     const postText = extractPostText(doc, scope);
@@ -322,7 +366,7 @@ function extractMetadata(scope: Element | Document): {
 
   for (const btn of buttons) {
     // Skip buttons inside comment articles
-    if (btn.closest('[role="article"]')) continue;
+    if (isInsideComment(btn)) continue;
 
     const text = btn.textContent?.trim() || '';
 
@@ -391,7 +435,12 @@ function getCleanText(el: Element): string {
 /** Extract comments already visible in the DOM — no async loading. */
 export function extractVisibleComments(doc: Document): ExtractedComment[] {
   const modal = findPostModal(doc);
-  const scope = modal || doc;
+  let feedPost: Element | null = null;
+  if (!modal) {
+    const feedPosts = findFeedPosts(doc);
+    if (feedPosts.length > 0) feedPost = pickMostVisiblePost(feedPosts);
+  }
+  const scope = modal || feedPost || doc;
 
   // Click "See more" on visible comments to reveal truncated text
   const articles = scope.querySelectorAll('[role="article"]');
