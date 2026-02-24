@@ -4,6 +4,12 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.0.5
+
+**LinkedIn support**
+
+- LinkedIn post extractor — summarize posts from feed or direct URLs, with smart "most visible post" detection on feed pages
+
 ## 1.0.4
 
 **Streaming responses & real-time preview**
