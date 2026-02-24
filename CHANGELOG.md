@@ -4,6 +4,12 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.0.6
+
+**Facebook feed support**
+
+- Facebook feed extractor — summarize posts directly from the feed without clicking to open them, using smart "most visible post" detection
+
 ## 1.0.5
 
 **LinkedIn support**
