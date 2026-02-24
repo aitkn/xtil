@@ -104,9 +104,20 @@ function extractFromScope(url: string, doc: Document, scope: Element | null): Ex
 /** Find all post containers in the Facebook feed. */
 function findFeedPosts(doc: Document): Element[] {
   const anchors = doc.querySelectorAll('[data-ad-rendering-role="profile_name"]');
-  if (anchors.length < 2) return [];
+  if (anchors.length === 0) return [];
 
-  // Find common ancestor of first two profile_name elements
+  // Single post: walk up to find a reasonable container and return it
+  if (anchors.length === 1) {
+    const el = anchors[0].closest('[data-ad-rendering-role="profile_name"]')?.parentElement;
+    // Walk up until we find an element with significant height (the post wrapper)
+    let container: Element | null = el || null;
+    while (container && container.getBoundingClientRect().height < 100) {
+      container = container.parentElement;
+    }
+    return container ? [container] : [];
+  }
+
+  // Multiple posts: find common ancestor of first two profile_name elements
   const chain1 = getAncestorChain(anchors[0]);
   const set2 = new Set(getAncestorChain(anchors[1]));
   let feedContainer: Element | null = null;
