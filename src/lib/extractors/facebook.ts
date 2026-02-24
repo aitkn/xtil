@@ -30,10 +30,10 @@ function findPostModal(doc: Document): Element | null {
   return null;
 }
 
-/** Check if the current context is a Facebook post (URL-based or modal). */
+/** Check if the current context is a Facebook post (URL-based, modal, or feed). */
 export function isFacebookPostContext(url: string, doc: Document): boolean {
   if (!/(^|\.)facebook\.com$/.test(new URL(url).hostname)) return false;
-  return FB_POST_URL_RE.test(url) || findPostModal(doc) !== null;
+  return FB_POST_URL_RE.test(url) || findPostModal(doc) !== null || findFeedPosts(doc).length > 0;
 }
 
 export const facebookExtractor: ContentExtractor = {
@@ -42,52 +42,113 @@ export const facebookExtractor: ContentExtractor = {
   },
 
   extract(url: string, doc: Document): ExtractedContent {
-    // Scope extraction to the post modal if present (feed overlay case)
+    // Feed mode: pick the most visible post from the feed
     const modal = findPostModal(doc);
-
-    // Click "See more" on main post to reveal full text
-    clickSeeMoreOnPost(doc, modal);
-
-    const scope = modal || doc;
-    const permalink = extractPermalink(url, scope);
-    const author = extractAuthor(doc, scope);
-    const postText = extractPostText(doc, scope);
-    const images = extractImages(scope);
-    const postMedia = extractPostMediaUrls(scope);
-    const richImages = buildRichImages(scope, postMedia);
-    const { reactions, commentCount, shareCount } = extractMetadata(scope);
-
-    let content = '';
-    if (author) content += `# Post by ${author}\n\n`;
-    if (postText) content += `${postText}\n\n`;
-    if (reactions || commentCount || shareCount) {
-      const parts: string[] = [];
-      if (reactions) parts.push(reactions);
-      if (commentCount) parts.push(`${commentCount} comments`);
-      if (shareCount) parts.push(`${shareCount} shares`);
-      content += `---\n${parts.join(' | ')}\n`;
+    if (!modal) {
+      const feedPosts = findFeedPosts(doc);
+      if (feedPosts.length > 0) {
+        const bestPost = pickMostVisiblePost(feedPosts);
+        if (bestPost) return extractFromScope(url, doc, bestPost);
+      }
     }
 
-    // Leave title empty so the LLM infers a meaningful one from the content
-    const title = '';
-    const wordCount = content.split(/\s+/).filter(Boolean).length;
-
-    return {
-      type: 'facebook',
-      url: permalink,
-      title,
-      author: author || undefined,
-      language: doc.documentElement.lang || undefined,
-      content,
-      wordCount,
-      estimatedReadingTime: Math.ceil(wordCount / 200),
-      thumbnailUrl: postMedia[0] || undefined,
-      thumbnailUrls: postMedia.length > 1 ? postMedia.slice(0, 4) : undefined,
-      images: images.length > 0 ? images : undefined,
-      richImages: richImages.length > 0 ? richImages : undefined,
-    };
+    // Modal or permalink mode
+    return extractFromScope(url, doc, modal);
   },
 };
+
+function extractFromScope(url: string, doc: Document, scope: Element | null): ExtractedContent {
+  clickSeeMoreOnPost(doc, scope);
+
+  const effectiveScope = scope || doc;
+  const permalink = extractPermalink(url, effectiveScope);
+  const author = extractAuthor(doc, effectiveScope);
+  const postText = extractPostText(doc, effectiveScope);
+  const images = extractImages(effectiveScope);
+  const postMedia = extractPostMediaUrls(effectiveScope);
+  const richImages = buildRichImages(effectiveScope, postMedia);
+  const { reactions, commentCount, shareCount } = extractMetadata(effectiveScope);
+
+  let content = '';
+  if (author) content += `# Post by ${author}\n\n`;
+  if (postText) content += `${postText}\n\n`;
+  if (reactions || commentCount || shareCount) {
+    const parts: string[] = [];
+    if (reactions) parts.push(reactions);
+    if (commentCount) parts.push(`${commentCount} comments`);
+    if (shareCount) parts.push(`${shareCount} shares`);
+    content += `---\n${parts.join(' | ')}\n`;
+  }
+
+  const title = '';
+  const wordCount = content.split(/\s+/).filter(Boolean).length;
+
+  return {
+    type: 'facebook',
+    url: permalink,
+    title,
+    author: author || undefined,
+    language: doc.documentElement.lang || undefined,
+    content,
+    wordCount,
+    estimatedReadingTime: Math.ceil(wordCount / 200),
+    thumbnailUrl: postMedia[0] || undefined,
+    thumbnailUrls: postMedia.length > 1 ? postMedia.slice(0, 4) : undefined,
+    images: images.length > 0 ? images : undefined,
+    richImages: richImages.length > 0 ? richImages : undefined,
+  };
+}
+
+// --- Feed post detection ---
+
+/** Find all post containers in the Facebook feed. */
+function findFeedPosts(doc: Document): Element[] {
+  const anchors = doc.querySelectorAll('[data-ad-rendering-role="profile_name"]');
+  if (anchors.length < 2) return [];
+
+  // Find common ancestor of first two profile_name elements
+  const chain1 = getAncestorChain(anchors[0]);
+  const set2 = new Set(getAncestorChain(anchors[1]));
+  let feedContainer: Element | null = null;
+  for (const a of chain1) {
+    if (set2.has(a)) { feedContainer = a; break; }
+  }
+  if (!feedContainer) return [];
+
+  // Collect direct children that contain post markers
+  const posts: Element[] = [];
+  for (const child of feedContainer.children) {
+    if (child.querySelector('[data-ad-rendering-role="profile_name"]')) {
+      posts.push(child);
+    }
+  }
+  return posts;
+}
+
+function getAncestorChain(el: Element): Element[] {
+  const chain: Element[] = [];
+  let current: Element | null = el;
+  while (current) { chain.push(current); current = current.parentElement; }
+  return chain;
+}
+
+/** Pick the post with the largest viewport intersection area. */
+function pickMostVisiblePost(posts: Element[]): Element | null {
+  if (posts.length === 0) return null;
+  if (posts.length === 1) return posts[0];
+
+  const vh = window.innerHeight;
+  let best: Element | null = null;
+  let bestArea = 0;
+
+  for (const post of posts) {
+    const rect = post.getBoundingClientRect();
+    const visibleHeight = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0));
+    const area = visibleHeight * rect.width;
+    if (area > bestArea) { bestArea = area; best = post; }
+  }
+  return best;
+}
 
 /** Extract the direct permalink for the post, stripping tracking params. */
 function extractPermalink(pageUrl: string, scope: Element | Document): string {
@@ -157,6 +218,15 @@ function clickSeeMoreOnPost(doc: Document, scope: Element | null): void {
 }
 
 function extractAuthor(doc: Document, scope: Element | Document): string | null {
+  // Feed/modal: profile_name data attribute
+  const profileName = scope.querySelector('[data-ad-rendering-role="profile_name"]');
+  if (profileName) {
+    // innerText has author name on first line; subsequent lines have "·", "Follow", etc.
+    const raw = (profileName as HTMLElement).innerText || profileName.textContent || '';
+    const name = raw.split('\n')[0].trim();
+    if (name && name.length > 1) return name;
+  }
+
   // Title pattern: "(N) Post text... - AuthorName | Facebook"
   const titleText = doc.title || '';
   const titleMatch = titleText.match(/\s-\s(.+?)\s*\|\s*Facebook\s*$/);
@@ -333,8 +403,15 @@ function extractMetadata(scope: Element | Document): {
       continue;
     }
 
-    // "All reactions: 6.6K"
-    if (/^All reactions:/i.test(text)) continue;
+    // "All reactions: 6.6K" or just "All reactions:\n321"
+    const allReactionsMatch = text.match(/^All reactions:?\s*(\d[\d,.]*K?M?)/i);
+    if (allReactionsMatch) {
+      if (reactionParts.length === 0) {
+        reactionParts.push(`${allReactionsMatch[1]} total`);
+      }
+      continue;
+    }
+    if (/^All reactions:?$/i.test(text)) continue;
 
     // Comment count: "399 comments" or just "399" near the reaction area
     const commentMatch = text.match(/^(\d[\d,.]*K?)\s*comments?$/i);
@@ -390,7 +467,10 @@ function getCleanText(el: Element): string {
 
 /** Extract comments already visible in the DOM — no async loading. */
 export function extractVisibleComments(doc: Document): ExtractedComment[] {
+  // Feed posts don't have visible comments — skip
   const modal = findPostModal(doc);
+  if (!modal && findFeedPosts(doc).length > 0) return [];
+
   const scope = modal || doc;
 
   // Click "See more" on visible comments to reveal truncated text
