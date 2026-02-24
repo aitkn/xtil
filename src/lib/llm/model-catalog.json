@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-02-24T08:55:32.345Z",
+  "_generated": "2026-02-24T23:15:20.443Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -41,7 +41,8 @@
           "maxOutput": 64000,
           "inputPrice": 1,
           "outputPrice": 5,
-          "vision": true
+          "vision": true,
+          "reasoning": false
         },
         "claude-opus-4-1-20250805": {
           "name": "Claude Opus 4.1"
@@ -63,7 +64,8 @@
           "maxOutput": 128000,
           "inputPrice": 5,
           "outputPrice": 25,
-          "vision": true
+          "vision": true,
+          "reasoning": false
         },
         "claude-sonnet-4-20250514": {
           "name": "Claude Sonnet 4"
@@ -82,7 +84,8 @@
           "maxOutput": 64000,
           "inputPrice": 3,
           "outputPrice": 15,
-          "vision": true
+          "vision": true,
+          "reasoning": false
         }
       }
     },
@@ -94,7 +97,8 @@
           "maxOutput": 8000,
           "inputPrice": 0.28,
           "outputPrice": 0.42,
-          "vision": false
+          "vision": false,
+          "reasoning": false
         },
         "deepseek-reasoner": {
           "name": "DeepSeek-V3.2 (Thinking Mode)",
@@ -468,12 +472,12 @@
           "name": "gpt-4o-mini-realtime-preview-2024-12-17"
         },
         "gpt-4o-mini-search-preview": {
-          "name": "gpt-4o-mini-search-preview",
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-4o-mini-search-preview"
         },
         "gpt-4o-mini-search-preview-2025-03-11": {
-          "name": "gpt-4o-mini-search-preview-2025-03-11",
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-4o-mini-search-preview-2025-03-11"
         },
         "gpt-4o-mini-transcribe": {
           "name": "gpt-4o-mini-transcribe"
@@ -503,12 +507,12 @@
           "name": "gpt-4o-realtime-preview-2025-06-03"
         },
         "gpt-4o-search-preview": {
-          "name": "gpt-4o-search-preview",
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-4o-search-preview"
         },
         "gpt-4o-search-preview-2025-03-11": {
-          "name": "gpt-4o-search-preview-2025-03-11",
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-4o-search-preview-2025-03-11"
         },
         "gpt-4o-transcribe": {
           "name": "gpt-4o-transcribe"
@@ -517,119 +521,122 @@
           "name": "gpt-4o-transcribe-diarize"
         },
         "gpt-5": {
-          "name": "gpt-5",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5"
         },
         "gpt-5-2025-08-07": {
-          "name": "gpt-5-2025-08-07",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5-2025-08-07"
         },
         "gpt-5-chat-latest": {
-          "name": "gpt-5-chat-latest",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5-chat-latest"
         },
         "gpt-5-codex": {
-          "name": "gpt-5-codex",
-          "reasoning": true
+          "reasoning": true,
+          "name": "gpt-5-codex"
         },
         "gpt-5-mini": {
-          "name": "gpt-5-mini",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5-mini"
         },
         "gpt-5-mini-2025-08-07": {
-          "name": "gpt-5-mini-2025-08-07",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5-mini-2025-08-07"
         },
         "gpt-5-nano": {
-          "name": "gpt-5-nano",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5-nano"
         },
         "gpt-5-nano-2025-08-07": {
-          "name": "gpt-5-nano-2025-08-07",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5-nano-2025-08-07"
         },
         "gpt-5-pro": {
-          "name": "gpt-5-pro",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5-pro"
         },
         "gpt-5-pro-2025-10-06": {
-          "name": "gpt-5-pro-2025-10-06",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5-pro-2025-10-06"
         },
         "gpt-5-search-api": {
-          "name": "gpt-5-search-api",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5-search-api"
         },
         "gpt-5-search-api-2025-10-14": {
-          "name": "gpt-5-search-api-2025-10-14",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5-search-api-2025-10-14"
         },
         "gpt-5.1": {
-          "name": "gpt-5.1",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5.1"
         },
         "gpt-5.1-2025-11-13": {
-          "name": "gpt-5.1-2025-11-13",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5.1-2025-11-13"
         },
         "gpt-5.1-chat-latest": {
-          "name": "gpt-5.1-chat-latest",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5.1-chat-latest"
         },
         "gpt-5.1-codex": {
-          "name": "gpt-5.1-codex",
-          "reasoning": true
+          "reasoning": true,
+          "name": "gpt-5.1-codex"
         },
         "gpt-5.1-codex-max": {
-          "name": "gpt-5.1-codex-max",
-          "reasoning": true
+          "reasoning": true,
+          "name": "gpt-5.1-codex-max"
         },
         "gpt-5.1-codex-mini": {
-          "name": "gpt-5.1-codex-mini",
-          "reasoning": true
+          "reasoning": true,
+          "name": "gpt-5.1-codex-mini"
         },
         "gpt-5.2": {
-          "name": "gpt-5.2",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5.2"
         },
         "gpt-5.2-2025-12-11": {
-          "name": "gpt-5.2-2025-12-11",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5.2-2025-12-11"
         },
         "gpt-5.2-chat-latest": {
-          "name": "gpt-5.2-chat-latest",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5.2-chat-latest"
         },
         "gpt-5.2-codex": {
-          "name": "gpt-5.2-codex",
-          "reasoning": true
+          "reasoning": true,
+          "name": "gpt-5.2-codex"
         },
         "gpt-5.2-pro": {
-          "name": "gpt-5.2-pro",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5.2-pro"
         },
         "gpt-5.2-pro-2025-12-11": {
-          "name": "gpt-5.2-pro-2025-12-11",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "gpt-5.2-pro-2025-12-11"
+        },
+        "gpt-5.3-codex": {
+          "name": "gpt-5.3-codex"
         },
         "gpt-audio": {
           "name": "gpt-audio"
@@ -687,8 +694,8 @@
           "webSearch": true
         },
         "o1-2024-12-17": {
-          "name": "o1-2024-12-17",
-          "reasoning": true
+          "reasoning": true,
+          "name": "o1-2024-12-17"
         },
         "o1-mini": {
           "name": "o1 mini",
@@ -710,8 +717,8 @@
           "webSearch": true
         },
         "o1-pro-2025-03-19": {
-          "name": "o1-pro-2025-03-19",
-          "reasoning": true
+          "reasoning": true,
+          "name": "o1-pro-2025-03-19"
         },
         "o3": {
           "name": "o3",
@@ -724,18 +731,18 @@
           "webSearch": true
         },
         "o3-2025-04-16": {
-          "name": "o3-2025-04-16",
-          "reasoning": true
+          "reasoning": true,
+          "name": "o3-2025-04-16"
         },
         "o3-deep-research": {
-          "name": "o3-deep-research",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "o3-deep-research"
         },
         "o3-deep-research-2025-06-26": {
-          "name": "o3-deep-research-2025-06-26",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "o3-deep-research-2025-06-26"
         },
         "o3-mini": {
           "name": "o3 mini",
@@ -747,17 +754,17 @@
           "reasoning": true
         },
         "o3-mini-2025-01-31": {
-          "name": "o3-mini-2025-01-31",
-          "reasoning": true
+          "reasoning": true,
+          "name": "o3-mini-2025-01-31"
         },
         "o3-pro": {
-          "name": "o3-pro",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "o3-pro"
         },
         "o3-pro-2025-06-10": {
-          "name": "o3-pro-2025-06-10",
-          "reasoning": true
+          "reasoning": true,
+          "name": "o3-pro-2025-06-10"
         },
         "o4-mini": {
           "name": "o4 mini",
@@ -770,18 +777,18 @@
           "webSearch": true
         },
         "o4-mini-2025-04-16": {
-          "name": "o4-mini-2025-04-16",
-          "reasoning": true
+          "reasoning": true,
+          "name": "o4-mini-2025-04-16"
         },
         "o4-mini-deep-research": {
-          "name": "o4-mini-deep-research",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "o4-mini-deep-research"
         },
         "o4-mini-deep-research-2025-06-26": {
-          "name": "o4-mini-deep-research-2025-06-26",
           "reasoning": true,
-          "webSearch": true
+          "webSearch": true,
+          "name": "o4-mini-deep-research-2025-06-26"
         }
       }
     },
@@ -806,7 +813,7 @@
           "contextWindow": 131072,
           "inputPrice": 3,
           "outputPrice": 15,
-          "vision": true,
+          "vision": false,
           "textGeneration": true,
           "webSearch": true
         },
@@ -815,13 +822,13 @@
           "contextWindow": 131072,
           "inputPrice": 0.3,
           "outputPrice": 0.5,
-          "vision": true,
+          "vision": false,
           "textGeneration": true,
           "webSearch": true
         },
         "grok-4": {
           "name": "Grok 4",
-          "vision": true,
+          "reasoning": true,
           "webSearch": true
         },
         "grok-4-0709": {

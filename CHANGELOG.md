@@ -4,6 +4,15 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.0.7
+
+**Web search & Grok fix**
+
+- Web search — enhance any section with live web results, fact-check claims against the web
+- Fixed Grok web search
+- Toolbar buttons spin while processing
+- Fact Check turns green after successful web search
+
 ## 1.0.6
 
 **Facebook feed support**

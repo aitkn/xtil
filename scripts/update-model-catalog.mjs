@@ -693,7 +693,11 @@ ${docsText}`;
 // ---------------------------------------------------------------------------
 // Merge logic
 // ---------------------------------------------------------------------------
-function mergeModelEntry(baseline, api, docs) {
+// Fields that are manually curated and should be preserved from the existing
+// catalog if no fresh source (baseline/API/docs) provides them.
+const PRESERVE_FIELDS = ['reasoning', 'webSearch'];
+
+function mergeModelEntry(baseline, api, docs, existing) {
   const merged = { ...baseline };
 
   // API layer overrides baseline (per non-null field)
@@ -710,10 +714,20 @@ function mergeModelEntry(baseline, api, docs) {
     }
   }
 
+  // Preserve manually-set fields from the existing catalog if not provided
+  // by any fresh source (baseline, API, docs)
+  if (existing) {
+    for (const key of PRESERVE_FIELDS) {
+      if (merged[key] == null && existing[key] != null) {
+        merged[key] = existing[key];
+      }
+    }
+  }
+
   return merged;
 }
 
-function mergeCatalog(baseline, apiModels, docsModels) {
+function mergeCatalog(baseline, apiModels, docsModels, existingModels) {
   // Collect all model IDs from all sources
   const allIds = new Set([
     ...Object.keys(baseline),
@@ -723,7 +737,7 @@ function mergeCatalog(baseline, apiModels, docsModels) {
 
   const merged = {};
   for (const id of allIds) {
-    merged[id] = mergeModelEntry(baseline[id] || {}, apiModels[id], docsModels[id]);
+    merged[id] = mergeModelEntry(baseline[id] || {}, apiModels[id], docsModels[id], existingModels?.[id]);
 
     // Ensure required fields have fallbacks
     if (!merged[id].name) merged[id].name = id;
@@ -751,7 +765,7 @@ function validateProvider(providerId, models) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-async function processProvider(providerId) {
+async function processProvider(providerId, existingModels) {
   const provider = PROVIDERS[providerId];
   console.log(`\n[${provider.name}]`);
 
@@ -786,8 +800,8 @@ async function processProvider(providerId) {
     console.log(`  Skipping docs (--skip-docs)`);
   }
 
-  // Merge
-  const merged = mergeCatalog(baseline, apiModels, docsModels);
+  // Merge (pass existing models to preserve manually-curated fields)
+  const merged = mergeCatalog(baseline, apiModels, docsModels, existingModels || {});
   console.log(`  Merged: ${Object.keys(merged).length} models`);
 
   // Validate
@@ -803,9 +817,9 @@ async function main() {
 
   const providerIds = providerFlag ? [providerFlag] : Object.keys(PROVIDERS);
 
-  // If single provider mode, load existing catalog and update just that provider
+  // Always load existing catalog to preserve manually-curated fields
   let existingCatalog = null;
-  if (providerFlag && existsSync(OUTPUT_PATH)) {
+  if (existsSync(OUTPUT_PATH)) {
     try {
       existingCatalog = JSON.parse(readFileSync(OUTPUT_PATH, 'utf-8'));
     } catch {
@@ -828,7 +842,8 @@ async function main() {
       console.error(`Unknown provider: ${id}`);
       process.exit(1);
     }
-    const models = await processProvider(id);
+    const existingModels = existingCatalog?.providers?.[id]?.models || {};
+    const models = await processProvider(id, existingModels);
 
     // Sort models alphabetically by ID
     const sorted = {};
