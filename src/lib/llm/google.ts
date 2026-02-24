@@ -1,4 +1,5 @@
 import type { ChatMessage, ChatOptions, LLMProvider, ProviderConfig } from './types';
+import { getCatalogEntry } from './models';
 
 const DEFAULT_ENDPOINT = 'https://generativelanguage.googleapis.com';
 
@@ -18,10 +19,12 @@ export class GoogleProvider implements LLMProvider {
     // Google's API requires the key as a query parameter (not a header) — this is their design.
     const url = `${this.endpoint}/v1beta/models/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
+    const entry = getCatalogEntry('google', this.config.model);
+    const isReasoning = entry?.reasoning === true;
     const generationConfig: Record<string, unknown> = {
-      temperature: options?.temperature ?? 0.3,
       maxOutputTokens: options?.maxTokens ?? 4096,
     };
+    if (!isReasoning) generationConfig.temperature = options?.temperature ?? 0.3;
     // Skip JSON response format when webSearch is active — Gemini doesn't allow
     // combining tools with responseMimeType/responseSchema.
     if (!options?.webSearch) {
@@ -86,10 +89,12 @@ export class GoogleProvider implements LLMProvider {
     const { systemInstruction, contents } = convertMessages(messages);
     const url = `${this.endpoint}/v1beta/models/${this.config.model}:streamGenerateContent?alt=sse&key=${this.config.apiKey}`;
 
+    const entry = getCatalogEntry('google', this.config.model);
+    const isReasoning = entry?.reasoning === true;
     const streamGenConfig: Record<string, unknown> = {
-      temperature: options?.temperature ?? 0.3,
       maxOutputTokens: options?.maxTokens ?? 4096,
     };
+    if (!isReasoning) streamGenConfig.temperature = options?.temperature ?? 0.3;
     // Note: responseSchema is NOT used for streaming — Gemini's streamGenerateContent
     // can produce broken responses with strict schema enforcement. jsonMode (just
     // responseMimeType) works reliably; the response is parsed on the UI side.

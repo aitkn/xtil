@@ -828,21 +828,15 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
     let lastChatPush = 0;
     const CHAT_THROTTLE_MS = 150;
 
-    const streamWithOpts = async (opts: ChatOptions) => {
-      accumulated = '';
-      lastChatPush = 0;
-      const generator = provider.streamChat(chatMessages, opts);
-      for await (const chunk of generator) {
-        accumulated += chunk;
-        const now = Date.now();
-        if (now - lastChatPush >= CHAT_THROTTLE_MS) {
-          lastChatPush = now;
-          broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });
-        }
+    const generator = provider.streamChat(chatMessages, chatOpts);
+    for await (const chunk of generator) {
+      accumulated += chunk;
+      const now = Date.now();
+      if (now - lastChatPush >= CHAT_THROTTLE_MS) {
+        lastChatPush = now;
+        broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });
       }
-    };
-
-    await streamWithOpts(chatOpts);
+    }
 
     // Final flush
     broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });

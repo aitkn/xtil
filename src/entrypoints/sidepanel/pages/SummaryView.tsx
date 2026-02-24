@@ -164,7 +164,7 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
       {summary.factCheck && (
         <Section title="Fact Check"
           subtitle={!searchedSections?.has('Fact Check') ? '(use search to update)' : undefined}
-          titleColor={searchedSections?.has('Fact Check') ? '#4caf50' : '#f9a825'}
+          titleColor={searchedSections?.has('Fact Check') ? 'var(--md-sys-color-success)' : 'var(--md-sys-color-warning)'}
           onDelete={onDeleteSection ? () => onDeleteSection('factCheck') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Fact Check', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Fact Check', 'less') : undefined}
