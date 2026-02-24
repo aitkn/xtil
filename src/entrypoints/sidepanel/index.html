@@ -263,6 +263,31 @@
         background: var(--md-sys-color-error-container);
         color: var(--md-sys-color-on-error-container);
       }
+      .section-toolbar > .section-toolbar-search {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .section-toolbar > .section-toolbar-search:hover:not(:disabled) {
+        background: var(--md-sys-color-tertiary-container);
+        color: var(--md-sys-color-on-tertiary-container);
+      }
+      .section-toolbar > .section-toolbar-search.disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      /* Spinning animation for in-progress toolbar actions */
+      @keyframes toolbar-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .section-toolbar > button.spinning {
+        animation: toolbar-spin 1s linear infinite;
+        opacity: 1 !important;
+        pointer-events: none;
+      }
+      /* Keep toolbar visible when a button is spinning */
+      .section-toolbar:has(.spinning) { opacity: 1 !important; }
       .markdown-content pre.mermaid .node rect,
       .markdown-content pre.mermaid .node polygon,
       .markdown-content pre.mermaid .node circle { rx: 8; ry: 8; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.10)); }

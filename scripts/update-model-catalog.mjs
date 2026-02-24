@@ -73,6 +73,7 @@ const KNOWN_MODELS = {
         inputPrice: 2.5,
         outputPrice: 10.0,
         vision: true,
+        webSearch: true,
       },
       'gpt-4o-mini': {
         name: 'GPT-4o mini',
@@ -81,6 +82,7 @@ const KNOWN_MODELS = {
         inputPrice: 0.15,
         outputPrice: 0.6,
         vision: true,
+        webSearch: true,
       },
       'gpt-4.1': {
         name: 'GPT-4.1',
@@ -89,6 +91,7 @@ const KNOWN_MODELS = {
         inputPrice: 2.0,
         outputPrice: 8.0,
         vision: true,
+        webSearch: true,
       },
       'gpt-4.1-mini': {
         name: 'GPT-4.1 mini',
@@ -97,6 +100,7 @@ const KNOWN_MODELS = {
         inputPrice: 0.4,
         outputPrice: 1.6,
         vision: true,
+        webSearch: true,
       },
       'gpt-4.1-nano': {
         name: 'GPT-4.1 nano',
@@ -105,6 +109,7 @@ const KNOWN_MODELS = {
         inputPrice: 0.1,
         outputPrice: 0.4,
         vision: true,
+        webSearch: true,
       },
       'gpt-4-turbo': {
         name: 'GPT-4 Turbo',
@@ -121,6 +126,8 @@ const KNOWN_MODELS = {
         inputPrice: 15.0,
         outputPrice: 60.0,
         vision: true,
+        reasoning: true,
+        webSearch: true,
       },
       'o1-mini': {
         name: 'o1 mini',
@@ -129,6 +136,7 @@ const KNOWN_MODELS = {
         inputPrice: 1.1,
         outputPrice: 4.4,
         vision: false,
+        reasoning: true,
       },
       'o1-pro': {
         name: 'o1 Pro',
@@ -137,6 +145,8 @@ const KNOWN_MODELS = {
         inputPrice: 150.0,
         outputPrice: 600.0,
         vision: true,
+        reasoning: true,
+        webSearch: true,
       },
       'o3': {
         name: 'o3',
@@ -145,6 +155,8 @@ const KNOWN_MODELS = {
         inputPrice: 10.0,
         outputPrice: 40.0,
         vision: true,
+        reasoning: true,
+        webSearch: true,
       },
       'o3-mini': {
         name: 'o3 mini',
@@ -153,6 +165,7 @@ const KNOWN_MODELS = {
         inputPrice: 1.1,
         outputPrice: 4.4,
         vision: false,
+        reasoning: true,
       },
       'o4-mini': {
         name: 'o4 mini',
@@ -161,6 +174,8 @@ const KNOWN_MODELS = {
         inputPrice: 1.1,
         outputPrice: 4.4,
         vision: true,
+        reasoning: true,
+        webSearch: true,
       },
       'chatgpt-4o-latest': {
         name: 'ChatGPT-4o Latest',
@@ -169,6 +184,7 @@ const KNOWN_MODELS = {
         inputPrice: 5.0,
         outputPrice: 15.0,
         vision: true,
+        webSearch: true,
       },
     },
   },
@@ -241,6 +257,8 @@ const KNOWN_MODELS = {
         inputPrice: 1.25,
         outputPrice: 10.0,
         vision: true,
+        reasoning: true,
+        webSearch: true,
       },
       'gemini-2.5-flash-preview-05-20': {
         name: 'Gemini 2.5 Flash',
@@ -249,6 +267,8 @@ const KNOWN_MODELS = {
         inputPrice: 0.15,
         outputPrice: 0.6,
         vision: true,
+        reasoning: true,
+        webSearch: true,
       },
       'gemini-2.0-flash': {
         name: 'Gemini 2.0 Flash',
@@ -257,6 +277,7 @@ const KNOWN_MODELS = {
         inputPrice: 0.1,
         outputPrice: 0.4,
         vision: true,
+        webSearch: true,
       },
       'gemini-2.0-flash-lite': {
         name: 'Gemini 2.0 Flash Lite',
@@ -265,6 +286,7 @@ const KNOWN_MODELS = {
         inputPrice: 0.075,
         outputPrice: 0.3,
         vision: true,
+        webSearch: true,
       },
       'gemini-1.5-pro': {
         name: 'Gemini 1.5 Pro',
@@ -273,6 +295,7 @@ const KNOWN_MODELS = {
         inputPrice: 1.25,
         outputPrice: 5.0,
         vision: true,
+        webSearch: true,
       },
       'gemini-1.5-flash': {
         name: 'Gemini 1.5 Flash',
@@ -281,6 +304,7 @@ const KNOWN_MODELS = {
         inputPrice: 0.075,
         outputPrice: 0.3,
         vision: true,
+        webSearch: true,
       },
     },
   },
@@ -294,6 +318,8 @@ const KNOWN_MODELS = {
         outputPrice: 0.5,
         vision: true,
         textGeneration: true,
+        reasoning: true,
+        webSearch: true,
       },
       'grok-4-1-fast-non-reasoning': {
         name: 'Grok 4.1 Fast (Non-Reasoning)',
@@ -302,6 +328,7 @@ const KNOWN_MODELS = {
         outputPrice: 0.5,
         vision: true,
         textGeneration: true,
+        webSearch: true,
       },
       'grok-code-fast-1': {
         name: 'Grok Code Fast 1',
@@ -318,6 +345,7 @@ const KNOWN_MODELS = {
         outputPrice: 15.0,
         vision: true,
         textGeneration: true,
+        webSearch: true,
       },
       'grok-4-fast-reasoning': {
         name: 'Grok 4 Fast (Reasoning)',
@@ -326,6 +354,8 @@ const KNOWN_MODELS = {
         outputPrice: 0.5,
         vision: true,
         textGeneration: true,
+        reasoning: true,
+        webSearch: true,
       },
       'grok-4-fast-non-reasoning': {
         name: 'Grok 4 Fast (Non-Reasoning)',
@@ -334,6 +364,7 @@ const KNOWN_MODELS = {
         outputPrice: 0.5,
         vision: true,
         textGeneration: true,
+        webSearch: true,
       },
       'grok-3': {
         name: 'Grok 3',
@@ -342,6 +373,7 @@ const KNOWN_MODELS = {
         outputPrice: 15.0,
         vision: false,
         textGeneration: true,
+        webSearch: true,
       },
       'grok-3-mini': {
         name: 'Grok 3 Mini',
@@ -350,6 +382,7 @@ const KNOWN_MODELS = {
         outputPrice: 0.5,
         vision: false,
         textGeneration: true,
+        webSearch: true,
       },
       'grok-2-vision-1212': {
         name: 'Grok 2 Vision',
@@ -358,6 +391,7 @@ const KNOWN_MODELS = {
         outputPrice: 10.0,
         vision: true,
         textGeneration: true,
+        webSearch: true,
       },
       // --- Image/video generation models (not for chat) ---
       'grok-2-image-1212': {
@@ -399,6 +433,7 @@ const KNOWN_MODELS = {
         inputPrice: 0.55,
         outputPrice: 2.19,
         vision: false,
+        reasoning: true,
       },
     },
   },
@@ -597,6 +632,8 @@ Extract ALL models mentioned with their specifications. For each model, provide:
 - inputPrice: price per 1 million input tokens in USD (number)
 - outputPrice: price per 1 million output tokens in USD (number)
 - vision: whether the model supports image/vision input (boolean)
+- reasoning: whether the model is a reasoning/thinking model that uses chain-of-thought (boolean). Examples: o1, o3, o4-mini, gpt-5, gpt-5.2, Gemini 2.5 Pro/Flash (thinking), DeepSeek R1.
+- webSearch: whether the model supports built-in web search / grounding via API tools (boolean). Examples: OpenAI web_search_preview, Google Search grounding, xAI live_search.
 
 Respond with ONLY a JSON object mapping model IDs to their metadata. Omit fields you cannot determine. Example:
 {
@@ -606,7 +643,9 @@ Respond with ONLY a JSON object mapping model IDs to their metadata. Omit fields
     "maxOutput": 16384,
     "inputPrice": 2.50,
     "outputPrice": 10.00,
-    "vision": true
+    "vision": true,
+    "reasoning": false,
+    "webSearch": true
   }
 }
 

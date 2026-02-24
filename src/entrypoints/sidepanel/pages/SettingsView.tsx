@@ -140,7 +140,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           filtered[pid] = filtered[pid].map((m) => {
             const cat = catalogMap.get(m.id);
             if (!cat) return m;
-            return { ...m, name: cat.name, inputPrice: cat.inputPrice ?? m.inputPrice, outputPrice: cat.outputPrice ?? m.outputPrice, contextWindow: cat.contextWindow ?? m.contextWindow, maxOutput: cat.maxOutput ?? m.maxOutput, vision: cat.vision ?? m.vision };
+            return { ...m, name: cat.name, inputPrice: cat.inputPrice ?? m.inputPrice, outputPrice: cat.outputPrice ?? m.outputPrice, contextWindow: cat.contextWindow ?? m.contextWindow, maxOutput: cat.maxOutput ?? m.maxOutput, vision: cat.vision ?? m.vision, reasoning: cat.reasoning ?? m.reasoning, webSearch: cat.webSearch ?? m.webSearch };
           });
           // Add new models not already in the cached list
           const existingIds = new Set(filtered[pid].map((m) => m.id));

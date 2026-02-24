@@ -191,7 +191,7 @@ async function handleMessage(message: Message): Promise<Message> {
       return { type: 'CANCEL_SUMMARIZE', success: true } as Message;
     }
     case 'CHAT_MESSAGE':
-      return handleChatMessage(message.messages, message.summary, message.content, message.tabId);
+      return handleChatMessage(message.messages, message.summary, message.content, message.tabId, message.webSearch);
     case 'EXPORT':
       return handleExport(message.adapterId, message.summary, message.content, message.replacePageId);
     case 'CHECK_NOTION_DUPLICATE':
@@ -702,6 +702,7 @@ async function handleChatMessage(
   summary: SummaryDocument,
   content: ExtractedContent,
   tabId?: number,
+  webSearch?: boolean,
 ): Promise<ChatResponseMessage> {
   try {
     const settings = await getSettings();
@@ -819,13 +820,14 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
     let lastResponseBody = '';
 
     const chatOpts: ChatOptions = schemaEnforced
-      ? { jsonSchema: RESPONSE_SCHEMA, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } }
-      : { jsonMode: true, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } };
+      ? { jsonSchema: RESPONSE_SCHEMA, webSearch, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } }
+      : { jsonMode: true, webSearch, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } };
 
     // Stream the chat response so the user sees typing in real-time
     let accumulated = '';
     let lastChatPush = 0;
     const CHAT_THROTTLE_MS = 150;
+
     const generator = provider.streamChat(chatMessages, chatOpts);
     for await (const chunk of generator) {
       accumulated += chunk;
@@ -835,6 +837,7 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
         broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });
       }
     }
+
     // Final flush
     broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });
     const response = accumulated;

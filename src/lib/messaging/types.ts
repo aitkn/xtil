@@ -91,6 +91,8 @@ export interface ChatMessageRequest {
   summary: SummaryDocument;
   content: ExtractedContent;
   tabId?: number;
+  /** Enable web search / grounding for this request. */
+  webSearch?: boolean;
 }
 
 export interface ChatResponseMessage {

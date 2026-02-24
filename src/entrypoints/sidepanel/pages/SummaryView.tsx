@@ -17,9 +17,16 @@ interface SummaryContentProps {
   onNavigate?: (url: string) => void;
   onDeleteSection?: (sectionKey: string) => void;
   onAdjustSection?: (sectionTitle: string, direction: 'more' | 'less') => void;
+  onWebSearch?: (sectionTitle: string) => void;
+  /** When set, search button is shown disabled with this tooltip instead of hidden. */
+  webSearchDisabledReason?: string;
+  /** Sections that have been updated via web search. */
+  searchedSections?: ReadonlySet<string>;
+  /** Currently active section actions (for spinning buttons). */
+  activeSectionActions?: ReadonlyMap<string, 'search' | 'more' | 'less'>;
 }
 
-export function SummaryContent({ summary, content, onExport, notionUrl, exporting, onNavigate, onDeleteSection, onAdjustSection }: SummaryContentProps) {
+export function SummaryContent({ summary, content, onExport, notionUrl, exporting, onNavigate, onDeleteSection, onAdjustSection, onWebSearch, webSearchDisabledReason, searchedSections, activeSectionActions }: SummaryContentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mdSaved, setMdSaved] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -40,6 +47,8 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
     else window.open(url, '_blank');
   };
 
+  const spinning = (title: string) => activeSectionActions?.get(title) ?? null;
+
   return (
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions
     <div ref={containerRef} data-summary-container onClick={handleLinkClick}>
@@ -49,6 +58,9 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           onDelete={onDeleteSection ? () => onDeleteSection('tldr') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('TL;DR', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('TL;DR', 'less') : undefined}
+          onWebSearch={onWebSearch ? () => onWebSearch('TL;DR') : undefined}
+          spinningAction={spinning('TL;DR')}
+          webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
           <div class="summary-callout">
             <div style={{ font: 'var(--md-sys-typescale-body-large)', lineHeight: 1.5 }}><MarkdownRenderer content={tldrBody} /></div>
@@ -68,6 +80,9 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           onDelete={onDeleteSection ? () => onDeleteSection('keyTakeaways') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Key Takeaways', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Key Takeaways', 'less') : undefined}
+          onWebSearch={onWebSearch ? () => onWebSearch('Key Takeaways') : undefined}
+          spinningAction={spinning('Key Takeaways')}
+          webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
           <ol style={{ paddingLeft: '24px', font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.6, color: 'var(--md-sys-color-on-surface)' }}>
             {summary.keyTakeaways.map((point, i) => (
@@ -83,6 +98,9 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           onDelete={onDeleteSection ? () => onDeleteSection('summary') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Summary', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Summary', 'less') : undefined}
+          onWebSearch={onWebSearch ? () => onWebSearch('Summary') : undefined}
+          spinningAction={spinning('Summary')}
+          webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
           <div style={{ font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.6 }}>
             <MarkdownRenderer content={summary.summary} />
@@ -96,6 +114,9 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           onDelete={onDeleteSection ? () => onDeleteSection('notableQuotes') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Notable Quotes', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Notable Quotes', 'less') : undefined}
+          onWebSearch={onWebSearch ? () => onWebSearch('Notable Quotes') : undefined}
+          spinningAction={spinning('Notable Quotes')}
+          webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
           {summary.notableQuotes.map((quote, i) => (
             <blockquote key={i} style={{
@@ -118,6 +139,9 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           onDelete={onDeleteSection ? () => onDeleteSection('prosAndCons') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Pros & Cons', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Pros & Cons', 'less') : undefined}
+          onWebSearch={onWebSearch ? () => onWebSearch('Pros & Cons') : undefined}
+          spinningAction={spinning('Pros & Cons')}
+          webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
           <div class="pros-cons-grid">
             <div class="pros-card">
@@ -139,9 +163,14 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
       {/* Fact Check */}
       {summary.factCheck && (
         <Section title="Fact Check"
+          subtitle={!searchedSections?.has('Fact Check') ? '(use search to update)' : undefined}
+          titleColor={searchedSections?.has('Fact Check') ? 'var(--md-sys-color-success)' : 'var(--md-sys-color-warning)'}
           onDelete={onDeleteSection ? () => onDeleteSection('factCheck') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Fact Check', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Fact Check', 'less') : undefined}
+          onWebSearch={onWebSearch ? () => onWebSearch('Fact Check') : undefined}
+          spinningAction={spinning('Fact Check')}
+          webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
           <div style={{ font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.5 }}>
             <MarkdownRenderer content={summary.factCheck} />
@@ -155,6 +184,9 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           onDelete={onDeleteSection ? () => onDeleteSection('commentsHighlights') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Comment Highlights', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Comment Highlights', 'less') : undefined}
+          onWebSearch={onWebSearch ? () => onWebSearch('Comment Highlights') : undefined}
+          spinningAction={spinning('Comment Highlights')}
+          webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
           <ul style={{ paddingLeft: '20px', font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.6 }}>
             {summary.commentsHighlights.map((h, i) => <li key={i}><InlineMarkdown text={h} /></li>)}
@@ -168,6 +200,9 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           onDelete={onDeleteSection ? () => onDeleteSection('conclusion') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Conclusion', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Conclusion', 'less') : undefined}
+          onWebSearch={onWebSearch ? () => onWebSearch('Conclusion') : undefined}
+          spinningAction={spinning('Conclusion')}
+          webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
           <div class="summary-callout-conclusion">
             <div style={{ font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.5 }}>
@@ -183,6 +218,9 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           onDelete={onDeleteSection ? () => onDeleteSection(`extra:${title}`) : undefined}
           onMore={onAdjustSection ? () => onAdjustSection(title, 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection(title, 'less') : undefined}
+          onWebSearch={onWebSearch ? () => onWebSearch(title) : undefined}
+          spinningAction={spinning(title)}
+          webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
           <div style={{ font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.6 }}>
             <MarkdownRenderer content={content} />
@@ -543,12 +581,19 @@ const sectionUserState = new Map<string, boolean>();
 /** Reset user section overrides (call when generating a fresh summary for a new page). */
 export function resetSectionState() { sectionUserState.clear(); }
 
-function Section({ title, defaultOpen = false, onDelete, onMore, onLess, children }: {
+function Section({ title, subtitle, titleColor, defaultOpen = false, onDelete, onMore, onLess, onWebSearch, webSearchDisabledReason, spinningAction, children }: {
   title: string;
+  subtitle?: string;
+  titleColor?: string;
   defaultOpen?: boolean;
   onDelete?: () => void;
   onMore?: () => void;
   onLess?: () => void;
+  onWebSearch?: () => void;
+  /** When set, the search button is shown but disabled with this tooltip. */
+  webSearchDisabledReason?: string;
+  /** Which button is currently spinning (in-progress action). */
+  spinningAction?: 'search' | 'more' | 'less' | null;
   children: preact.ComponentChildren;
 }) {
   const [open, setOpen] = useState(sectionUserState.get(title) ?? defaultOpen);
@@ -559,7 +604,8 @@ function Section({ title, defaultOpen = false, onDelete, onMore, onLess, childre
     setOpen(next);
   };
 
-  const hasToolbar = onDelete || onMore || onLess;
+  const showSearchButton = onWebSearch || webSearchDisabledReason;
+  const hasToolbar = onDelete || onMore || onLess || showSearchButton;
 
   return (
     <div class="summary-section" style={{ marginBottom: '4px', position: 'relative' }}>
@@ -590,15 +636,29 @@ function Section({ title, defaultOpen = false, onDelete, onMore, onLess, childre
           fontSize: '10px',
           color: 'var(--md-sys-color-on-surface-variant)',
         }}>&#9654;</span>
-        {title}
+        <span style={titleColor ? { color: titleColor } : undefined}>{title}</span>
+        {subtitle && <span style={{ font: 'var(--md-sys-typescale-label-small)', color: titleColor || 'var(--md-sys-color-on-surface-variant)', opacity: 0.7, marginLeft: '4px' }}>{subtitle}</span>}
       </button>
       {hasToolbar && (
         <div class="section-toolbar no-print">
+          {showSearchButton && (
+            <button
+              onClick={onWebSearch ? (e) => { e.stopPropagation(); onWebSearch(); } : undefined}
+              disabled={!onWebSearch}
+              class={`section-toolbar-search${!onWebSearch ? ' disabled' : ''}${spinningAction === 'search' ? ' spinning' : ''}`}
+              title={webSearchDisabledReason || 'Update with web search'}
+              aria-label={webSearchDisabledReason || 'Update with web search'}
+            >
+              <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <circle cx="6.5" cy="6.5" r="4.5" /><line x1="10" y1="10" x2="14" y2="14" />
+              </svg>
+            </button>
+          )}
           {onMore && (
-            <button onClick={(e) => { e.stopPropagation(); onMore(); }} title="Elaborate more" aria-label="Elaborate more">+</button>
+            <button class={spinningAction === 'more' ? 'spinning' : undefined} onClick={(e) => { e.stopPropagation(); onMore(); }} title="Elaborate more" aria-label="Elaborate more">+</button>
           )}
           {onLess && (
-            <button onClick={(e) => { e.stopPropagation(); onLess(); }} title="Make shorter" aria-label="Make shorter">&minus;</button>
+            <button class={spinningAction === 'less' ? 'spinning' : undefined} onClick={(e) => { e.stopPropagation(); onLess(); }} title="Make shorter" aria-label="Make shorter">&minus;</button>
           )}
           {onDelete && (
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} class="section-toolbar-delete" title={`Remove ${title}`} aria-label={`Remove ${title}`}>&#215;</button>
