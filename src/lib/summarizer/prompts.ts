@@ -391,7 +391,7 @@ Image Analysis Instructions:
 }
 
 export function getSummarizationPrompt(content: ExtractedContent, detailLevel: 'brief' | 'standard' | 'detailed' = 'standard'): string {
-  const isDiscussion = content.type === 'reddit' || content.type === 'twitter' || content.type === 'linkedin';
+  const isDiscussion = ['reddit', 'twitter', 'linkedin'].includes(content.type);
   const contentLabel = content.type === 'youtube' ? 'YouTube video'
     : content.type === 'reddit' ? 'Reddit discussion'
     : content.type === 'twitter' ? 'X thread'

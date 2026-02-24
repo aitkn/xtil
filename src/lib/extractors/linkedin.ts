@@ -270,35 +270,20 @@ function extractPostText(postEl: Element): string {
 }
 
 function getCleanText(el: Element): string {
-  const doc = el.ownerDocument!;
-  const parts: string[] = [];
-  const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const parent = node.parentElement;
-      if (!parent) return NodeFilter.FILTER_REJECT;
-      // Skip "see more"/"see less" buttons
-      if (parent.closest('button')) return NodeFilter.FILTER_REJECT;
-      // Skip hidden elements
-      if (parent.getAttribute('aria-hidden') === 'true' &&
-          !parent.closest('.feed-shared-text, .update-components-text')) {
-        return NodeFilter.FILTER_REJECT;
-      }
-      const text = node.textContent?.trim();
-      if (!text) return NodeFilter.FILTER_REJECT;
-      return NodeFilter.FILTER_ACCEPT;
-    },
+  // Clone to avoid modifying the live DOM
+  const clone = el.cloneNode(true) as HTMLElement;
+
+  // Remove "see more"/"see less" buttons to avoid including their text
+  clone.querySelectorAll('button').forEach(btn => {
+    const text = btn.textContent?.trim().toLowerCase() || '';
+    if (text.includes('see more') || text.includes('see less')) {
+      btn.remove();
+    }
   });
 
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    const text = node.textContent?.trim();
-    if (text) parts.push(text);
-  }
-
-  // Join with spaces, then convert double-newlines back to paragraph breaks
-  return parts.join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  // innerText preserves paragraph breaks from block-level elements
+  const text = clone.innerText || '';
+  return text.replace(/(\n\s*){3,}/g, '\n\n').trim();
 }
 
 function extractPostUrl(postEl: Element, pageUrl: string): string {
@@ -336,10 +321,13 @@ function cleanLinkedInUrl(raw: string): string {
   try {
     const u = new URL(raw);
     // Remove tracking params
+    const trackingParams = new Set([
+      'utm_source', 'utm_medium', 'utm_campaign', 'utm_content',
+      'trackingId', 'refId', 'trk', 'midToken', 'midSig',
+      'lipi', 'lici',
+    ]);
     for (const key of [...u.searchParams.keys()]) {
-      if (['utm_source', 'utm_medium', 'utm_campaign', 'utm_content',
-           'trackingId', 'refId', 'trk', 'midToken', 'midSig',
-           'lipi', 'lici'].includes(key)) {
+      if (trackingParams.has(key)) {
         u.searchParams.delete(key);
       }
     }
