@@ -77,7 +77,7 @@ export class NotionAdapter implements ExportAdapter {
       const uploadId = await this.uploadImageToNotion(content.thumbnailUrl);
       if (uploadId) {
         thumbnailRef = { type: 'file_upload', file_upload: { id: uploadId } };
-      } else if (content.type !== 'facebook') {
+      } else if (content.type !== 'facebook' && content.type !== 'linkedin') {
         // Fallback to external URL for non-Facebook (public URLs)
         thumbnailRef = { type: 'external', external: { url: content.thumbnailUrl } };
       }
@@ -237,9 +237,11 @@ export class NotionAdapter implements ExportAdapter {
             ? 'Reddit Discussion'
             : content.type === 'twitter'
               ? 'X Thread'
-              : content.type === 'github'
-                ? 'GitHub'
-                : 'Web Page';
+              : content.type === 'linkedin'
+                ? 'LinkedIn Post'
+                : content.type === 'github'
+                  ? 'GitHub'
+                  : 'Web Page';
 
     const properties: Record<string, unknown> = {
       Title: {

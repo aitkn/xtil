@@ -6,6 +6,7 @@ import { facebookExtractor } from './facebook';
 import { redditExtractor } from './reddit';
 import { twitterExtractor } from './twitter';
 import { githubExtractor } from './github';
+import { linkedinExtractor } from './linkedin';
 import { articleExtractor } from './article';
 import { genericExtractor } from './generic';
 
@@ -17,6 +18,7 @@ const extractors: ContentExtractor[] = [
   redditExtractor,
   twitterExtractor,
   githubExtractor,
+  linkedinExtractor,
   articleExtractor,
   genericExtractor, // always last — fallback
 ];
