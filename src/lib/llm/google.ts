@@ -1,6 +1,20 @@
 import type { ChatMessage, ChatOptions, LLMProvider, ProviderConfig } from './types';
 import { getCatalogEntry } from './models';
 
+/** Extract a clean error message from Gemini API error JSON. */
+function parseGeminiError(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    const msg = parsed?.error?.message;
+    if (typeof msg === 'string') {
+      // Strip verbose quota lines after the first sentence
+      const first = msg.split('\n')[0].trim();
+      return `Gemini API error (${status}): ${first}`;
+    }
+  } catch { /* not JSON */ }
+  return `Gemini API error (${status}): ${body.slice(0, 200)}`;
+}
+
 const DEFAULT_ENDPOINT = 'https://generativelanguage.googleapis.com';
 
 export class GoogleProvider implements LLMProvider {
@@ -63,7 +77,7 @@ export class GoogleProvider implements LLMProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+        throw new Error(parseGeminiError(response.status, errorText));
       }
 
       const data = await response.json();
@@ -123,7 +137,7 @@ export class GoogleProvider implements LLMProvider {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+      throw new Error(parseGeminiError(response.status, errorText));
     }
 
     const reader = response.body?.getReader();

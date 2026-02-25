@@ -2170,6 +2170,7 @@ function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
     summary: (parsed.summary as string) || '',
     notableQuotes: Array.isArray(parsed.notableQuotes) ? parsed.notableQuotes : [],
     conclusion: (parsed.conclusion as string) || '',
+    factCheck: coerceToMarkdownString(parsed.factCheck),
     prosAndCons: pc ? { pros: Array.isArray(pc.pros) ? pc.pros : [], cons: Array.isArray(pc.cons) ? pc.cons : [] } : undefined,
     commentsHighlights: coerceCommentsHighlights(parsed),
     extraSections: collectUnknownAsExtra(parsed, explicitExtra ?? undefined),
@@ -2181,6 +2182,29 @@ function normalizeSummary(parsed: Record<string, unknown>): SummaryDocument {
     inferredAuthor: (parsed.inferredAuthor as string) || undefined,
     inferredPublishDate: (parsed.inferredPublishDate as string) || undefined,
   };
+}
+
+/**
+ * Coerce a value to a markdown string.
+ * Handles: string, array of strings, array of objects ({claim, verdict, ...}).
+ */
+function coerceToMarkdownString(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  return value
+    .map((v: unknown) => {
+      let s: string;
+      if (typeof v === 'string') {
+        s = v.trim();
+      } else if (v && typeof v === 'object') {
+        // Handle structured objects like {claim, verdict, explanation}
+        s = Object.values(v as Record<string, unknown>).filter(Boolean).map(String).join(' — ');
+      } else {
+        s = String(v).trim();
+      }
+      return s.startsWith('- ') ? s : `- ${s}`;
+    })
+    .join('\n');
 }
 
 const DELETE_SENTINEL = '__DELETE__';
@@ -2221,9 +2245,11 @@ function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDoc
     switch (key) {
       case 'tldr': case 'summary': case 'conclusion': case 'factCheck':
       case 'sourceLanguage': case 'summaryLanguage': case 'translatedTitle':
-      case 'inferredTitle': case 'inferredAuthor': case 'inferredPublishDate':
-        if (typeof value === 'string') result[key] = value;
+      case 'inferredTitle': case 'inferredAuthor': case 'inferredPublishDate': {
+        const coerced = coerceToMarkdownString(value);
+        if (coerced !== undefined) result[key] = coerced;
         break;
+      }
       case 'keyTakeaways': case 'notableQuotes': case 'relatedTopics':
       case 'tags':
         if (Array.isArray(value)) result[key] = value;

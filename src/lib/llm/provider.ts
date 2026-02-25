@@ -1,6 +1,21 @@
 import type { ChatMessage, ChatOptions, LLMProvider, ProviderConfig } from './types';
 import { getCatalogEntry } from './models';
 
+/** Strip Grok inline citation markup tags from response text. */
+function stripCitationTags(text: string): string {
+  return text.replace(/<grok:render[^>]*>[^<]*(?:<\/grok:render>)?/g, '');
+}
+
+/** Extract a clean error message from OpenAI-compatible API error JSON. */
+function parseApiError(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    const msg = parsed?.error?.message;
+    if (typeof msg === 'string') return `LLM API error (${status}): ${msg.split('\n')[0].trim()}`;
+  } catch { /* not JSON */ }
+  return `LLM API error (${status}): ${body.slice(0, 200)}`;
+}
+
 /**
  * Base provider for OpenAI-compatible APIs.
  * Works for: OpenAI, xAI (Grok), DeepSeek, self-hosted (Ollama, LM Studio).
@@ -51,6 +66,29 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 
   /**
+   * Format a message for the Responses API (OpenAI).
+   * Uses `input_text` / `input_image` part types instead of Chat Completions'
+   * `text` / `image_url`.
+   */
+  private formatResponsesMessage(m: ChatMessage): Record<string, unknown> {
+    if (m.images?.length) {
+      const parts: Array<Record<string, unknown>> = [{ type: 'input_text', text: m.content }];
+      for (const img of m.images) {
+        if ('url' in img) {
+          parts.push({ type: 'input_image', image_url: img.url });
+        } else {
+          parts.push({
+            type: 'input_image',
+            image_url: `data:${img.mimeType};base64,${img.base64}`,
+          });
+        }
+      }
+      return { role: m.role, content: parts };
+    }
+    return { role: m.role, content: m.content };
+  }
+
+  /**
    * Responses API — used for web search on OpenAI and xAI.
    * OpenAI: web_search_preview tool; xAI: web_search tool.
    * Chat Completions API only supports 'function'/'custom' tool types.
@@ -62,9 +100,11 @@ export class OpenAICompatibleProvider implements LLMProvider {
       .filter(m => m.role === 'system')
       .map(m => m.content)
       .join('\n\n') || undefined;
+    // OpenAI Responses API uses different content part types (input_text/input_image);
+    // xAI Responses API doesn't support multi-part content at all — text only.
     const input = messages
       .filter(m => m.role !== 'system')
-      .map(m => this.formatMessage(m));
+      .map(m => this.isOpenAI ? this.formatResponsesMessage(m) : ({ role: m.role, content: m.content }));
 
     const searchTool = this.isOpenAI ? 'web_search_preview' : 'web_search';
     const body: Record<string, unknown> = {
@@ -96,7 +136,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`LLM API error (${response.status}): ${errorText}`);
+        throw new Error(parseApiError(response.status, errorText));
       }
 
       const data = await response.json();
@@ -108,10 +148,10 @@ export class OpenAICompatibleProvider implements LLMProvider {
         if (item.type === 'message') {
           const content = item.content as Array<Record<string, unknown>> | undefined;
           const textPart = content?.find((c: Record<string, unknown>) => c.type === 'output_text');
-          if (textPart?.text) return textPart.text as string;
+          if (textPart?.text) return stripCitationTags(textPart.text as string);
         }
       }
-      return data.output_text || '';
+      return stripCitationTags(data.output_text || '');
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         if (options?.signal?.aborted) throw new Error('Summarization cancelled');
@@ -168,7 +208,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`LLM API error (${response.status}): ${errorText}`);
+        throw new Error(parseApiError(response.status, errorText));
       }
 
       const data = await response.json();
@@ -223,7 +263,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`LLM API error (${response.status}): ${errorText}`);
+      throw new Error(parseApiError(response.status, errorText));
     }
 
     let accumulated = '';

@@ -1,5 +1,15 @@
 import type { ChatMessage, ChatOptions, LLMProvider, ProviderConfig } from './types';
 
+/** Extract a clean error message from Anthropic API error JSON. */
+function parseAnthropicError(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    const msg = parsed?.error?.message;
+    if (typeof msg === 'string') return `Anthropic API error (${status}): ${msg.split('\n')[0].trim()}`;
+  } catch { /* not JSON */ }
+  return `Anthropic API error (${status}): ${body.slice(0, 200)}`;
+}
+
 const DEFAULT_ENDPOINT = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
 
@@ -60,7 +70,7 @@ export class AnthropicProvider implements LLMProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Anthropic API error (${response.status}): ${errorText}`);
+        throw new Error(parseAnthropicError(response.status, errorText));
       }
 
       const data = await response.json();
@@ -119,7 +129,7 @@ export class AnthropicProvider implements LLMProvider {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Anthropic API error (${response.status}): ${errorText}`);
+      throw new Error(parseAnthropicError(response.status, errorText));
     }
 
     const reader = response.body?.getReader();

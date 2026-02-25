@@ -4,6 +4,15 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.0.8
+
+**Web search & error handling fixes**
+
+- Fixed web search for Grok and OpenAI models
+- Fixed Fact Check section not appearing with Gemini models
+- Strip Grok citation tags from web search results
+- Clean, readable API error messages instead of raw JSON
+
 ## 1.0.7
 
 **Web search & Grok fix**

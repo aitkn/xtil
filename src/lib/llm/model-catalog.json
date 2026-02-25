@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-02-24T23:15:20.443Z",
+  "_generated": "2026-02-25T08:12:08.672Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -42,7 +42,8 @@
           "inputPrice": 1,
           "outputPrice": 5,
           "vision": true,
-          "reasoning": false
+          "reasoning": false,
+          "webSearch": false
         },
         "claude-opus-4-1-20250805": {
           "name": "Claude Opus 4.1"
@@ -65,7 +66,8 @@
           "inputPrice": 5,
           "outputPrice": 25,
           "vision": true,
-          "reasoning": false
+          "reasoning": false,
+          "webSearch": false
         },
         "claude-sonnet-4-20250514": {
           "name": "Claude Sonnet 4"
@@ -85,7 +87,8 @@
           "inputPrice": 3,
           "outputPrice": 15,
           "vision": true,
-          "reasoning": false
+          "reasoning": false,
+          "webSearch": false
         }
       }
     },
@@ -101,7 +104,7 @@
           "reasoning": false
         },
         "deepseek-reasoner": {
-          "name": "DeepSeek-V3.2 (Thinking Mode)",
+          "name": "DeepSeek-V3.2 Reasoning",
           "contextWindow": 128000,
           "maxOutput": 64000,
           "inputPrice": 0.28,
