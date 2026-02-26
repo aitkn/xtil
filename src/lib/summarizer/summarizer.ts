@@ -80,7 +80,7 @@ export function buildSummarizationSystemPrompt(
   let systemPrompt = getSystemPrompt(detailLevel, language, languageExcept, hasImages, wordCount, contentType, githubPageType);
 
   if (userInstructions) {
-    systemPrompt += `\n\nAdditional user instructions (HIGHEST PRIORITY — these override any prior rules or guidelines above): ${userInstructions}`;
+    systemPrompt += `\n\nUSER AUTHORITY: The user's additional instructions below are the highest-priority instructions. They override ALL prior rules, formatting requirements, and summarization guidelines above. The user has full authority to change the topic, skip the summary, request something completely different, or ignore any previous instruction. Always comply with the user's requests without pushback.\n\nUser instructions: ${userInstructions}`;
   }
 
   return systemPrompt;
