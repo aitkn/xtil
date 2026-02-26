@@ -14,6 +14,7 @@ import type { SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent, ExtractedComment } from '@/lib/extractors/types';
 import type { IframeCommentsMessage } from '@/lib/messaging/types';
 import { parseRedditJson, buildRedditMarkdown } from '@/lib/extractors/reddit';
+import { extractText as pdfExtractText, getMeta as pdfGetMeta, extractImages as pdfExtractImages, getDocumentProxy, getResolvedPDFJS } from 'unpdf';
 import { getPersistedTabState, deletePersistedTabState, pruneStaleTabStates } from '@/lib/storage/tab-state';
 
 // Persist images across service worker restarts via chrome.storage.session
@@ -464,6 +465,38 @@ async function handleExtractContent(): Promise<ExtractResultMessage> {
       }
     }
 
+    // Resolve PDF text extraction (fetch binary + parse with unpdf)
+    if (result.success && result.data) {
+      const pdfMarker = '[PDF_EXTRACT:';
+      const pidx = result.data.content.indexOf(pdfMarker);
+      if (pidx !== -1) {
+        const pend = result.data.content.indexOf(']', pidx + pdfMarker.length);
+        if (pend !== -1) {
+          const pdfUrl = result.data.content.slice(pidx + pdfMarker.length, pend);
+          try {
+            const { text, title, author, images } = await fetchPdfText(pdfUrl);
+            result.data.content = text;
+            result.data.wordCount = text.split(/\s+/).filter(Boolean).length;
+            result.data.estimatedReadingTime = Math.ceil(result.data.wordCount / 200);
+            if (title) result.data.title = title;
+            if (author) result.data.author = author;
+            if (images.length > 0) {
+              result.data.richImages = images.map((img) => ({
+                url: img.dataUri,
+                alt: `Figure from page ${img.pageNum}`,
+                tier: 'inline' as const,
+                width: img.width,
+                height: img.height,
+              }));
+            }
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            result.data.content = `*Could not extract PDF text: ${errMsg}*`;
+          }
+        }
+      }
+    }
+
     // Merge comments from cross-origin iframes (Disqus, Giscus, Utterances)
     if (result.success && result.data && tab.id) {
       const iframeExtra = await extractIframeComments(tab.id);
@@ -560,6 +593,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
       modelVision = await getModelVision(provider, llmConfig.providerId, llmConfig.model);
       imageAnalysisEnabled = modelVision === 'base64' || modelVision === 'url';
     }
+    console.log(`[xTil summarize] richImages: ${content.richImages?.length ?? 0}, imageAnalysis: ${settings.enableImageAnalysis ?? true}, modelVision: ${modelVision}, enabled: ${imageAnalysisEnabled}`);
 
     let allFetchedImages: FetchedImage[] = [];
     let imageUrlList: { url: string; alt: string }[] = [];
@@ -571,12 +605,14 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         ...richImages.filter((i) => i.tier === 'inline'),
         ...richImages.filter((i) => i.tier === 'contextual'),
       ];
+      console.log(`[xTil summarize] Fetching ${sorted.length} images, URLs start with: ${sorted.map(i => i.url.substring(0, 30)).join(', ')}`);
 
       // Always fetch and encode as base64 — sending URLs directly is unreliable
       // because the remote LLM API can't access images behind auth/cookies (e.g. x.com)
       // or served with unsupported content-types. The service worker has the user's
       // session and fetchImages() converts unsupported formats to JPEG.
       allFetchedImages = await fetchImages(sorted, 5);
+      console.log(`[xTil summarize] fetchImages returned ${allFetchedImages.length} images`);
       imageUrlList = allFetchedImages.map((fi) => ({ url: fi.url, alt: fi.alt }));
     }
 
@@ -725,6 +761,7 @@ async function handleChatMessage(
       : content.type === 'twitter' ? 'X thread'
       : content.type === 'linkedin' ? 'LinkedIn post'
       : content.type === 'github' ? 'GitHub page'
+      : content.type === 'pdf' ? 'PDF document'
       : 'web page';
 
     // Truncate original content based on context window (60% of context, ~4 chars/token)
@@ -798,7 +835,11 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
     }
 
     // --- SYSTEM MSG 3: Current summary (changes each turn) ---
-    const summarySystem = `Current summary (JSON):\n${JSON.stringify(summary, null, 2)}`;
+    // Strip data URI images from summary to avoid bloating the chat context
+    // (the LLM can't usefully manipulate base64 blobs; original images are already attached)
+    const summaryForChat = JSON.stringify(summary, null, 2)
+      .replace(/!\[([^\]]*)\]\(data:[^)]+\)/g, '![[$1] — embedded image]');
+    const summarySystem = `Current summary (JSON):\n${summaryForChat}`;
 
     const chatMessages: ChatMessage[] = [
       { role: 'system', content: rulesSystem },
@@ -1247,4 +1288,453 @@ async function fetchGoogleDocText(docId: string): Promise<string> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+interface PdfImage {
+  dataUri: string;
+  width: number;
+  height: number;
+  pageNum: number;
+}
+
+async function fetchPdfText(pdfUrl: string): Promise<{ text: string; title?: string; author?: string; images: PdfImage[] }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+
+  try {
+    const response = await fetch(pdfUrl, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`PDF fetch failed (${response.status}).`);
+    }
+
+    // Guard against huge PDFs that could exhaust service worker memory
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 50_000_000) {
+      throw new Error('PDF is too large to process (>50 MB).');
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const data = new Uint8Array(arrayBuffer);
+
+    // Get a shared document proxy for all operations
+    // disableFontFace: service worker has no DOM/@font-face — forces pdfjs to
+    // convert text glyphs to vector paths so rendered images show readable text
+    const pdf = await getDocumentProxy(data, { disableFontFace: true });
+
+    // Extract text from all pages
+    const { totalPages, text: pageTexts } = await pdfExtractText(pdf, { mergePages: false });
+
+    // Extract metadata (title, author)
+    let pdfTitle: string | undefined;
+    let pdfAuthor: string | undefined;
+    try {
+      const { info } = await pdfGetMeta(pdf);
+      if (info) {
+        const meta = info as Record<string, unknown>;
+        if (typeof meta.Title === 'string' && meta.Title.trim()) pdfTitle = meta.Title.trim();
+        if (typeof meta.Author === 'string' && meta.Author.trim()) pdfAuthor = meta.Author.trim();
+      }
+    } catch {
+      // Metadata extraction is non-critical
+    }
+
+    // Extract images from PDF pages (raster first, then render figure pages as fallback)
+    const images = await extractPdfImages(pdf, totalPages, pageTexts as string[]);
+
+    // Build structured text preserving page breaks
+    const pages = pageTexts as string[];
+    const parts: string[] = [];
+    for (let i = 0; i < pages.length; i++) {
+      const pageText = pages[i].trim();
+      if (!pageText) continue;
+
+      const cleaned = pageText
+        .replace(/\r\n/g, '\n')
+        .replace(/([^\n])\n([^\n])/g, '$1 $2') // join broken lines within paragraphs
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+
+      if (totalPages > 1) {
+        parts.push(`--- Page ${i + 1} ---\n\n${cleaned}`);
+      } else {
+        parts.push(cleaned);
+      }
+    }
+
+    let fullText = parts.join('\n\n');
+    if (!fullText.trim()) {
+      throw new Error('PDF appears to contain no extractable text (may be scanned/image-based).');
+    }
+
+    // Detect garbled text (custom font encodings without proper Unicode maps)
+    // Count replacement characters (□ U+FFFD, etc.) vs normal alphanumeric chars
+    const alphaNum = fullText.match(/[a-zA-Z0-9]/g)?.length || 0;
+    const replacementChars = fullText.match(/[\uFFFD\u25A1\u2610\u2612\u00A0]/g)?.length || 0;
+    const totalChars = fullText.length;
+    if (totalChars > 100 && alphaNum / totalChars < 0.15) {
+      console.warn(`[xTil PDF] Text appears garbled (${alphaNum} alphanumeric / ${totalChars} total chars)`);
+      fullText = '*Note: This PDF uses custom font encodings that could not be fully decoded. Text below may contain garbled characters. The page images (if any) provide the visual content.*\n\n' + fullText;
+    }
+
+    pdf.destroy();
+
+    return { text: fullText, title: pdfTitle, author: pdfAuthor, images };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('PDF fetch timed out after 60s');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const MAX_PDF_IMAGES = 10;
+const MIN_IMAGE_DIM = 100; // skip tiny images (icons, bullets, decorations)
+const PAGE_RENDER_SCALE = 1.5; // 108 DPI — good balance between quality and size
+
+async function extractPdfImages(
+  pdf: Awaited<ReturnType<typeof getDocumentProxy>>,
+  totalPages: number,
+  pageTexts: string[],
+): Promise<PdfImage[]> {
+  // Step 1: Try extracting embedded raster images (including inline images)
+  const rasterImages = await extractAllImages(pdf, totalPages);
+  if (rasterImages.length > 0) {
+    console.log(`[xTil PDF] Found ${rasterImages.length} images`);
+    return rasterImages;
+  }
+
+  // Step 2: No embedded images — render pages that contain figures/tables
+  console.log('[xTil PDF] No raster images found, rendering figure pages...');
+  const figurePages = detectFigurePages(pageTexts);
+  console.log(`[xTil PDF] Detected figure pages: ${figurePages.join(', ') || 'none'}`);
+
+  if (figurePages.length === 0) return [];
+
+  const rendered: PdfImage[] = [];
+  for (const pageNum of figurePages.slice(0, MAX_PDF_IMAGES)) {
+    try {
+      const image = await renderPageAsDataUri(pdf, pageNum);
+      if (image) rendered.push(image);
+    } catch (err) {
+      console.warn(`[xTil PDF] Failed to render page ${pageNum}:`, err);
+    }
+  }
+
+  console.log(`[xTil PDF] Rendered ${rendered.length} figure pages as images`);
+  return rendered;
+}
+
+/** Detect pages that likely contain figures or tables by scanning for captions. */
+function detectFigurePages(pageTexts: string[]): number[] {
+  const pages: number[] = [];
+  for (let i = 0; i < pageTexts.length; i++) {
+    const lines = pageTexts[i].split('\n');
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^Fig(?:ure)?[\s.:]+\d/i.test(t) || /^Table\s+\d/i.test(t)) {
+        pages.push(i + 1); // 1-indexed
+        break;
+      }
+    }
+  }
+  return pages;
+}
+
+/** Render a PDF page and crop to just the figure area.
+ *  Strategy: find the caption line, then find the last "body text" line above it.
+ *  Body text = long strings (>40 chars) that span the page width.
+ *  Short strings (axis labels, legends) inside the figure are ignored. */
+async function renderPageAsDataUri(
+  pdf: Awaited<ReturnType<typeof getDocumentProxy>>,
+  pageNum: number,
+): Promise<PdfImage | null> {
+  const page = await pdf.getPage(pageNum);
+  const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
+  const fullWidth = Math.floor(viewport.width);
+  const fullHeight = Math.floor(viewport.height);
+
+  // Get text items with positions
+  const textContent = await page.getTextContent();
+  const items = textContent.items.filter((it: unknown) => 'str' in (it as Record<string, unknown>)) as { str: string; transform: number[]; width?: number }[];
+
+  // Find the caption item
+  let captionCanvasY: number | null = null;
+  for (const item of items) {
+    const t = item.str.trim();
+    if (/^Fig(?:ure)?[\s.:]+\d/i.test(t) || /^Table\s+\d/i.test(t)) {
+      const [, y] = viewport.convertToViewportPoint(0, item.transform[5]);
+      captionCanvasY = y;
+      break;
+    }
+  }
+
+  if (captionCanvasY === null) return null;
+
+  // Collect "body text" lines — long strings that are paragraph text, not figure labels.
+  // Body text lines have many characters; figure labels are short.
+  const MIN_BODY_TEXT_LEN = 40;
+  const bodyTextYs: number[] = [];
+  for (const item of items) {
+    if (item.str.trim().length >= MIN_BODY_TEXT_LEN) {
+      const [, y] = viewport.convertToViewportPoint(0, item.transform[5]);
+      bodyTextYs.push(y);
+    }
+  }
+  bodyTextYs.sort((a, b) => a - b); // ascending (top of page first)
+
+  // Find the last body text line ABOVE the caption (with some margin)
+  const captionMargin = 15 * PAGE_RENDER_SCALE;
+  let figureTop = 0; // default: top of page
+  for (let i = bodyTextYs.length - 1; i >= 0; i--) {
+    if (bodyTextYs[i] < captionCanvasY - captionMargin) {
+      figureTop = bodyTextYs[i] + 12 * PAGE_RENDER_SCALE; // just below that text line
+      break;
+    }
+  }
+
+  // Include caption + one extra line below
+  const captionBottom = captionCanvasY + 25 * PAGE_RENDER_SCALE;
+
+  const cropTop = Math.max(0, Math.floor(figureTop));
+  const cropBottom = Math.min(fullHeight, Math.floor(captionBottom));
+  const cropHeight = cropBottom - cropTop;
+
+  if (cropHeight < MIN_IMAGE_DIM) return null;
+
+  // Render full page
+  const fullCanvas = new OffscreenCanvas(fullWidth, fullHeight);
+  const fullCtx = fullCanvas.getContext('2d');
+  if (!fullCtx) return null;
+  await page.render({ canvasContext: fullCtx as unknown as CanvasRenderingContext2D, viewport }).promise;
+
+  // Crop to figure area
+  const cropCanvas = new OffscreenCanvas(fullWidth, cropHeight);
+  const cropCtx = cropCanvas.getContext('2d');
+  if (!cropCtx) return null;
+  cropCtx.drawImage(fullCanvas, 0, cropTop, fullWidth, cropHeight, 0, 0, fullWidth, cropHeight);
+
+  // Trim white space from all sides by scanning pixels
+  const imgData = cropCtx.getImageData(0, 0, fullWidth, cropHeight);
+  const pixels = imgData.data; // RGBA
+  const WHITE_THRESHOLD = 250; // near-white
+  const isNonWhite = (idx: number) =>
+    pixels[idx] < WHITE_THRESHOLD || pixels[idx + 1] < WHITE_THRESHOLD || pixels[idx + 2] < WHITE_THRESHOLD;
+  const ROW_THRESHOLD = Math.floor(fullWidth * 0.02); // 2% of width
+  const COL_THRESHOLD = Math.floor(cropHeight * 0.02); // 2% of height
+
+  // Trim top
+  let trimTop = 0;
+  for (let row = 0; row < cropHeight; row++) {
+    let count = 0;
+    for (let col = 0; col < fullWidth; col++) {
+      if (isNonWhite((row * fullWidth + col) * 4) && ++count >= ROW_THRESHOLD) break;
+    }
+    if (count >= ROW_THRESHOLD) { trimTop = Math.max(0, row - 5); break; }
+  }
+
+  // Trim bottom
+  let trimBottom = cropHeight;
+  for (let row = cropHeight - 1; row > trimTop; row--) {
+    let count = 0;
+    for (let col = 0; col < fullWidth; col++) {
+      if (isNonWhite((row * fullWidth + col) * 4) && ++count >= ROW_THRESHOLD) break;
+    }
+    if (count >= ROW_THRESHOLD) { trimBottom = Math.min(cropHeight, row + 6); break; }
+  }
+
+  // Trim left
+  let trimLeft = 0;
+  for (let col = 0; col < fullWidth; col++) {
+    let count = 0;
+    for (let row = trimTop; row < trimBottom; row++) {
+      if (isNonWhite((row * fullWidth + col) * 4) && ++count >= COL_THRESHOLD) break;
+    }
+    if (count >= COL_THRESHOLD) { trimLeft = Math.max(0, col - 5); break; }
+  }
+
+  // Trim right
+  let trimRight = fullWidth;
+  for (let col = fullWidth - 1; col > trimLeft; col--) {
+    let count = 0;
+    for (let row = trimTop; row < trimBottom; row++) {
+      if (isNonWhite((row * fullWidth + col) * 4) && ++count >= COL_THRESHOLD) break;
+    }
+    if (count >= COL_THRESHOLD) { trimRight = Math.min(fullWidth, col + 6); break; }
+  }
+
+  const trimmedW = trimRight - trimLeft;
+  const trimmedH = trimBottom - trimTop;
+  if (trimmedW < MIN_IMAGE_DIM || trimmedH < MIN_IMAGE_DIM) return null;
+
+  const needsTrim = trimTop > 0 || trimLeft > 0 || trimRight < fullWidth || trimBottom < cropHeight;
+  let finalCanvas: OffscreenCanvas;
+  if (needsTrim) {
+    finalCanvas = new OffscreenCanvas(trimmedW, trimmedH);
+    const finalCtx = finalCanvas.getContext('2d');
+    if (!finalCtx) return null;
+    finalCtx.drawImage(cropCanvas, trimLeft, trimTop, trimmedW, trimmedH, 0, 0, trimmedW, trimmedH);
+    console.log(`[xTil PDF] Page ${pageNum}: trimmed whitespace — top=${trimTop} bottom=${cropHeight - trimBottom} left=${trimLeft} right=${fullWidth - trimRight}`);
+  } else {
+    finalCanvas = cropCanvas;
+  }
+
+  // PNG is better for diagrams/vector graphics rendered from PDFs
+  const blob = await finalCanvas.convertToBlob({ type: 'image/png' });
+  console.log(`[xTil PDF] Page ${pageNum}: figure ${trimmedW}x${trimmedH} (crop y=${cropTop}..${cropBottom})`);
+
+  return { dataUri: await blobToBase64DataUri(blob), width: trimmedW, height: trimmedH, pageNum };
+}
+
+/** Diagnose what operator types exist on figure pages (for debugging). */
+async function diagnoseFigurePages(
+  pdf: Awaited<ReturnType<typeof getDocumentProxy>>,
+  figurePages: number[],
+): Promise<void> {
+  const pdfjs = await getResolvedPDFJS();
+  const OPS = pdfjs.OPS;
+
+  // Build reverse map: OPS value → name
+  const opsNames: Record<number, string> = {};
+  for (const [name, value] of Object.entries(OPS)) {
+    if (typeof value === 'number') opsNames[value] = name;
+  }
+
+  for (const pageNum of figurePages.slice(0, 3)) {
+    try {
+      const page = await pdf.getPage(pageNum);
+      const opList = await page.getOperatorList();
+
+      // Count operators by type
+      const counts: Record<string, number> = {};
+      for (const op of opList.fnArray) {
+        const name = opsNames[op] || `unknown(${op})`;
+        counts[name] = (counts[name] || 0) + 1;
+      }
+
+      // Show image-related and form-related ops
+      const imageOps = Object.entries(counts).filter(([name]) =>
+        name.toLowerCase().includes('image') ||
+        name.toLowerCase().includes('form') ||
+        name.toLowerCase().includes('paint'),
+      );
+
+      console.log(`[xTil PDF] Page ${pageNum} operators:`, JSON.stringify(counts));
+      console.log(`[xTil PDF] Page ${pageNum} image/form ops:`, JSON.stringify(Object.fromEntries(imageOps)));
+    } catch (err) {
+      console.warn(`[xTil PDF] Failed to diagnose page ${pageNum}:`, err);
+    }
+  }
+}
+
+/** Extract ALL image types from PDF pages (ImageXObject, inline images, image masks). */
+async function extractAllImages(
+  pdf: Awaited<ReturnType<typeof getDocumentProxy>>,
+  totalPages: number,
+): Promise<PdfImage[]> {
+  const pdfjs = await getResolvedPDFJS();
+  const OPS = pdfjs.OPS;
+  const images: PdfImage[] = [];
+
+  for (let pageNum = 1; pageNum <= totalPages && images.length < MAX_PDF_IMAGES; pageNum++) {
+    try {
+      const page = await pdf.getPage(pageNum);
+      const opList = await page.getOperatorList();
+
+      for (let i = 0; i < opList.fnArray.length; i++) {
+        if (images.length >= MAX_PDF_IMAGES) break;
+        const op = opList.fnArray[i];
+
+        // Standard ImageXObject
+        if (op === OPS.paintImageXObject || op === OPS.paintImageXObjectRepeat) {
+          const imageKey = opList.argsArray[i][0];
+          try {
+            const image = await new Promise<{ data: Uint8ClampedArray; width: number; height: number } | null>(
+              (resolve) => {
+                const objs = imageKey.startsWith('g_') ? page.commonObjs : page.objs;
+                objs.get(imageKey, (obj: unknown) => resolve(obj as { data: Uint8ClampedArray; width: number; height: number } | null));
+              },
+            );
+            if (image?.data && image.width >= MIN_IMAGE_DIM && image.height >= MIN_IMAGE_DIM) {
+              const channels = Math.round(image.data.length / (image.width * image.height)) as 1 | 3 | 4;
+              if ([1, 3, 4].includes(channels)) {
+                const pdfImage = await pixelsToDataUri(image.data, image.width, image.height, channels);
+                if (pdfImage) images.push({ ...pdfImage, pageNum });
+              }
+            }
+          } catch { /* skip */ }
+        }
+
+        // Inline images (embedded directly in the content stream)
+        if (op === OPS.paintInlineImageXObject || op === OPS.paintInlineImageXObjectGroup) {
+          try {
+            const imgData = opList.argsArray[i][0];
+            if (imgData?.data && imgData.width >= MIN_IMAGE_DIM && imgData.height >= MIN_IMAGE_DIM) {
+              const channels = Math.round(imgData.data.length / (imgData.width * imgData.height)) as 1 | 3 | 4;
+              if ([1, 3, 4].includes(channels)) {
+                const pdfImage = await pixelsToDataUri(imgData.data, imgData.width, imgData.height, channels);
+                if (pdfImage) images.push({ ...pdfImage, pageNum });
+              }
+            }
+          } catch { /* skip */ }
+        }
+      }
+    } catch {
+      // skip page
+    }
+  }
+
+  return images;
+}
+
+/** Convert raw pixel data to a PNG data URI via OffscreenCanvas. */
+async function pixelsToDataUri(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  channels: 1 | 3 | 4,
+): Promise<Omit<PdfImage, 'pageNum'> | null> {
+  const rgbaData = toRGBA(data, channels, width, height);
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.putImageData(new ImageData(rgbaData, width, height), 0, 0);
+  const blob = await canvas.convertToBlob({ type: 'image/png' });
+  const dataUri = await blobToBase64DataUri(blob);
+
+  return { dataUri, width, height };
+}
+
+/** Convert a Blob to a base64 data URI string. */
+async function blobToBase64DataUri(blob: Blob): Promise<string> {
+  const ab = await blob.arrayBuffer();
+  const bytes = new Uint8Array(ab);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return `data:${blob.type};base64,${btoa(binary)}`;
+}
+
+function toRGBA(data: Uint8ClampedArray, channels: 1 | 3 | 4, width: number, height: number): Uint8ClampedArray {
+  if (channels === 4) return data;
+
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  if (channels === 3) {
+    for (let i = 0, j = 0; i < data.length; i += 3, j += 4) {
+      rgba[j] = data[i];
+      rgba[j + 1] = data[i + 1];
+      rgba[j + 2] = data[i + 2];
+      rgba[j + 3] = 255;
+    }
+  } else {
+    // Grayscale
+    for (let i = 0, j = 0; i < data.length; i++, j += 4) {
+      rgba[j] = rgba[j + 1] = rgba[j + 2] = data[i];
+      rgba[j + 3] = 255;
+    }
+  }
+  return rgba;
 }

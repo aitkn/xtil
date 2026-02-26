@@ -4,6 +4,16 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.0.9
+
+**PDF support & LaTeX math rendering**
+
+- PDF text extraction — summarize academic papers, reports, and any PDF opened in Chrome
+- PDF figure extraction — renders vector diagrams from PDF pages with smart cropping
+- LaTeX math rendering — formulas display beautifully in the side panel via KaTeX
+- Native Notion equation support — LaTeX formulas export as Notion's built-in equations
+- Clipboard math — formulas paste into Gmail and Google Docs using Unicode math and HTML sup/sub
+
 ## 1.0.8
 
 **Web search & error handling fixes**

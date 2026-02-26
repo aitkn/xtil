@@ -378,6 +378,7 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
 }) {
   const badgeColors: Record<string, { bg: string; text: string }> = {
     article: { bg: 'var(--md-sys-color-success-container)', text: 'var(--md-sys-color-on-success-container)' },
+    pdf: { bg: 'var(--md-sys-color-secondary-container)', text: 'var(--md-sys-color-on-secondary-container)' },
     youtube: { bg: 'var(--md-sys-color-error-container)', text: 'var(--md-sys-color-on-error-container)' },
     facebook: { bg: 'var(--md-sys-color-primary-container)', text: 'var(--md-sys-color-on-primary-container)' },
     reddit: { bg: '#FFE0B2', text: '#E65100' },
@@ -402,7 +403,7 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
         fontWeight: 600,
         textTransform: 'uppercase',
       }}>
-        {content.type === 'youtube' ? 'YouTube' : content.type === 'facebook' ? 'Facebook' : content.type === 'reddit' ? 'Reddit' : content.type === 'twitter' ? 'X' : content.type === 'github' ? 'GitHub' : content.type === 'linkedin' ? 'LinkedIn' : content.type}
+        {content.type === 'youtube' ? 'YouTube' : content.type === 'pdf' ? 'PDF' : content.type === 'facebook' ? 'Facebook' : content.type === 'reddit' ? 'Reddit' : content.type === 'twitter' ? 'X' : content.type === 'github' ? 'GitHub' : content.type === 'linkedin' ? 'LinkedIn' : content.type}
       </span>
       {content.type !== 'github' && content.estimatedReadingTime > 0 && (
         <span style={{ color: 'var(--md-sys-color-on-surface-variant)', font: 'var(--md-sys-typescale-label-small)' }}>
@@ -837,6 +838,96 @@ async function svgToPng(liveSvg: SVGSVGElement): Promise<string> {
   }
 }
 
+
+/** Convert LaTeX to simplified HTML using <sup>, <sub>, and Unicode math.
+ *  Handles the common cases that appear in academic paper summaries.
+ *  Google Docs, Gmail, and most rich text editors support this subset. */
+function latexToSimpleHtml(tex: string): string {
+  let s = tex.trim();
+
+  // Greek letters
+  const greek: Record<string, string> = {
+    alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', zeta: 'ζ',
+    eta: 'η', theta: 'θ', iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ',
+    nu: 'ν', xi: 'ξ', pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ',
+    upsilon: 'υ', phi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω',
+    Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ',
+    Pi: 'Π', Sigma: 'Σ', Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω',
+    varepsilon: 'ε', varphi: 'φ', vartheta: 'ϑ',
+  };
+  for (const [cmd, ch] of Object.entries(greek)) {
+    s = s.replace(new RegExp(`\\\\${cmd}(?![a-zA-Z])`, 'g'), ch);
+  }
+
+  // Math operators and symbols
+  const symbols: Record<string, string> = {
+    '\\sum': '∑', '\\prod': '∏', '\\int': '∫', '\\infty': '∞',
+    '\\partial': '∂', '\\nabla': '∇', '\\forall': '∀', '\\exists': '∃',
+    '\\in': '∈', '\\notin': '∉', '\\subset': '⊂', '\\subseteq': '⊆',
+    '\\cup': '∪', '\\cap': '∩', '\\emptyset': '∅',
+    '\\leq': '≤', '\\geq': '≥', '\\neq': '≠', '\\approx': '≈',
+    '\\equiv': '≡', '\\sim': '∼', '\\propto': '∝',
+    '\\times': '×', '\\cdot': '·', '\\pm': '±', '\\mp': '∓',
+    '\\rightarrow': '→', '\\leftarrow': '←', '\\Rightarrow': '⇒',
+    '\\Leftarrow': '⇐', '\\leftrightarrow': '↔', '\\mapsto': '↦',
+    '\\ldots': '…', '\\cdots': '⋯', '\\vdots': '⋮',
+    '\\langle': '⟨', '\\rangle': '⟩',
+    '\\models': '⊨', '\\vDash': '⊨', '\\vdash': '⊢',
+    '\\neg': '¬', '\\land': '∧', '\\lor': '∨',
+    '\\min': 'min', '\\max': 'max', '\\log': 'log', '\\exp': 'exp',
+    '\\sin': 'sin', '\\cos': 'cos', '\\tan': 'tan',
+    '\\lim': 'lim', '\\sup': 'sup', '\\inf': 'inf',
+    '\\det': 'det', '\\dim': 'dim', '\\arg': 'arg',
+  };
+  for (const [cmd, ch] of Object.entries(symbols)) {
+    s = s.split(cmd).join(ch);
+  }
+
+  // Accents: \tilde{x} → x̃, \hat{x} → x̂, \bar{x} → x̄, \dot{x} → ẋ
+  s = s.replace(/\\tilde\{([^}])\}/g, '$1\u0303');
+  s = s.replace(/\\hat\{([^}])\}/g, '$1\u0302');
+  s = s.replace(/\\bar\{([^}])\}/g, '$1\u0304');
+  s = s.replace(/\\dot\{([^}])\}/g, '$1\u0307');
+  s = s.replace(/\\vec\{([^}])\}/g, '$1\u20D7');
+  // Multi-char accent groups: \tilde{abc} → ã b̃ c̃ — just add to first char
+  s = s.replace(/\\tilde\{([^}]+)\}/g, '$1\u0303');
+  s = s.replace(/\\hat\{([^}]+)\}/g, '$1\u0302');
+  s = s.replace(/\\bar\{([^}]+)\}/g, '$1\u0304');
+
+  // \text{...} and \mathrm{...} — just unwrap
+  s = s.replace(/\\(?:text|mathrm|textrm|textit|mathit|mathbf|textbf)\{([^}]*)\}/g, '$1');
+
+  // \frac{a}{b} → a/b (or a⁄b with fraction slash)
+  s = s.replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, '($1/$2)');
+
+  // \sqrt{x} → √x, \sqrt[n]{x} → ⁿ√x
+  s = s.replace(/\\sqrt\[([^\]]*)\]\{([^}]*)\}/g, '<sup>$1</sup>√($2)');
+  s = s.replace(/\\sqrt\{([^}]*)\}/g, '√($1)');
+
+  // Remove \left, \right, \big, \Big, \bigg, \Bigg
+  s = s.replace(/\\(?:left|right|big|Big|bigg|Bigg)\s*/g, '');
+
+  // Remove remaining unknown commands (keep their argument if any)
+  s = s.replace(/\\[a-zA-Z]+\{([^}]*)\}/g, '$1');
+  s = s.replace(/\\[a-zA-Z]+/g, '');
+
+  // Superscripts: ^{...} → <sup>...</sup>, ^x → <sup>x</sup>
+  s = s.replace(/\^\{([^}]*)\}/g, '<sup>$1</sup>');
+  s = s.replace(/\^([a-zA-Z0-9+\-])/g, '<sup>$1</sup>');
+
+  // Subscripts: _{...} → <sub>...</sub>, _x → <sub>x</sub>
+  s = s.replace(/_\{([^}]*)\}/g, '<sub>$1</sub>');
+  s = s.replace(/_([a-zA-Z0-9])/g, '<sub>$1</sub>');
+
+  // Clean up remaining LaTeX artifacts
+  s = s.replace(/[{}]/g, '');          // stray braces
+  s = s.replace(/\\\\/g, '');          // line breaks
+  s = s.replace(/\\[,;:!]\s*/g, ' '); // thin spaces
+  s = s.replace(/\s{2,}/g, ' ');      // collapse whitespace
+
+  return s.trim();
+}
+
 const STORE_URL = 'https://xtil.ai';
 
 export async function copyToClipboard(summary: SummaryDocument, content: ExtractedContent | null, containerEl: HTMLElement | null) {
@@ -893,6 +984,26 @@ export async function copyToClipboard(summary: SummaryDocument, content: Extract
 
     // Restore collapsed sections
     liveSections.forEach((el, i) => { el.style.display = savedDisplay[i]; });
+
+    // Replace KaTeX HTML with simplified HTML that Google Docs can render
+    // (GDocs strips KaTeX's complex CSS positioning, flattening formulas into garbled text)
+    clone.querySelectorAll<HTMLElement>('.katex-display').forEach(display => {
+      const annotation = display.querySelector('annotation');
+      if (!annotation) return;
+      const html = latexToSimpleHtml(annotation.textContent || '');
+      const div = document.createElement('div');
+      div.style.cssText = 'text-align:center;margin:8px 0;font-size:1.1em;';
+      div.innerHTML = html;
+      display.replaceWith(div);
+    });
+    clone.querySelectorAll<HTMLElement>('.katex').forEach(el => {
+      const annotation = el.querySelector('annotation');
+      if (!annotation) return;
+      const html = latexToSimpleHtml(annotation.textContent || '');
+      const span = document.createElement('span');
+      span.innerHTML = html;
+      el.replaceWith(span);
+    });
 
     // Replace Related Topics with a simple comma-separated link list (Google Docs strips inline-block/margin)
     if (summary.relatedTopics.length > 0) {

@@ -349,8 +349,9 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
     );
   }
   guidelines.push(`- All text fields support full markdown formatting (bold, italic, links, lists, etc.). Use it wherever it improves clarity.`);
+  guidelines.push(`- MATH FORMULAS: When the content contains mathematical expressions, equations, or formulas, reproduce them using LaTeX notation: \`$...$\` for inline math and \`$$...$$\` for display (block) equations. Always prefer LaTeX over Unicode approximations for anything beyond simple arithmetic.`);
   if (mermaidGuideline) guidelines.push(mermaidGuideline);
-  if (!contentType || contentType === 'article' || contentType === 'generic') {
+  if (!contentType || contentType === 'article' || contentType === 'pdf' || contentType === 'generic') {
     const chartMax = detailLevel === 'brief' ? '1' : detailLevel === 'standard' ? '2-3' : '2-5';
     guidelines.push(`- DATA CHARTS: If the content contains significant numerical tables or datasets, identify the most important data and visualize it using mermaid charts (\`xychart-beta\` for trends/comparisons, \`pie\` for proportions). Create up to ${chartMax} chart(s). Place charts in the "summary" or "extraSections" near the relevant discussion. This applies even when process/architecture diagrams are otherwise omitted — data visualization is always valuable when the numbers warrant it.`);
   }
@@ -397,6 +398,7 @@ export function getSummarizationPrompt(content: ExtractedContent, detailLevel: '
     : content.type === 'twitter' ? 'X thread'
     : content.type === 'linkedin' ? 'LinkedIn post'
     : content.type === 'github' ? getGitHubContentLabel(content)
+    : content.type === 'pdf' ? 'PDF document'
     : 'article/page';
 
   let prompt = `Summarize the following ${contentLabel}.\n\n`;

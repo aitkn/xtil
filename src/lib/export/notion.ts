@@ -89,6 +89,9 @@ export class NotionAdapter implements ExportAdapter {
     // Build page content blocks
     const children = this.buildContentBlocks(summary, content, thumbnailRef);
 
+    // Upload any data URI images (e.g. PDF figure renders) — Notion rejects URLs > 2000 chars
+    await this.uploadDataUriImages(children);
+
     // Notion API limits children to 100 blocks per request.
     // Send the first batch with page creation, then append the rest.
     const firstBatch = children.slice(0, 100);
@@ -231,7 +234,9 @@ export class NotionAdapter implements ExportAdapter {
       ? 'YouTube Video'
       : content.type === 'article'
         ? 'Article'
-        : content.type === 'facebook'
+        : content.type === 'pdf'
+          ? 'PDF'
+          : content.type === 'facebook'
           ? 'Facebook Post'
           : content.type === 'reddit'
             ? 'Reddit Discussion'
@@ -337,6 +342,48 @@ export class NotionAdapter implements ExportAdapter {
       return uploadId;
     } catch {
       return null; // Non-fatal — export continues without thumbnail
+    }
+  }
+
+  /** Find image blocks with data URI URLs, upload them to Notion, and replace in-place. */
+  private async uploadDataUriImages(blocks: unknown[]): Promise<void> {
+    for (const block of blocks) {
+      const b = block as { type?: string; image?: { type: string; external?: { url: string }; file_upload?: { id: string } } };
+      if (b.type !== 'image' || b.image?.type !== 'external') continue;
+      const url = b.image.external?.url;
+      if (!url || !url.startsWith('data:')) continue;
+
+      // Parse data URI to Blob
+      const match = url.match(/^data:(image\/[^;]+);base64,(.+)$/s);
+      if (!match) continue;
+      const mimeType = match[1];
+      const base64 = match[2];
+      const byteChars = atob(base64);
+      const bytes = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([bytes], { type: mimeType });
+
+      // Upload via Notion file upload API
+      const createResp = await this.notionFetch('/file_uploads', { method: 'POST', body: '{}' });
+      if (!createResp.ok) continue;
+      const { id: uploadId } = await createResp.json() as { id: string };
+
+      const form = new FormData();
+      const ext = mimeType.split('/')[1] || 'png';
+      form.append('file', blob, `figure.${ext}`);
+
+      const sendResp = await fetch(`${NOTION_API}/file_uploads/${uploadId}/send`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+          'Notion-Version': NOTION_VERSION,
+        },
+        body: form,
+      });
+      if (!sendResp.ok) continue;
+
+      // Replace external ref with file_upload ref
+      b.image = { type: 'file_upload', file_upload: { id: uploadId } } as typeof b.image;
     }
   }
 

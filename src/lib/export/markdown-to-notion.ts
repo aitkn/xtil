@@ -1,7 +1,7 @@
 import { marked, type Token, type Tokens } from 'marked';
 
 // Notion block types used
-interface NotionRichText {
+interface NotionRichTextText {
   type: 'text';
   text: { content: string; link?: { url: string } | null };
   annotations?: {
@@ -13,6 +13,13 @@ interface NotionRichText {
   };
 }
 
+interface NotionRichTextEquation {
+  type: 'equation';
+  equation: { expression: string };
+}
+
+type NotionRichText = NotionRichTextText | NotionRichTextEquation;
+
 interface NotionBlock {
   object: 'block';
   type: string;
@@ -22,8 +29,23 @@ interface NotionBlock {
 const MAX_RICH_TEXT_LENGTH = 2000;
 
 export function markdownToNotionBlocks(markdown: string): NotionBlock[] {
-  const tokens = marked.lexer(markdown);
-  return tokensToBlocks(tokens);
+  // Extract display math blocks ($$...$$) before marked lexing — they become equation blocks
+  const parts = markdown.split(/(\$\$[\s\S]+?\$\$)/g);
+  const blocks: NotionBlock[] = [];
+  for (const part of parts) {
+    const displayMatch = part.match(/^\$\$([\s\S]+?)\$\$$/);
+    if (displayMatch) {
+      blocks.push({
+        object: 'block',
+        type: 'equation',
+        equation: { expression: displayMatch[1].trim() },
+      });
+    } else if (part.trim()) {
+      const tokens = marked.lexer(part);
+      blocks.push(...tokensToBlocks(tokens));
+    }
+  }
+  return blocks;
 }
 
 function tokensToBlocks(tokens: Token[]): NotionBlock[] {
@@ -202,7 +224,7 @@ function inlineTokensToRichText(tokens: Token[]): NotionRichText[] {
         if ('tokens' in t && t.tokens && t.tokens.length > 0) {
           result.push(...inlineTokensToRichText(t.tokens));
         } else {
-          result.push(makeRichText(t.text));
+          result.push(...splitInlineMath(t.text));
         }
         break;
       }
@@ -210,7 +232,7 @@ function inlineTokensToRichText(tokens: Token[]): NotionRichText[] {
         const t = token as Tokens.Strong;
         const inner = inlineTokensToRichText(t.tokens || []);
         for (const rt of inner) {
-          rt.annotations = { ...rt.annotations, bold: true };
+          if (rt.type === 'text') rt.annotations = { ...rt.annotations, bold: true };
         }
         result.push(...inner);
         break;
@@ -219,7 +241,7 @@ function inlineTokensToRichText(tokens: Token[]): NotionRichText[] {
         const t = token as Tokens.Em;
         const inner = inlineTokensToRichText(t.tokens || []);
         for (const rt of inner) {
-          rt.annotations = { ...rt.annotations, italic: true };
+          if (rt.type === 'text') rt.annotations = { ...rt.annotations, italic: true };
         }
         result.push(...inner);
         break;
@@ -235,7 +257,9 @@ function inlineTokensToRichText(tokens: Token[]): NotionRichText[] {
       }
       case 'link': {
         const t = token as Tokens.Link;
-        const text = t.tokens ? inlineTokensToRichText(t.tokens).map((r) => r.text.content).join('') : t.text;
+        const text = t.tokens ? inlineTokensToRichText(t.tokens).map((r) =>
+          r.type === 'text' ? r.text.content : r.equation.expression
+        ).join('') : t.text;
         result.push({
           type: 'text',
           text: { content: text, link: { url: t.href } },
@@ -265,8 +289,27 @@ function inlineTokensToRichText(tokens: Token[]): NotionRichText[] {
   return result;
 }
 
-function makeRichText(content: string): NotionRichText {
+function makeRichText(content: string): NotionRichTextText {
   return { type: 'text', text: { content } };
+}
+
+/** Split a text string into rich text segments, converting $...$ to Notion inline equations. */
+function splitInlineMath(text: string): NotionRichText[] {
+  const re = /(?<![\\$])\$(?!\s)((?:[^$\\]|\\.)+?)(?<!\s)\$/g;
+  const result: NotionRichText[] = [];
+  let lastIndex = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIndex) {
+      result.push(makeRichText(text.slice(lastIndex, m.index)));
+    }
+    result.push({ type: 'equation', equation: { expression: m[1].trim() } });
+    lastIndex = re.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    result.push(makeRichText(text.slice(lastIndex)));
+  }
+  return result.length > 0 ? result : [makeRichText(text)];
 }
 
 function splitRichText(text: string): NotionRichText[] {
@@ -281,9 +324,13 @@ function splitRichText(text: string): NotionRichText[] {
   return chunks;
 }
 
+function rtLength(rt: NotionRichText): number {
+  return rt.type === 'text' ? rt.text.content.length : rt.equation.expression.length;
+}
+
 function splitParagraphBlock(richText: NotionRichText[]): NotionBlock[] {
   // Check total content length
-  const totalLength = richText.reduce((sum, rt) => sum + rt.text.content.length, 0);
+  const totalLength = richText.reduce((sum, rt) => sum + rtLength(rt), 0);
   if (totalLength <= MAX_RICH_TEXT_LENGTH) {
     return [{
       object: 'block',
@@ -298,7 +345,8 @@ function splitParagraphBlock(richText: NotionRichText[]): NotionBlock[] {
   let currentLength = 0;
 
   for (const rt of richText) {
-    if (currentLength + rt.text.content.length > MAX_RICH_TEXT_LENGTH && currentBatch.length > 0) {
+    const len = rtLength(rt);
+    if (currentLength + len > MAX_RICH_TEXT_LENGTH && currentBatch.length > 0) {
       blocks.push({
         object: 'block',
         type: 'paragraph',
@@ -308,7 +356,7 @@ function splitParagraphBlock(richText: NotionRichText[]): NotionBlock[] {
       currentLength = 0;
     }
 
-    if (rt.text.content.length > MAX_RICH_TEXT_LENGTH) {
+    if (rt.type === 'text' && len > MAX_RICH_TEXT_LENGTH) {
       // Split this single rich text element
       for (let i = 0; i < rt.text.content.length; i += MAX_RICH_TEXT_LENGTH) {
         const chunk = { ...rt, text: { ...rt.text, content: rt.text.content.slice(i, i + MAX_RICH_TEXT_LENGTH) } };
@@ -320,7 +368,7 @@ function splitParagraphBlock(richText: NotionRichText[]): NotionBlock[] {
       }
     } else {
       currentBatch.push(rt);
-      currentLength += rt.text.content.length;
+      currentLength += len;
     }
   }
 

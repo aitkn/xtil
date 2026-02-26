@@ -2314,6 +2314,23 @@ function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDoc
 }
 
 /** Merge partial updates into an existing SummaryDocument. undefined values delete keys. */
+/** Extract markdown image references with data: URIs from text. */
+function extractDataUriImages(text: string): string[] {
+  const re = /!\[[^\]]*\]\(data:[^)]+\)/g;
+  return text.match(re) || [];
+}
+
+/** Restore data URI images from the original field value if the updated value lost them. */
+function restoreDataUriImages(original: string, updated: string): string {
+  const origImages = extractDataUriImages(original);
+  if (origImages.length === 0) return updated;
+  // Check which images are missing in the updated text
+  const missing = origImages.filter(img => !updated.includes(img));
+  if (missing.length === 0) return updated;
+  // Append missing images at the end (they were stripped before sending to LLM)
+  return updated + '\n\n' + missing.join('\n\n');
+}
+
 function mergeSummaryUpdates(existing: SummaryDocument, updates: Partial<SummaryDocument>): SummaryDocument {
   const merged = { ...existing };
   for (const [key, value] of Object.entries(updates)) {
@@ -2327,12 +2344,18 @@ function mergeSummaryUpdates(existing: SummaryDocument, updates: Partial<Summary
         if (sValue === DELETE_SENTINEL) {
           delete base[sKey];
         } else if (typeof sValue === 'string') {
-          base[sKey] = fixMermaidBlocks(sValue);
+          const origVal = merged.extraSections?.[sKey];
+          let fixed = fixMermaidBlocks(sValue);
+          if (origVal) fixed = restoreDataUriImages(origVal, fixed);
+          base[sKey] = fixed;
         }
       }
       merged.extraSections = Object.keys(base).length > 0 ? base : undefined;
     } else if (typeof value === 'string') {
-      (merged as Record<string, unknown>)[key] = fixMermaidBlocks(value);
+      const origVal = (existing as Record<string, unknown>)[key];
+      let fixed = fixMermaidBlocks(value);
+      if (typeof origVal === 'string') fixed = restoreDataUriImages(origVal, fixed);
+      (merged as Record<string, unknown>)[key] = fixed;
     } else {
       (merged as Record<string, unknown>)[key] = value;
     }

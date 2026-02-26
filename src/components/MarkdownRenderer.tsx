@@ -2,6 +2,8 @@ import { useRef, useEffect, useState } from 'preact/hooks';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import mermaid from 'mermaid';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 /** Master color palette — 12 colors per theme. Used for pie, cScale, xyChart, and auto-legends. */
 export const PALETTE = {
@@ -244,6 +246,60 @@ marked.use({
   },
 });
 
+/** Render LaTeX math: $$...$$ (display) and $...$ (inline) → KaTeX HTML.
+ *  Runs BEFORE marked so LaTeX doesn't get mangled by markdown parsing.
+ *  Protects code/mermaid blocks from LaTeX processing. */
+function renderLatex(md: string): string {
+  // Protect fenced code blocks (```...```) from LaTeX processing
+  const codeBlocks: string[] = [];
+  let result = md.replace(/```[\s\S]*?```/g, (block) => {
+    codeBlocks.push(block);
+    return `\x00CODE${codeBlocks.length - 1}\x00`;
+  });
+  // Also protect inline code (`...`)
+  const inlineCode: string[] = [];
+  result = result.replace(/`[^`]+`/g, (code) => {
+    inlineCode.push(code);
+    return `\x00INLINE${inlineCode.length - 1}\x00`;
+  });
+
+  // Display math: $$...$$ (can span multiple lines)
+  result = result.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex: string) => {
+    try {
+      return katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false });
+    } catch {
+      return `<code class="katex-error">${tex.trim()}</code>`;
+    }
+  });
+  // Inline math: $...$ (not empty, not starting/ending with space)
+  result = result.replace(/(?<![\\$])\$(?!\s)((?:[^$\\]|\\.)+?)(?<!\s)\$/g, (_, tex: string) => {
+    try {
+      return katex.renderToString(tex.trim(), { displayMode: false, throwOnError: false });
+    } catch {
+      return `<code class="katex-error">${tex.trim()}</code>`;
+    }
+  });
+
+  // Restore protected blocks
+  result = result.replace(/\x00INLINE(\d+)\x00/g, (_, i) => inlineCode[parseInt(i)]);
+  result = result.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[parseInt(i)]);
+  return result;
+}
+
+// DOMPurify config: allow MathML tags + attributes used by KaTeX
+const PURIFY_CONFIG = {
+  ADD_TAGS: ['math', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'msqrt',
+    'mover', 'munder', 'munderover', 'mtable', 'mtr', 'mtd', 'mtext', 'mspace',
+    'annotation', 'semantics', 'mpadded', 'mstyle', 'menclose', 'mroot',
+    'mmultiscripts', 'mprescripts', 'none'],
+  ADD_ATTR: ['xmlns', 'encoding', 'mathvariant', 'stretchy', 'fence', 'separator',
+    'accent', 'accentunder', 'displaystyle', 'scriptlevel', 'lspace', 'rspace',
+    'minsize', 'maxsize', 'movablelimits', 'symmetric', 'linethickness',
+    'columnalign', 'rowalign', 'columnspacing', 'rowspacing',
+    'width', 'height', 'depth', 'voffset',
+    'aria-hidden', 'style'],
+};
+
 function useResolvedTheme(): 'light' | 'dark' {
   const [theme, setTheme] = useState<'light' | 'dark'>(
     () => (document.documentElement.dataset.theme as 'light' | 'dark') || 'light',
@@ -262,7 +318,7 @@ function useResolvedTheme(): 'light' | 'dark' {
 }
 
 export function InlineMarkdown({ text }: { text: string }) {
-  const html = DOMPurify.sanitize(marked.parseInline(text, { async: false }) as string);
+  const html = DOMPurify.sanitize(marked.parseInline(renderLatex(text), { async: false }) as string, PURIFY_CONFIG);
   return <span class="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
@@ -444,7 +500,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const theme = useResolvedTheme();
   const fixed = fixMermaidBlocks(content);
   const mermaidSources = extractMermaidSources(fixed);
-  const html = DOMPurify.sanitize(marked.parse(fixed, { async: false }) as string);
+  const html = DOMPurify.sanitize(marked.parse(renderLatex(fixed), { async: false }) as string, PURIFY_CONFIG);
 
   // Hide broken images gracefully (URLs may expire, especially social media thumbnails)
   useEffect(() => {

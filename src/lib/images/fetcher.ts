@@ -40,7 +40,42 @@ export async function fetchImages(
 }
 
 async function fetchSingleImage(img: ExtractedImage): Promise<FetchedImage | null> {
-  // Only fetch http(s) URLs — reject file://, data:, blob:, etc.
+  // Handle data: URIs directly (e.g. from PDF image extraction)
+  if (img.url.startsWith('data:')) {
+    try {
+      // Parse the data URI directly — don't use fetch() which may fail in service workers
+      const match = img.url.match(/^data:(image\/[^;]+);base64,(.+)$/s);
+      if (!match) {
+        console.warn('[xTil] data URI regex mismatch, prefix:', img.url.substring(0, 80));
+        return null;
+      }
+      const mimeType = match[1];
+      const base64 = match[2];
+
+      if (!SUPPORTED_MIME_TYPES.has(mimeType)) {
+        console.warn('[xTil] data URI unsupported mime:', mimeType);
+        return null;
+      }
+
+      // Check size (base64 is ~4/3 of binary)
+      const estimatedBytes = Math.ceil(base64.length * 3 / 4);
+      console.log(`[xTil] data URI image: ${mimeType}, ~${Math.round(estimatedBytes / 1024)}KB`);
+      if (estimatedBytes > MAX_IMAGE_BYTES) {
+        // Decode to blob and resize
+        const byteChars = atob(base64);
+        const bytes = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+        return await resizeAndEncode(new Blob([bytes], { type: mimeType }), img);
+      }
+
+      return { url: img.url, base64, mimeType, tier: img.tier, alt: img.alt, caption: img.caption };
+    } catch (err) {
+      console.error('[xTil] data URI processing failed:', err);
+      return null;
+    }
+  }
+
+  // Only fetch http(s) URLs — reject file://, blob:, etc.
   try { const u = new URL(img.url); if (u.protocol !== 'https:' && u.protocol !== 'http:') return null; } catch { return null; }
 
   const controller = new AbortController();
