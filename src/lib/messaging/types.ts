@@ -43,6 +43,8 @@ export interface ExtractContentMessage {
   type: 'EXTRACT_CONTENT';
   langPrefs?: string[];
   summaryLang?: string;
+  /** When true, extractor must not mutate the DOM (e.g. clicking "see more"). */
+  readonly?: boolean;
 }
 
 export interface ExtractResultMessage {

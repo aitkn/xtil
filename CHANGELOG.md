@@ -4,6 +4,14 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.0.11
+
+**Smarter post detection & language fixes**
+
+- Fixed Facebook/LinkedIn feed picking barely-visible posts — now requires at least 30% visibility
+- Live metadata refresh as you scroll through feeds (no flicker, no re-clicking "See more")
+- Stronger language rules to prevent mixed-language summaries
+
 ## 1.0.10
 
 **Model pricing update**

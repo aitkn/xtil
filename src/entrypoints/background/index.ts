@@ -176,7 +176,7 @@ async function getModelVision(
 async function handleMessage(message: Message): Promise<Message> {
   switch (message.type) {
     case 'EXTRACT_CONTENT':
-      return handleExtractContent();
+      return handleExtractContent(message.readonly);
     case 'EXTRACT_COMMENTS':
       return handleExtractComments();
     case 'SEEK_VIDEO':
@@ -384,7 +384,7 @@ function isRestrictedUrl(url?: string): boolean {
   } catch { return false; }
 }
 
-async function handleExtractContent(): Promise<ExtractResultMessage> {
+async function handleExtractContent(readonly?: boolean): Promise<ExtractResultMessage> {
   try {
     const [tab, settings] = await Promise.all([resolveTargetTab(), getSettings()]);
 
@@ -396,6 +396,7 @@ async function handleExtractContent(): Promise<ExtractResultMessage> {
       type: 'EXTRACT_CONTENT' as const,
       langPrefs: settings.summaryLanguageExcept,
       summaryLang: settings.summaryLanguage,
+      readonly,
     };
 
     let response: unknown;

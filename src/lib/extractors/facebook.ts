@@ -1,4 +1,4 @@
-import type { ContentExtractor, ExtractedComment, ExtractedContent, ExtractedImage } from './types';
+import type { ContentExtractor, ExtractedComment, ExtractedContent, ExtractedImage, ExtractOptions } from './types';
 
 const FB_POST_URL_RE =
   /facebook\.com\/(photo[./]|permalink\.php|story\.php|watch\/?\?|reel\/|.+\/(posts|videos)\/)/;
@@ -41,24 +41,24 @@ export const facebookExtractor: ContentExtractor = {
     return isFacebookPostContext(url, doc);
   },
 
-  extract(url: string, doc: Document): ExtractedContent {
+  extract(url: string, doc: Document, options?: ExtractOptions): ExtractedContent {
     // Feed mode: pick the most visible post from the feed
     const modal = findPostModal(doc);
     if (!modal) {
       const feedPosts = findFeedPosts(doc);
       if (feedPosts.length > 0) {
         const bestPost = pickMostVisiblePost(feedPosts);
-        if (bestPost) return extractFromScope(url, doc, bestPost);
+        if (bestPost) return extractFromScope(url, doc, bestPost, options);
       }
     }
 
     // Modal or permalink mode
-    return extractFromScope(url, doc, modal);
+    return extractFromScope(url, doc, modal, options);
   },
 };
 
-function extractFromScope(url: string, doc: Document, scope: Element | null): ExtractedContent {
-  clickSeeMoreOnPost(doc, scope);
+function extractFromScope(url: string, doc: Document, scope: Element | null, options?: ExtractOptions): ExtractedContent {
+  if (!options?.readonly) clickSeeMoreOnPost(doc, scope);
 
   const effectiveScope = scope || doc;
   const permalink = extractPermalink(url, effectiveScope);
@@ -143,20 +143,36 @@ function getAncestorChain(el: Element): Element[] {
   return chain;
 }
 
-/** Pick the post with the largest viewport intersection area. */
+/** Pick the most visible post: prefer fully visible + closest to viewport top. */
 function pickMostVisiblePost(posts: Element[]): Element | null {
   if (posts.length === 0) return null;
   if (posts.length === 1) return posts[0];
 
   const vh = window.innerHeight;
   let best: Element | null = null;
-  let bestArea = 0;
+  let bestScore = -Infinity;
 
   for (const post of posts) {
     const rect = post.getBoundingClientRect();
-    const visibleHeight = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0));
-    const area = visibleHeight * rect.width;
-    if (area > bestArea) { bestArea = area; best = post; }
+    if (rect.height === 0) continue;
+
+    const visibleTop = Math.max(rect.top, 0);
+    const visibleBottom = Math.min(rect.bottom, vh);
+    const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+    const visibleRatio = visibleHeight / rect.height;
+
+    // Skip posts that are barely visible (less than 30% showing)
+    if (visibleRatio < 0.3) continue;
+
+    // Fully visible posts get a large bonus over partial ones
+    const fullyVisible = visibleRatio >= 0.95 ? 10000 : 0;
+    // Primary: how much of the post is visible (0-100 scaled to 0-1000)
+    const ratioScore = visibleRatio * 1000;
+    // Tiebreaker: prefer closest to top (small influence)
+    const topScore = -Math.max(rect.top, 0);
+    const score = fullyVisible + ratioScore + topScore;
+
+    if (score > bestScore) { bestScore = score; best = post; }
   }
   return best;
 }

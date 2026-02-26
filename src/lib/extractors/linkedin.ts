@@ -1,4 +1,4 @@
-import type { ContentExtractor, ExtractedContent, ExtractedImage } from './types';
+import type { ContentExtractor, ExtractedContent, ExtractedImage, ExtractOptions } from './types';
 
 /** Match individual post URLs */
 const LI_POST_URL_RE =
@@ -23,7 +23,7 @@ export const linkedinExtractor: ContentExtractor = {
     return findPostContainers(doc).length > 0;
   },
 
-  extract(url: string, doc: Document): ExtractedContent {
+  extract(url: string, doc: Document, options?: ExtractOptions): ExtractedContent {
     // On a direct post URL, extract the main post; on feed, pick the most visible
     const isDirectPost = LI_POST_URL_RE.test(url);
     const containers = findPostContainers(doc);
@@ -42,8 +42,8 @@ export const linkedinExtractor: ContentExtractor = {
       return fallbackExtract(url, doc);
     }
 
-    // Click "see more" to expand truncated text
-    clickSeeMore(postEl);
+    // Click "see more" to expand truncated text (skip in readonly mode — e.g. scroll-triggered refresh)
+    if (!options?.readonly) clickSeeMore(postEl);
 
     const author = extractAuthor(postEl);
     const headline = extractHeadline(postEl);
@@ -141,18 +141,33 @@ function findPostContainers(doc: Document): Element[] {
 
 function pickMostVisiblePost(containers: Element[]): Element {
   const viewportHeight = window.innerHeight;
+
+  // Score each post: prefer fully visible + closest to top of viewport.
+  // A small post fully on-screen should beat a large post that's only partially visible.
   let best = containers[0];
-  let bestArea = 0;
+  let bestScore = -Infinity;
 
   for (const el of containers) {
     const rect = el.getBoundingClientRect();
+    if (rect.height === 0) continue;
+
     const visibleTop = Math.max(rect.top, 0);
     const visibleBottom = Math.min(rect.bottom, viewportHeight);
     const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-    const area = visibleHeight * rect.width;
+    const visibleRatio = visibleHeight / rect.height; // 0..1
 
-    if (area > bestArea) {
-      bestArea = area;
+    // Fully visible posts (ratio >= 0.95) get a large bonus over partial ones
+    const fullyVisible = visibleRatio >= 0.95 ? 1000 : 0;
+
+    // Among posts with equal visibility tier, prefer the one closest to the top.
+    // Negate rect.top so higher position = higher score.
+    const topScore = -Math.max(rect.top, 0);
+
+    // Tiebreaker: visible ratio (for partially visible posts)
+    const score = fullyVisible + topScore + visibleRatio * 100;
+
+    if (score > bestScore) {
+      bestScore = score;
       best = el;
     }
   }

@@ -762,14 +762,24 @@ export function App() {
   }, []);
 
   // Extract content from active tab
-  const extractContent = useCallback(async () => {
-    setExtracting(true);
+  const extractContent = useCallback(async (quiet = false) => {
+    if (!quiet) setExtracting(true);
     try {
-      const response = await sendMessage({ type: 'EXTRACT_CONTENT' }) as ExtractResultMessage;
+      const response = await sendMessage({ type: 'EXTRACT_CONTENT', ...(quiet && { readonly: true }) }) as ExtractResultMessage;
       if (response.success && response.data) {
         // Discard if user switched tabs during extraction
         if (response.tabId && activeTabIdRef.current != null && response.tabId !== activeTabIdRef.current) {
           return;
+        }
+
+        // Quiet mode: skip update if content hasn't meaningfully changed
+        if (quiet) {
+          const prev = contentRef.current;
+          const next = response.data;
+          if (prev && prev.title === next.title && prev.wordCount === next.wordCount
+              && prev.content.length === next.content.length && prev.thumbnailUrl === next.thumbnailUrl) {
+            return;
+          }
         }
 
         setRestricted(false);
@@ -828,7 +838,7 @@ export function App() {
     } catch {
       // Silently fail — user can still click Summarize which will retry
     } finally {
-      setExtracting(false);
+      if (!quiet) setExtracting(false);
     }
   }, []);
 
@@ -995,10 +1005,21 @@ export function App() {
         setChatStreamingText(msg.chunk || '');
         return;
       }
-      if (msg?.type !== 'CONTENT_CHANGED') return;
-      if (sender.tab?.id != null && sender.tab.id !== activeTabIdRef.current) return;
-      if (spaTimer) clearTimeout(spaTimer);
-      spaTimer = setTimeout(() => extractContent(), 800);
+      // Navigation-level changes (Gmail/Facebook) — always re-extract
+      if (msg?.type === 'CONTENT_CHANGED') {
+        if (sender.tab?.id != null && sender.tab.id !== activeTabIdRef.current) return;
+        if (spaTimer) clearTimeout(spaTimer);
+        spaTimer = setTimeout(() => extractContent(), 800);
+        return;
+      }
+      // User interaction (scroll/click) — only refresh metadata when no summary yet
+      if (msg?.type === 'CONTENT_ACTIVITY') {
+        if (sender.tab?.id != null && sender.tab.id !== activeTabIdRef.current) return;
+        if (summaryRef.current || loadingRef.current) return;
+        if (spaTimer) clearTimeout(spaTimer);
+        spaTimer = setTimeout(() => extractContent(true), 300);
+        return;
+      }
     };
 
     const onRemoved = (tabId: number) => {

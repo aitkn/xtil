@@ -66,15 +66,29 @@ export default defineContentScript({
       observer.observe(document.body, { childList: true, subtree: true });
     }
 
+    // Generic activity detection: scroll/click → metadata refresh after 2s of inactivity
+    {
+      let activityTimer: ReturnType<typeof setTimeout> | null = null;
+      const onActivity = () => {
+        if (activityTimer) clearTimeout(activityTimer);
+        activityTimer = setTimeout(() => {
+          activityTimer = null;
+          chromeRuntime.sendMessage({ type: 'CONTENT_ACTIVITY' }).catch(() => {});
+        }, 1000);
+      };
+      window.addEventListener('scroll', onActivity, { passive: true });
+      document.addEventListener('click', onActivity);
+    }
+
     chromeRuntime.onMessage.addListener(
       (message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response: unknown) => void) => {
         if (sender.id !== chromeRuntime.id) {
           sendResponse({ success: false, error: 'Unauthorized sender' });
           return;
         }
-        const msg = message as { type: string; videoId?: string; hintLang?: string; langPrefs?: string[]; summaryLang?: string };
+        const msg = message as { type: string; videoId?: string; hintLang?: string; langPrefs?: string[]; summaryLang?: string; readonly?: boolean };
         if (msg.type === 'EXTRACT_CONTENT') {
-          extractAndResolve(msg.langPrefs, msg.summaryLang)
+          extractAndResolve(msg.langPrefs, msg.summaryLang, msg.readonly)
             .then((content) => {
               sendResponse({ type: 'EXTRACT_RESULT', success: true, data: content } as ExtractResultMessage);
             })
@@ -120,9 +134,9 @@ export default defineContentScript({
   },
 });
 
-async function extractAndResolve(langPrefs?: string[], summaryLang?: string): Promise<ExtractedContent> {
+async function extractAndResolve(langPrefs?: string[], summaryLang?: string, readonly?: boolean): Promise<ExtractedContent> {
   const extractor = detectExtractor(window.location.href, document);
-  const content = extractor.extract(window.location.href, document);
+  const content = extractor.extract(window.location.href, document, readonly ? { readonly: true } : undefined);
 
   const comments = extractComments(document, window.location.href);
   if (comments.length > 0) {

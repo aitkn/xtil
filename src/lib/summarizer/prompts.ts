@@ -39,17 +39,28 @@ const LANGUAGE_NAMES: Record<string, string> = {
 
 export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', language: string, languageExcept: string[] = [], imageAnalysisEnabled = false, wordCount = 1500, contentType?: string, githubPageType?: string): string {
   const targetLang = LANGUAGE_NAMES[language] || language;
+  // Remove target language from exceptions — translating target→target is a no-op
   const exceptLangs = languageExcept
+    .filter((code) => code !== language)
     .map((code) => LANGUAGE_NAMES[code] || code)
     .filter(Boolean);
 
+  const sourceLangDetection = 'Source language = the language the MAJORITY of the body text is written in. A few foreign words, proper names, technical terms, or short quotes in another language do NOT change it — only the dominant language of the body text counts.';
+
   let langInstruction: string;
   if (language === 'auto') {
-    langInstruction = 'Respond in the same language as the source content. Match the content language exactly.';
+    langInstruction = `Respond in the same language as the source content. Match the content language exactly. ${sourceLangDetection}`;
   } else if (exceptLangs.length > 0) {
-    langInstruction = `CRITICAL! LANGUAGE RULE (MANDATORY — no exceptions): If the source content is written in ${exceptLangs.join(' or ')}, you MUST respond in that same language — do NOT translate it. For ALL other source languages, you MUST translate and write the ENTIRE summary in ${targetLang}. This applies unconditionally — even if a previous summary exists in another language, you must produce ${targetLang} output. Never inherit the source language into your response unless it is ${exceptLangs.join(' or ')}.`;
+    // Build explicit mapping: "Source is Russian → write in Russian", "Source is anything else → write in English"
+    const exceptRules = exceptLangs.map((lang) => `- Source is ${lang} → write ENTIRE summary in ${lang}`).join('\n');
+    langInstruction = `LANGUAGE RULE (MANDATORY):
+${sourceLangDetection}
+Output language — based on the source language, pick EXACTLY ONE:
+${exceptRules}
+- Source is any other language → translate and write ENTIRE summary in ${targetLang}
+Every field value must be in the chosen output language. No mixing languages within or across fields.`;
   } else {
-    langInstruction = `Respond in ${targetLang}.`;
+    langInstruction = `Write the ENTIRE summary in ${targetLang}. ${sourceLangDetection}`;
   }
 
   const size: 'short' | 'medium' | 'long' = wordCount < 500 ? 'short' : wordCount < 3000 ? 'medium' : 'long';
@@ -337,8 +348,8 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
   if (!skipExtraSections) guidelines.push(`- "extraSections": ${gExtraSections}`);
   guidelines.push(
     `- "tags": ${d.tags} short, lowercase tags.`,
-    `- "sourceLanguage" must be the ISO 639-1 code of the original content language (e.g. "en", "ru", "fr").`,
-    `- "summaryLanguage" must be the ISO 639-1 code of the language you wrote the summary in. CRITICAL: This must match the LANGUAGE RULE at the top. If the rule says to respond in ${targetLang}, then summaryLanguage MUST be "${language}" and ALL text fields must be in ${targetLang}. Do NOT write the summary in the source language unless it is explicitly listed as an exception.`,
+    `- "sourceLanguage" must be the ISO 639-1 code of the language the MAJORITY of the original content is written in (e.g. "en", "ru", "fr"). A few foreign words, proper names, or technical terms do not change the source language — only the dominant language of the body text counts.`,
+    `- "summaryLanguage" must be the ISO 639-1 code of the language you actually wrote the summary in. It must match the output language you chose in the LANGUAGE RULE (Step 2) at the top.`,
   );
   if (!isGitHub) {
     guidelines.push(
@@ -366,6 +377,17 @@ export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', 
 
   const role = isGitHub ? 'an expert software engineer and content summarizer' : 'an expert content summarizer';
 
+  // Build a short, punchy language reminder for the very end of the prompt (recency bias)
+  let langReminder: string;
+  if (language === 'auto') {
+    langReminder = '\n\nREMINDER: Write the summary in the SAME language as the source content.';
+  } else if (exceptLangs.length > 0) {
+    const exceptBullets = exceptLangs.map((lang) => `${lang} source → ${lang} output`).join(', ');
+    langReminder = `\n\nREMINDER — EXTREMELY IMPORTANT!!! — before you write: Identify the source language first. ${exceptBullets}. All other sources → ${targetLang} output. Do NOT default to ${targetLang} — check the source language. DO NOT MIX LANGUAGES. The ENTIRE text MUST use the SAME output language.`;
+  } else {
+    langReminder = `\n\nREMINDER: Write the ENTIRE summary in ${targetLang}.`;
+  }
+
   return `You are ${role}. Today's date is ${today}. Your training data has a knowledge cutoff — many events, laws, announcements, personnel changes, and developments have occurred since then that you have NO information about. ${langInstruction}
 
 Content: ~${wordCount.toLocaleString()} words → classified as "${size}" (thresholds: short <500, medium 500-3000, long 3000+). The ranges below are tuned for this size tier. If the content is near a threshold boundary, blend smoothly — do not produce drastically different output for 490 vs 510 words.
@@ -388,7 +410,8 @@ Image Analysis Instructions:
 - Images marked [THUMBNAIL] in the attached list are already displayed as the page header image in the UI. You MUST analyze their content, but do NOT embed them with \`![](url)\` in the summary — they would appear twice.` + (detailLevel !== 'brief' ? `
 - For each non-thumbnail image, decide the best approach: embed as \`![description](url)\` in the summary (subject to the limit above), describe it in text, or discard if not informative.
 - If you see image URLs listed in the text that you believe are critical to understanding the content but were NOT attached, you may include \`"requestedImages": ["url1", "url2"]\` (max 3 URLs) at the top level of the response alongside "text" and "summary". The system will fetch them and re-run. Only request images that are clearly referenced in the text and essential for understanding.
-- Do NOT request images if the attached images already cover the key visuals.` : '') : '');
+- Do NOT request images if the attached images already cover the key visuals.` : '') : '')
+  + langReminder;
 }
 
 export function getSummarizationPrompt(content: ExtractedContent, detailLevel: 'brief' | 'standard' | 'detailed' = 'standard'): string {

@@ -54,7 +54,12 @@ export interface ExtractedComment {
   likes?: number;
 }
 
+export interface ExtractOptions {
+  /** When true, extractor must not mutate the DOM (e.g. clicking "see more"). */
+  readonly?: boolean;
+}
+
 export interface ContentExtractor {
   canExtract(url: string, document: Document): boolean;
-  extract(url: string, document: Document): ExtractedContent;
+  extract(url: string, document: Document, options?: ExtractOptions): ExtractedContent;
 }
