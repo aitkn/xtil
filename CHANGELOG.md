@@ -4,6 +4,13 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.0.12
+
+**Print & thumbnail fixes**
+
+- Fixed math formulas appearing doubled/garbled when printing or saving as PDF
+- Fixed empty thumbnails showing up on pages with no content images (e.g., arxiv papers)
+
 ## 1.0.11
 
 **Smarter post detection & language fixes**

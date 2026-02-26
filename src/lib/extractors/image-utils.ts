@@ -12,9 +12,21 @@ const AD_TRACKING_DOMAINS = [
   'ads.', 'adserver.', 'beacon.',
 ];
 
+/** URL path segments that indicate branding/logos rather than content images. */
+const LOGO_URL_PATTERNS = /(?:^|[\/_-])(logo|logomark|logotype|brand|favicon|site-icon)(?:[\/_.-]|$)/i;
+
 function isAdOrTracking(url: string): boolean {
   const lower = url.toLowerCase();
   return AD_TRACKING_DOMAINS.some((d) => lower.includes(d));
+}
+
+function isLogoUrl(url: string): boolean {
+  try {
+    const path = new URL(url).pathname;
+    return LOGO_URL_PATTERNS.test(path);
+  } catch {
+    return LOGO_URL_PATTERNS.test(url);
+  }
 }
 
 function hasMeaningfulAlt(alt: string): boolean {
@@ -69,6 +81,12 @@ export function extractRichImages(container: HTMLElement): ExtractedImage[] {
 export function pickThumbnail(container: HTMLElement, candidates: string[]): string | undefined {
   if (candidates.length === 0) return undefined;
 
+  // Filter out logo/branding images and images inside header/nav/footer
+  const chromeElements = new Set<HTMLImageElement>();
+  for (const img of container.querySelectorAll('header img, nav img, footer img, [role="banner"] img')) {
+    chromeElements.add(img as HTMLImageElement);
+  }
+
   interface Measured { url: string; w: number; h: number }
   const measured: Measured[] = [];
   const imgMap = new Map<string, HTMLImageElement>();
@@ -78,7 +96,9 @@ export function pickThumbnail(container: HTMLElement, candidates: string[]): str
   }
 
   for (const url of candidates) {
+    if (isLogoUrl(url)) continue;
     const img = imgMap.get(url);
+    if (img && chromeElements.has(img)) continue;
     const w = img ? (img.naturalWidth || img.width || 0) : 0;
     const h = img ? (img.naturalHeight || img.height || 0) : 0;
     measured.push({ url, w, h });

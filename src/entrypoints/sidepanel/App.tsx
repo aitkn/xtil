@@ -429,8 +429,10 @@ function printSummary(contentEl: HTMLElement | null) {
   clone.querySelectorAll('.section-toggle span:first-child').forEach(el => el.remove());
   clone.querySelectorAll('.no-print').forEach(el => el.remove());
 
-  // Collect inline styles from sidepanel head
-  const styles = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('');
+  // Collect all styles (inline <style> + linked <link rel="stylesheet">) from sidepanel head
+  const inlineStyles = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('');
+  const linkedStyles = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(l => l.outerHTML).join('');
+  const styles = linkedStyles + inlineStyles;
   const theme = document.documentElement.getAttribute('data-theme') || 'light';
 
   // Pass content via session storage, then open the print page
