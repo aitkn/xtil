@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-02-26T20:55:57.897Z",
+  "_generated": "2026-02-26T23:07:28.513Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -119,7 +119,7 @@
           "reasoning": false
         },
         "deepseek-reasoner": {
-          "name": "DeepSeek-V3.2 (Thinking Mode)",
+          "name": "DeepSeek-V3.2 Reasoning",
           "contextWindow": 128000,
           "maxOutput": 64000,
           "inputPrice": 0.28,
@@ -942,16 +942,6 @@
           "outputPrice": 0.5,
           "vision": true,
           "textGeneration": true,
-          "reasoning": true,
-          "webSearch": true
-        },
-        "grok-4-20": {
-          "name": "Grok 4.20",
-          "reasoning": true,
-          "webSearch": true
-        },
-        "grok-4-20-multi-agent": {
-          "name": "Grok 4.20 Multi-Agent",
           "reasoning": true,
           "webSearch": true
         },

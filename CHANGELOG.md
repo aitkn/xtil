@@ -4,39 +4,22 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
-## 1.0.13
+## 1.1.0
 
-**Print, thumbnail & comment fixes**
-
-- Fixed math formulas appearing doubled/garbled when printing or saving as PDF
-- Fixed empty thumbnails showing up on pages with no content images (e.g., arxiv papers)
-- User comments now produce consistent results whether entered before or after summarizing
-- Updated store listing with PDF support and web search
-
-## 1.0.11
-
-**Smarter post detection & language fixes**
-
-- Fixed Facebook/LinkedIn feed picking barely-visible posts — now requires at least 30% visibility
-- Live metadata refresh as you scroll through feeds (no flicker, no re-clicking "See more")
-- Stronger language rules to prevent mixed-language summaries
-
-## 1.0.10
-
-**Model pricing update**
-
-- Fixed missing prices in the model selector for recently added models
-- Prices now stay visible when providers rename or update their models
-
-## 1.0.9
-
-**PDF support & LaTeX math rendering**
+**PDF support, math rendering & feed improvements**
 
 - PDF text extraction — summarize academic papers, reports, and any PDF opened in Chrome
 - PDF figure extraction — renders vector diagrams from PDF pages with smart cropping
 - LaTeX math rendering — formulas display beautifully in the side panel via KaTeX
 - Native Notion equation support — LaTeX formulas export as Notion's built-in equations
 - Clipboard math — formulas paste into Gmail and Google Docs using Unicode math and HTML sup/sub
+- Live metadata refresh as you scroll through feeds (no flicker, no re-clicking "See more")
+- Stronger language rules to prevent mixed-language summaries
+- Fixed Facebook/LinkedIn feed picking barely-visible posts
+- Fixed math formulas appearing doubled/garbled when printing or saving as PDF
+- Fixed empty thumbnails on pages with no content images
+- User comments now produce consistent results whether entered before or after summarizing
+- Updated model catalog with latest pricing
 
 ## 1.0.8
 
