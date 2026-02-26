@@ -4,6 +4,13 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.0.10
+
+**Model pricing update**
+
+- Fixed missing prices in the model selector for recently added models
+- Prices now stay visible when providers rename or update their models
+
 ## 1.0.9
 
 **PDF support & LaTeX math rendering**

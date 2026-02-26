@@ -53,6 +53,31 @@ const PREVIEW_SUFFIX_RE = /^(.+)-preview-\d{2}-\d{2,4}$/;
 export function filterChatModels(models: ModelInfo[]): ModelInfo[] {
   // Collect all model IDs for dedup lookup
   const idSet = new Set(models.map((m) => m.id));
+  const byId = new Map(models.map((m) => [m.id, m]));
+
+  // Before dedup, propagate pricing from dated/preview variants to their base
+  // models so that when the variant is hidden, the base still shows a price.
+  for (const m of models) {
+    if (m.inputPrice == null) continue;
+
+    let baseId: string | undefined;
+    const dateMatch = DATE_SUFFIX_RE.exec(m.id);
+    if (dateMatch && idSet.has(dateMatch[1])) baseId = dateMatch[1];
+    if (!baseId) {
+      const previewMatch = PREVIEW_SUFFIX_RE.exec(m.id);
+      if (previewMatch && idSet.has(previewMatch[1])) baseId = previewMatch[1];
+    }
+    if (!baseId) continue;
+
+    const base = byId.get(baseId)!;
+    if (base.inputPrice != null) continue; // base already has pricing
+    base.inputPrice = m.inputPrice;
+    base.outputPrice = m.outputPrice;
+    if (base.maxOutput == null) base.maxOutput = m.maxOutput;
+    if (base.vision == null) base.vision = m.vision;
+    if (base.reasoning == null) base.reasoning = m.reasoning;
+    if (base.webSearch == null) base.webSearch = m.webSearch;
+  }
 
   return models.filter((m) => {
     // a) Catalog says not text-capable

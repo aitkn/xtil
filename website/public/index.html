@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>xTil — AI Page Summarizer Chrome Extension</title>
-  <meta name="description" content="xTil (extract + distill) is a free, privacy-first Chrome extension that summarizes articles, YouTube videos, GitHub PRs, and more using your own AI key. Diagrams, fact-checks, chat, and Notion export.">
+  <meta name="description" content="xTil (extract + distill) is a free, privacy-first Chrome extension that summarizes articles, YouTube videos, GitHub PRs, PDFs, and more using your own AI key. Diagrams, fact-checks, LaTeX math, chat, and Notion export.">
   <meta property="og:title" content="xTil — AI Page Summarizer Chrome Extension">
   <meta property="og:description" content="Free, privacy-first Chrome extension that summarizes any page or video using your own AI key. Diagrams, fact-checks, chat refinement, and Notion export.">
   <meta property="og:type" content="website">
@@ -2223,16 +2223,21 @@
 <!-- ─── Additional features (text-only bento) ─── -->
 <section class="features-section" style="padding-top:0;">
   <div class="container">
-    <div class="bento" style="grid-template-columns: repeat(2, 1fr);">
+    <div class="bento" style="grid-template-columns: repeat(3, 1fr);">
       <div class="bento-card reveal">
         <div class="card-icon" style="background:rgba(109,95,245,0.12);color:var(--primary-bright);">&#10148;</div>
         <h3>Export Everywhere</h3>
-        <p>Save to Notion &mdash; xTil auto-creates a searchable database with title, URL, tags, source type, and the AI model used. Download as Markdown with full formatting. Copy as rich HTML and paste straight into Gmail, Google Docs, or Slack with formatting intact. Or print as PDF.</p>
+        <p>Save to Notion with title, URL, tags, and source type. Download as Markdown. Copy as rich HTML and paste into Gmail, Google Docs, or Slack with formatting intact. Or print as PDF.</p>
       </div>
       <div class="bento-card reveal reveal-delay-1">
+        <div class="card-icon" style="background:rgba(56,178,172,0.12);color:#38b2ac;">&#8721;</div>
+        <h3>LaTeX Math</h3>
+        <p>Mathematical formulas render beautifully via KaTeX in any summary. Exports as native Notion equations, pastes into Gmail and Google Docs as Unicode math with proper superscripts and subscripts.</p>
+      </div>
+      <div class="bento-card reveal reveal-delay-2">
         <div class="card-icon" style="background:rgba(52,211,153,0.12);color:var(--emerald);">&#128737;</div>
         <h3>Privacy First</h3>
-        <p>xTil has no backend. There are no servers between you and your AI provider. Your API key stays in your browser's local storage, and page content goes directly to the LLM you choose &mdash; OpenAI, Anthropic, Google, or your own machine. No accounts, no analytics, no telemetry. Ever.</p>
+        <p>xTil has no backend. Your API key stays in local storage, page content goes directly to the LLM you choose. No accounts, no analytics, no telemetry. Ever.</p>
       </div>
     </div>
   </div>
@@ -2254,7 +2259,7 @@
       <div class="pipeline-step reveal reveal-delay-1">
         <div class="step-orb"><span class="num">2</span></div>
         <h3>Click the icon</h3>
-        <p>xTil extracts content from articles, videos &amp; PRs, stripping clutter and analyzing images.</p>
+        <p>xTil extracts content from articles, videos, PRs &amp; PDFs, stripping clutter and analyzing images.</p>
       </div>
       <div class="pipeline-step reveal reveal-delay-2">
         <div class="step-orb"><span class="num">3</span></div>
@@ -2307,6 +2312,11 @@
         <div class="card-icon" style="background:rgba(10,102,194,0.12);color:#0a66c2;">&#128188;</div>
         <h3>LinkedIn</h3>
         <p>Summarize posts from feed or direct URLs. On feed pages, smart detection picks the post with the most screen coverage. Expands truncated text, extracts author headline, engagement metrics, and visible comments.</p>
+      </div>
+      <div class="bento-card reveal reveal-delay-1">
+        <div class="card-icon" style="background:rgba(183,28,28,0.12);color:#ef5350;">&#128195;</div>
+        <h3>PDF</h3>
+        <p>Extracts text from academic papers, reports, and any PDF opened in Chrome. Renders vector figures from PDF pages with smart white-space cropping. Works with any PDF &mdash; just open it in a tab and summarize.</p>
       </div>
     </div>
   </div>

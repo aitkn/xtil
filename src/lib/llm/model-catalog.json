@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-02-26T10:30:12.667Z",
+  "_generated": "2026-02-26T11:08:41.779Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -46,7 +46,12 @@
           "webSearch": false
         },
         "claude-opus-4-1-20250805": {
-          "name": "Claude Opus 4.1"
+          "name": "Claude Opus 4.1",
+          "contextWindow": 200000,
+          "maxOutput": 32000,
+          "inputPrice": 15,
+          "outputPrice": 75,
+          "vision": true
         },
         "claude-opus-4-20250514": {
           "name": "Claude Opus 4",
@@ -57,7 +62,12 @@
           "vision": true
         },
         "claude-opus-4-5-20251101": {
-          "name": "Claude Opus 4.5"
+          "name": "Claude Opus 4.5",
+          "contextWindow": 200000,
+          "maxOutput": 32000,
+          "inputPrice": 5,
+          "outputPrice": 25,
+          "vision": true
         },
         "claude-opus-4-6": {
           "name": "Claude Opus 4.6",
@@ -70,7 +80,12 @@
           "webSearch": false
         },
         "claude-sonnet-4-20250514": {
-          "name": "Claude Sonnet 4"
+          "name": "Claude Sonnet 4",
+          "contextWindow": 200000,
+          "maxOutput": 16384,
+          "inputPrice": 3,
+          "outputPrice": 15,
+          "vision": true
         },
         "claude-sonnet-4-5-20250929": {
           "name": "Claude Sonnet 4.5",
@@ -104,7 +119,7 @@
           "reasoning": false
         },
         "deepseek-reasoner": {
-          "name": "DeepSeek-V3.2 Reasoning",
+          "name": "DeepSeek-V3.2 (Thinking Mode)",
           "contextWindow": 128000,
           "maxOutput": 64000,
           "inputPrice": 0.28,
@@ -183,6 +198,9 @@
           "name": "Gemini 2.5 Flash",
           "contextWindow": 1048576,
           "maxOutput": 65536,
+          "inputPrice": 0.3,
+          "outputPrice": 2.5,
+          "vision": true,
           "reasoning": true,
           "webSearch": true
         },
@@ -195,6 +213,9 @@
           "name": "Gemini 2.5 Flash-Lite",
           "contextWindow": 1048576,
           "maxOutput": 65536,
+          "inputPrice": 0.1,
+          "outputPrice": 0.4,
+          "vision": true,
           "webSearch": true
         },
         "gemini-2.5-flash-lite-preview-09-2025": {
@@ -222,6 +243,9 @@
           "name": "Gemini 2.5 Pro",
           "contextWindow": 1048576,
           "maxOutput": 65536,
+          "inputPrice": 1.25,
+          "outputPrice": 10,
+          "vision": true,
           "reasoning": true,
           "webSearch": true
         },
@@ -244,6 +268,9 @@
           "name": "Gemini 3 Flash Preview",
           "contextWindow": 1048576,
           "maxOutput": 65536,
+          "inputPrice": 0.5,
+          "outputPrice": 3,
+          "vision": true,
           "webSearch": true
         },
         "gemini-3-pro-image-preview": {
@@ -255,12 +282,18 @@
           "name": "Gemini 3 Pro Preview",
           "contextWindow": 1048576,
           "maxOutput": 65536,
+          "inputPrice": 2,
+          "outputPrice": 12,
+          "vision": true,
           "webSearch": true
         },
         "gemini-3.1-pro-preview": {
           "name": "Gemini 3.1 Pro Preview",
           "contextWindow": 1048576,
           "maxOutput": 65536,
+          "inputPrice": 2,
+          "outputPrice": 12,
+          "vision": true,
           "webSearch": true
         },
         "gemini-3.1-pro-preview-customtools": {
@@ -524,9 +557,14 @@
           "name": "gpt-4o-transcribe-diarize"
         },
         "gpt-5": {
+          "name": "GPT-5",
+          "contextWindow": 200000,
+          "maxOutput": 100000,
+          "inputPrice": 1.25,
+          "outputPrice": 10,
+          "vision": true,
           "reasoning": true,
-          "webSearch": true,
-          "name": "gpt-5"
+          "webSearch": true
         },
         "gpt-5-2025-08-07": {
           "reasoning": true,
@@ -543,9 +581,14 @@
           "name": "gpt-5-codex"
         },
         "gpt-5-mini": {
+          "name": "GPT-5 mini",
+          "contextWindow": 200000,
+          "maxOutput": 100000,
+          "inputPrice": 0.25,
+          "outputPrice": 2,
+          "vision": true,
           "reasoning": true,
-          "webSearch": true,
-          "name": "gpt-5-mini"
+          "webSearch": true
         },
         "gpt-5-mini-2025-08-07": {
           "reasoning": true,
@@ -553,9 +596,14 @@
           "name": "gpt-5-mini-2025-08-07"
         },
         "gpt-5-nano": {
+          "name": "GPT-5 nano",
+          "contextWindow": 200000,
+          "maxOutput": 100000,
+          "inputPrice": 0.05,
+          "outputPrice": 0.4,
+          "vision": true,
           "reasoning": true,
-          "webSearch": true,
-          "name": "gpt-5-nano"
+          "webSearch": true
         },
         "gpt-5-nano-2025-08-07": {
           "reasoning": true,
@@ -563,9 +611,14 @@
           "name": "gpt-5-nano-2025-08-07"
         },
         "gpt-5-pro": {
+          "name": "GPT-5 Pro",
+          "contextWindow": 200000,
+          "maxOutput": 100000,
+          "inputPrice": 15,
+          "outputPrice": 120,
+          "vision": true,
           "reasoning": true,
-          "webSearch": true,
-          "name": "gpt-5-pro"
+          "webSearch": true
         },
         "gpt-5-pro-2025-10-06": {
           "reasoning": true,
@@ -583,9 +636,14 @@
           "name": "gpt-5-search-api-2025-10-14"
         },
         "gpt-5.1": {
+          "name": "GPT-5.1",
+          "contextWindow": 200000,
+          "maxOutput": 100000,
+          "inputPrice": 1.25,
+          "outputPrice": 10,
+          "vision": true,
           "reasoning": true,
-          "webSearch": true,
-          "name": "gpt-5.1"
+          "webSearch": true
         },
         "gpt-5.1-2025-11-13": {
           "reasoning": true,
@@ -610,9 +668,14 @@
           "name": "gpt-5.1-codex-mini"
         },
         "gpt-5.2": {
+          "name": "GPT-5.2",
+          "contextWindow": 200000,
+          "maxOutput": 100000,
+          "inputPrice": 1.75,
+          "outputPrice": 14,
+          "vision": true,
           "reasoning": true,
-          "webSearch": true,
-          "name": "gpt-5.2"
+          "webSearch": true
         },
         "gpt-5.2-2025-12-11": {
           "reasoning": true,
@@ -629,9 +692,14 @@
           "name": "gpt-5.2-codex"
         },
         "gpt-5.2-pro": {
+          "name": "GPT-5.2 Pro",
+          "contextWindow": 200000,
+          "maxOutput": 100000,
+          "inputPrice": 21,
+          "outputPrice": 168,
+          "vision": true,
           "reasoning": true,
-          "webSearch": true,
-          "name": "gpt-5.2-pro"
+          "webSearch": true
         },
         "gpt-5.2-pro-2025-12-11": {
           "reasoning": true,
@@ -727,8 +795,8 @@
           "name": "o3",
           "contextWindow": 200000,
           "maxOutput": 100000,
-          "inputPrice": 10,
-          "outputPrice": 40,
+          "inputPrice": 2,
+          "outputPrice": 8,
           "vision": true,
           "reasoning": true,
           "webSearch": true
@@ -761,9 +829,14 @@
           "name": "o3-mini-2025-01-31"
         },
         "o3-pro": {
+          "name": "o3 Pro",
+          "contextWindow": 200000,
+          "maxOutput": 100000,
+          "inputPrice": 20,
+          "outputPrice": 80,
+          "vision": true,
           "reasoning": true,
-          "webSearch": true,
-          "name": "o3-pro"
+          "webSearch": true
         },
         "o3-pro-2025-06-10": {
           "reasoning": true,
@@ -831,6 +904,11 @@
         },
         "grok-4": {
           "name": "Grok 4",
+          "contextWindow": 262144,
+          "inputPrice": 3,
+          "outputPrice": 15,
+          "vision": true,
+          "textGeneration": true,
           "reasoning": true,
           "webSearch": true
         },
