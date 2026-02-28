@@ -810,8 +810,13 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             const maxNameLen = Math.max(...currentModels.map((m) => m.name.length), 0);
             return currentModels.map((m) => {
               const price = estimateArticlePrice(m.inputPrice, m.outputPrice, local.summaryDetailLevel);
-              const pad = nbsp.repeat(maxNameLen - m.name.length + 2);
-              const label = price != null ? `${m.name}${pad}${formatArticlePriceFixed(price)}` : m.name;
+              const namePad = nbsp.repeat(maxNameLen - m.name.length + 1);
+              // Fixed-width badge columns: 👁 = vision, 🌐 = web search
+              // Each emoji slot uses 2 nbsp when absent to match emoji width in monospace
+              const visionBadge = m.vision ? '\u{1F441}' : nbsp.repeat(2);
+              const webBadge = m.webSearch ? '\u{1F310}' : nbsp.repeat(2);
+              const suffix = price != null ? `${nbsp}${formatArticlePriceFixed(price)}` : '';
+              const label = `${m.name}${namePad}${visionBadge}${webBadge}${suffix}`;
               return <option key={m.id} value={m.id}>{label}</option>;
             });
           })()}

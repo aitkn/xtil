@@ -1989,15 +1989,18 @@ export function App() {
                   const today = new Date().toISOString().slice(0, 10);
                   let prompt: string;
                   if (sectionTitle === 'Fact Check') {
-                    prompt = `Today is ${today}. Search the web for the LATEST news (as of ${today}) about each claim in the "${sectionTitle}" section. Search each claim individually by name and recent dates.
+                    prompt = `Today is ${today}. Search the web for the LATEST information (as of ${today}) about each claim in the "${sectionTitle}" section. For each significant claim, run TWO types of searches:
+1. VERIFY — search for the claim directly to find supporting or contradicting evidence.
+2. CHALLENGE — actively search for contrarian views, counterarguments, opposing data, or critics of the claim. Try queries like "[claim topic] criticism", "[claim topic] debunked", "[claim topic] misleading", or "[claim topic] alternative view".
 
-IMPORTANT: Your job is to UPDATE verdicts based ONLY on what web search results say. Ignore your training data — trust the search results.
-- If multiple independent sources confirm a claim → ✅ Verified
-- If sources contradict a claim → ❌ False
-- If only one source or unclear → ⚠️ Partial, explain what's confirmed and what isn't
-- If no search results found → keep the existing verdict unchanged
-For politically sensitive topics, prefer sources without a stake in the outcome over official/government sources.
-Cite each source with name and date.`;
+Use search results to UPDATE verdicts, but apply evidentiary rigor:
+- Do NOT confuse repetition with verification. If many outlets repeat the same claim, trace it to the ORIGINAL source and note their stake.
+- ✅ Verified = only for claims backed by primary evidence (court filings, raw data, public records) or independent convergence (multiple parties with DIFFERENT incentives confirming). If contrarian search found credible disagreement → cannot be ✅.
+- ⚠️ Contested/Misleading = DEFAULT for political, geopolitical, corporate, or institutional claims — even if widely reported. Use when source has a stake, framing is misleading, or credible contrarian positions exist. When contrarian sources are found, briefly note their argument.
+- ❌ False = only when search results provide specific contradicting evidence.
+- ⛔ Omitted = flag if search reveals important context the article left out that would materially change the reader's conclusion.
+- If no relevant search results found → keep existing verdict unchanged.
+Prefer sources without a stake in the outcome. Mention source name and date in the explanation — do NOT use citation markup or reference tags, just plain text.`;
                   } else if (sectionTitle === 'Notable Quotes') {
                     prompt = `Today is ${today}. Search the web to verify the quotes in the "${sectionTitle}" section. Check attribution accuracy and add context about any recent developments related to the quoted statements. Cite sources with dates.`;
                   } else {
