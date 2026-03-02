@@ -131,31 +131,23 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       // Auto-merge new catalog models and update metadata when catalog version changes
       const currentCatalogVersion = getCatalogVersion();
       if (settings.catalogVersion !== currentCatalogVersion) {
-        let merged = false;
         for (const pid of Object.keys(filtered)) {
           const catalogModels = getCatalogModels(pid);
           if (catalogModels.length === 0) continue;
-          const catalogMap = new Map(catalogModels.map((m) => [m.id, m]));
-          // Update metadata (name, prices, etc.) for existing models from catalog
-          filtered[pid] = filtered[pid].map((m) => {
-            const cat = catalogMap.get(m.id);
-            if (!cat) return m;
-            return { ...m, name: cat.name, inputPrice: cat.inputPrice ?? m.inputPrice, outputPrice: cat.outputPrice ?? m.outputPrice, contextWindow: cat.contextWindow ?? m.contextWindow, maxOutput: cat.maxOutput ?? m.maxOutput, vision: cat.vision ?? m.vision, reasoning: cat.reasoning ?? m.reasoning, webSearch: cat.webSearch ?? m.webSearch };
+          const catalogIds = new Set(catalogModels.map((m) => m.id));
+          const cachedMap = new Map(filtered[pid].map((m) => [m.id, m]));
+          // Rebuild list in catalog order: update metadata for existing, add new, drop removed
+          // Catalog is the curated source of truth — models not in it are dropped
+          filtered[pid] = catalogModels.map((cat) => {
+            const cached = cachedMap.get(cat.id);
+            if (!cached) return cat; // new model from catalog
+            return { ...cached, name: cat.name, inputPrice: cat.inputPrice ?? cached.inputPrice, outputPrice: cat.outputPrice ?? cached.outputPrice, contextWindow: cat.contextWindow ?? cached.contextWindow, maxOutput: cat.maxOutput ?? cached.maxOutput, vision: cat.vision ?? cached.vision, reasoning: cat.reasoning ?? cached.reasoning, webSearch: cat.webSearch ?? cached.webSearch };
           });
-          // Add new models not already in the cached list
-          const existingIds = new Set(filtered[pid].map((m) => m.id));
-          const newModels = catalogModels.filter((m) => !existingIds.has(m.id));
-          if (newModels.length > 0) {
-            filtered[pid] = [...filtered[pid], ...newModels];
-            merged = true;
-          }
         }
-        // Persist the merged models and updated catalog version
-        if (merged || settings.catalogVersion !== currentCatalogVersion) {
-          const updatedSettings = { ...settings, cachedModels: filtered, catalogVersion: currentCatalogVersion };
-          lastSavedJson.current = JSON.stringify(updatedSettings);
-          onSave(updatedSettings);
-        }
+        // Persist rebuilt models and updated catalog version
+        const updatedSettings = { ...settings, cachedModels: filtered, catalogVersion: currentCatalogVersion };
+        lastSavedJson.current = JSON.stringify(updatedSettings);
+        onSave(updatedSettings);
       }
 
       setFetchedModels(filtered);
@@ -343,7 +335,16 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     setLoadingModels(true);
     setModelsError(null);
     try {
-      const models = await onFetchModels(pid, config.apiKey, config.endpoint);
+      let models = await onFetchModels(pid, config.apiKey, config.endpoint);
+      // For known providers, intersect with curated catalog — keep catalog order, enrich with API metadata
+      const catalogModels = getCatalogModels(pid);
+      if (catalogModels.length > 0) {
+        const apiMap = new Map(models.map((m) => [m.id, m]));
+        models = catalogModels.map((cat) => {
+          const api = apiMap.get(cat.id);
+          return api ? { ...cat, contextWindow: api.contextWindow ?? cat.contextWindow, maxOutput: api.maxOutput ?? cat.maxOutput, vision: api.vision ?? cat.vision } : cat;
+        });
+      }
       setFetchedModels((prev) => ({ ...prev, [pid]: models }));
     } catch (err) {
       setModelsError(err instanceof Error ? err.message : String(err));

@@ -4,6 +4,19 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.2
+
+**Auto fact-check & streaming polish**
+
+- Auto web-search fact check — opt-in setting to automatically verify claims after summarizing
+- Improved fact check verdicts — icon + verdict word shown upfront for quick scanning
+- Stronger fact check triggers — news, journalism, and bias-prone sources always get checked
+- Source diversity in search — web search now cross-references independent sources, not just echoes
+- Curated model catalog — removed legacy, overpriced, and non-text models for a cleaner selection
+- Streaming stability — sections stay open and scroll position is preserved while content streams in
+- Summary stays visible during diagram fixes instead of being hidden by a spinner
+- Chat messages render markdown properly during streaming
+
 ## 1.1.0
 
 **PDF support, math rendering & feed improvements**
