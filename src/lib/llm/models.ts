@@ -16,6 +16,7 @@ interface CatalogEntry {
 
 interface CatalogProvider {
   models: Record<string, CatalogEntry>;
+  excluded?: string[];
 }
 
 interface Catalog {
@@ -27,6 +28,29 @@ const catalog = catalogData as Catalog;
 
 export function getCatalogEntry(providerId: string, modelId: string): CatalogEntry | undefined {
   return catalog.providers?.[providerId]?.models?.[modelId];
+}
+
+export function getCatalogModelIds(providerId: string): Set<string> {
+  const models = catalog.providers?.[providerId]?.models;
+  return models ? new Set(Object.keys(models)) : new Set();
+}
+
+/** Cached excluded ID sets per provider */
+const excludedCache = new Map<string, Set<string>>();
+
+function getExcludedSet(providerId: string): Set<string> {
+  let set = excludedCache.get(providerId);
+  if (!set) {
+    const excluded = catalog.providers?.[providerId]?.excluded;
+    set = excluded ? new Set(excluded) : new Set();
+    excludedCache.set(providerId, set);
+  }
+  return set;
+}
+
+/** Check if a model ID is in the provider's excluded list */
+export function isModelExcluded(providerId: string, modelId: string): boolean {
+  return getExcludedSet(providerId).has(modelId);
 }
 
 /** Patterns matching non-chat model IDs to exclude */
@@ -102,10 +126,6 @@ export function filterChatModels(models: ModelInfo[]): ModelInfo[] {
 
     return true;
   });
-}
-
-export function getCatalogVersion(): string {
-  return catalog._generated;
 }
 
 export function getCatalogModels(providerId: string): ModelInfo[] {

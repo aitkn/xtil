@@ -1220,11 +1220,6 @@ async function handleFetchModels(
 ): Promise<FetchModelsResultMessage> {
   try {
     const models = await fetchModels(providerId, apiKey, endpoint);
-    // Cache results in storage
-    const settings = await getSettings();
-    await saveSettings({
-      cachedModels: { ...settings.cachedModels, [providerId]: models },
-    });
     return { type: 'FETCH_MODELS_RESULT', success: true, models };
   } catch (err) {
     return {

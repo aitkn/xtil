@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import type { Settings, ThemeMode, ProviderConfig } from '@/lib/storage/types';
 import type { ModelInfo, VisionSupport } from '@/lib/llm/types';
 import { PROVIDER_DEFINITIONS } from '@/lib/llm/registry';
-import { filterChatModels, getCatalogModels, getCatalogVersion, getCatalogEntry } from '@/lib/llm/models';
+import { getCatalogModels, getCatalogModelIds, isModelExcluded, getCatalogEntry } from '@/lib/llm/models';
 import { Button } from '@/components/Button';
 import { estimateArticlePrice, formatArticlePriceFixed } from '@/lib/pricing';
 
@@ -121,37 +121,32 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
 
   useEffect(() => {
     setLocal(settings);
-    if (settings.cachedModels) {
-      // Re-filter cached models (they may predate filter changes)
-      const filtered: Record<string, ModelInfo[]> = {};
-      for (const [pid, models] of Object.entries(settings.cachedModels)) {
-        filtered[pid] = filterChatModels(models);
+
+    // Catalog-first: always start from curated catalog, append cached API extras
+    const result: Record<string, ModelInfo[]> = {};
+    for (const def of PROVIDER_DEFINITIONS) {
+      const pid = def.id;
+      let models = getCatalogModels(pid);
+
+      // Append cached API extras (genuinely new models from previous fetches)
+      if (settings.cachedModels?.[pid]) {
+        const catalogIds = getCatalogModelIds(pid);
+        const extras = settings.cachedModels[pid].filter(
+          (m) => !catalogIds.has(m.id) && !isModelExcluded(pid, m.id),
+        );
+        models = [...models, ...extras];
       }
 
-      // Auto-merge new catalog models and update metadata when catalog version changes
-      const currentCatalogVersion = getCatalogVersion();
-      if (settings.catalogVersion !== currentCatalogVersion) {
-        for (const pid of Object.keys(filtered)) {
-          const catalogModels = getCatalogModels(pid);
-          if (catalogModels.length === 0) continue;
-          const catalogIds = new Set(catalogModels.map((m) => m.id));
-          const cachedMap = new Map(filtered[pid].map((m) => [m.id, m]));
-          // Rebuild list in catalog order: update metadata for existing, add new, drop removed
-          // Catalog is the curated source of truth — models not in it are dropped
-          filtered[pid] = catalogModels.map((cat) => {
-            const cached = cachedMap.get(cat.id);
-            if (!cached) return cat; // new model from catalog
-            return { ...cached, name: cat.name, inputPrice: cat.inputPrice ?? cached.inputPrice, outputPrice: cat.outputPrice ?? cached.outputPrice, contextWindow: cat.contextWindow ?? cached.contextWindow, maxOutput: cat.maxOutput ?? cached.maxOutput, vision: cat.vision ?? cached.vision, reasoning: cat.reasoning ?? cached.reasoning, webSearch: cat.webSearch ?? cached.webSearch };
-          });
-        }
-        // Persist rebuilt models and updated catalog version
-        const updatedSettings = { ...settings, cachedModels: filtered, catalogVersion: currentCatalogVersion };
-        lastSavedJson.current = JSON.stringify(updatedSettings);
-        onSave(updatedSettings);
+      // Keep currently selected model even if not in catalog or extras
+      const selectedId = settings.providerConfigs[pid]?.model;
+      if (selectedId && !models.find((m) => m.id === selectedId)) {
+        const cached = settings.cachedModels?.[pid]?.find((m) => m.id === selectedId);
+        models.push(cached || { id: selectedId, name: selectedId, contextWindow: 100000 });
       }
 
-      setFetchedModels(filtered);
+      if (models.length > 0) result[pid] = models;
     }
+    setFetchedModels(result);
     lastSavedJson.current = JSON.stringify(settings);
 
     // Always respect persisted onboardingCompleted flag
@@ -167,11 +162,17 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     }
   }, [settings]);
 
-  // Auto-save on changes (debounced)
+  // Auto-save on changes (debounced) — only persist API extras, not catalog models
   useEffect(() => {
+    const cachedExtras: Record<string, ModelInfo[]> = {};
+    for (const [pid, models] of Object.entries(fetchedModels)) {
+      const catalogIds = getCatalogModelIds(pid);
+      const extras = models.filter((m) => !catalogIds.has(m.id) && !isModelExcluded(pid, m.id));
+      if (extras.length > 0) cachedExtras[pid] = extras;
+    }
     const finalSettings = {
       ...local,
-      cachedModels: { ...local.cachedModels, ...fetchedModels },
+      cachedModels: Object.keys(cachedExtras).length > 0 ? cachedExtras : undefined,
     };
     const json = JSON.stringify(finalSettings);
     if (json === lastSavedJson.current) return;
@@ -335,16 +336,29 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     setLoadingModels(true);
     setModelsError(null);
     try {
-      let models = await onFetchModels(pid, config.apiKey, config.endpoint);
-      // For known providers, intersect with curated catalog — keep catalog order, enrich with API metadata
-      const catalogModels = getCatalogModels(pid);
-      if (catalogModels.length > 0) {
-        const apiMap = new Map(models.map((m) => [m.id, m]));
-        models = catalogModels.map((cat) => {
-          const api = apiMap.get(cat.id);
-          return api ? { ...cat, contextWindow: api.contextWindow ?? cat.contextWindow, maxOutput: api.maxOutput ?? cat.maxOutput, vision: api.vision ?? cat.vision } : cat;
-        });
+      const apiModels = await onFetchModels(pid, config.apiKey, config.endpoint);
+
+      let models: ModelInfo[];
+      if (pid === 'self-hosted') {
+        // Self-hosted: use API results directly (no catalog)
+        models = apiModels;
+      } else {
+        // Catalog-first: catalog models + genuinely new API discoveries
+        const catalogModels = getCatalogModels(pid);
+        const catalogIds = getCatalogModelIds(pid);
+        const newModels = apiModels.filter(
+          (m) => !catalogIds.has(m.id) && !isModelExcluded(pid, m.id),
+        );
+        models = [...catalogModels, ...newModels];
       }
+
+      // Keep currently selected model if not already in list
+      const selectedId = config.model;
+      if (selectedId && !models.find((m) => m.id === selectedId)) {
+        const fromApi = apiModels.find((m) => m.id === selectedId);
+        models.push(fromApi || { id: selectedId, name: selectedId, contextWindow: 100000 });
+      }
+
       setFetchedModels((prev) => ({ ...prev, [pid]: models }));
     } catch (err) {
       setModelsError(err instanceof Error ? err.message : String(err));
@@ -861,6 +875,17 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
                 return { ...prev, modelCapabilities: caps };
               });
             }} />
+            {modelSupportsWebSearch && (
+              <span style={{
+                font: 'var(--md-sys-typescale-label-small)',
+                color: 'var(--md-sys-color-on-success-container)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                backgroundColor: 'var(--md-sys-color-success-container)',
+              }}>
+                {'\u2713'} web search
+              </span>
+            )}
           </div>
         )}
 

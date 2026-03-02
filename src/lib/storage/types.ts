@@ -25,7 +25,6 @@ export interface Settings {
   summaryDetailLevel: 'brief' | 'standard' | 'detailed';
   theme: ThemeMode;
   cachedModels?: Record<string, ModelInfo[]>;
-  catalogVersion?: string;
   modelCapabilities?: Record<string, ModelCapabilities>;
   enableImageAnalysis?: boolean;
   autoSearchFactCheck?: boolean;
