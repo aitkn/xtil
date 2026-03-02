@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import type { Settings, ThemeMode, ProviderConfig } from '@/lib/storage/types';
 import type { ModelInfo, VisionSupport } from '@/lib/llm/types';
 import { PROVIDER_DEFINITIONS } from '@/lib/llm/registry';
-import { filterChatModels, getCatalogModels, getCatalogVersion } from '@/lib/llm/models';
+import { filterChatModels, getCatalogModels, getCatalogVersion, getCatalogEntry } from '@/lib/llm/models';
 import { Button } from '@/components/Button';
 import { estimateArticlePrice, formatArticlePriceFixed } from '@/lib/pricing';
 
@@ -930,6 +930,37 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             : 'Run Test Connection to check if this model supports images'}
         </div>
 
+        {(() => {
+          const entry = getCatalogEntry(currentProviderId, currentConfig.model);
+          const supportsWebSearch = !!entry?.webSearch;
+          return (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+                <input
+                  type="checkbox"
+                  id="autoSearchFactCheck"
+                  name="auto-search-fact-check"
+                  checked={local.autoSearchFactCheck ?? false}
+                  disabled={!supportsWebSearch}
+                  onChange={(e) => setLocal({ ...local, autoSearchFactCheck: (e.target as HTMLInputElement).checked })}
+                  style={{ margin: 0 }}
+                />
+                <label
+                  htmlFor="autoSearchFactCheck"
+                  style={{ font: 'var(--md-sys-typescale-label-medium)', color: supportsWebSearch ? 'var(--md-sys-color-on-surface)' : 'var(--md-sys-color-on-surface-variant)', cursor: supportsWebSearch ? 'pointer' : 'default' }}
+                >
+                  Auto-search fact checks
+                </label>
+              </div>
+              <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', marginTop: '2px', marginLeft: '26px' }}>
+                {supportsWebSearch
+                  ? 'Automatically verify claims with web search after summarizing'
+                  : 'Web search not available for this model'}
+              </div>
+            </>
+          );
+        })()}
+
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
           <Button onClick={handleTestLLM} loading={testingLLM} size="sm" variant="secondary" title="Test LLM connection">
             Test Connection
@@ -1289,6 +1320,34 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         </div>
 
         <StepHint step="detail" currentStep={onboardingStep} />
+
+        {(() => {
+          const entry = getCatalogEntry(currentProviderId, currentConfig.model);
+          if (!entry?.webSearch) return null;
+          return (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+                <input
+                  type="checkbox"
+                  id="wizardAutoSearchFactCheck"
+                  name="wizard-auto-search-fact-check"
+                  checked={local.autoSearchFactCheck ?? false}
+                  onChange={(e) => setLocal({ ...local, autoSearchFactCheck: (e.target as HTMLInputElement).checked })}
+                  style={{ margin: 0 }}
+                />
+                <label
+                  htmlFor="wizardAutoSearchFactCheck"
+                  style={{ font: 'var(--md-sys-typescale-label-medium)', color: 'var(--md-sys-color-on-surface)', cursor: 'pointer' }}
+                >
+                  Auto-search fact checks
+                </label>
+              </div>
+              <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', marginTop: '2px', marginLeft: '26px' }}>
+                Automatically verify claims with web search after summarizing
+              </div>
+            </>
+          );
+        })()}
 
         {/* Finish setup button during onboarding — only when detail was already selected */}
         {isOnboarding && onboardingStep === 'detail' && (

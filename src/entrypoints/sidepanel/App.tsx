@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import { coerceExtraSections, type SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent } from '@/lib/extractors/types';
 import type { ChatMessage, VisionSupport } from '@/lib/llm/types';
@@ -112,6 +112,28 @@ function tryExtractStreamingChatText(raw: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** Build the web-search prompt for the Fact Check section (used by both auto and manual triggers). */
+function buildFactCheckSearchPrompt(today: string): string {
+  return `Today is ${today}. Search the web for the LATEST information (as of ${today}) about each claim in the "Fact Check" section. For each significant claim, run TWO types of searches:
+1. VERIFY — search for the claim directly to find supporting or contradicting evidence.
+2. CHALLENGE — actively search for contrarian views, counterarguments, opposing data, or critics of the claim. Try queries like "[claim topic] criticism", "[claim topic] debunked", "[claim topic] misleading", or "[claim topic] alternative view".
+
+CRITICAL — SOURCE DIVERSITY RULE:
+Before citing search results, ask: "Do these sources trace back to ONE original source?" If 5 outlets all report the same claim, that is NOT 5 confirmations — it is 1 claim amplified 5 times. News agencies (AP, Reuters, AFP) syndicate stories that hundreds of outlets republish verbatim. Government press releases get repeated as "reporting" by aligned media. Corporate announcements get echoed by industry press.
+- Count ORIGINAL sources, not republishers. Name the original.
+- Sources with the SAME editorial lean, ownership group, or geopolitical alignment count as ONE perspective, not independent confirmation. E.g. 5 Western outlets agreeing on a geopolitical claim ≠ verified — they share the same information ecosystem. Same for 5 Russian, Chinese, or any aligned-bloc sources.
+- ✅ Verified REQUIRES sources with DIFFERENT incentives agreeing (e.g. both the accused AND independent investigators confirm; or adversarial governments both acknowledge the same fact). If all your sources would benefit from the same narrative → ⚠️ at best.
+- When listing sources, note their perspective/lean in parentheses: e.g. "BBC (Western, UK state-funded)", "RT (Russian state-affiliated)", "Al Jazeera (Qatari state-funded)", "Fox News (US right-leaning)", "NYT (US center-left)".
+
+Use search results to UPDATE verdicts:
+- ✅ Verified = ONLY when confirmed by primary evidence (court filings, raw data, public records) OR by independent convergence from sources with DIFFERENT incentives. Multiple outlets from the same perspective repeating a claim is NOT verification. If contrarian search found credible disagreement → cannot be ✅.
+- ⚠️ Contested/Misleading = DEFAULT for political, geopolitical, corporate, or institutional claims — even if widely reported. Use when: all confirming sources share similar bias; source has a stake; framing is misleading; credible contrarian positions exist. When contrarian sources are found, briefly note their argument.
+- ❌ False = only when search results provide specific contradicting evidence.
+- ⛔ Omitted = flag if search reveals important context the article left out that would materially change the reader's conclusion. ALSO flag if all search results come from one perspective and the opposing perspective is absent.
+- If no relevant search results found → keep existing verdict unchanged.
+Mention source name, perspective, and date in the explanation — do NOT use citation markup or reference tags, just plain text.`;
 }
 
 /** Count total mermaid code blocks across all summary text fields. */
@@ -1151,8 +1173,27 @@ export function App() {
     [chatStreamingText],
   );
 
+  // Preserve scroll position during streaming updates — save before DOM paint, restore after
+  const streamingScrollLock = useRef(false);
+  useLayoutEffect(() => {
+    if (!streamingSummary || !scrollAreaRef.current) return;
+    // Save scroll position before React commits DOM changes
+    const el = scrollAreaRef.current;
+    const savedTop = el.scrollTop;
+    streamingScrollLock.current = true;
+    // Restore after paint
+    requestAnimationFrame(() => {
+      if (streamingScrollLock.current && el.scrollTop !== savedTop) {
+        el.scrollTop = savedTop;
+      }
+      streamingScrollLock.current = false;
+    });
+  }, [streamingSummary]);
+
   const handleSummarize = useCallback(async (userInstructions?: string) => {
     const originTabId = activeTabIdRef.current;
+    let autoSearchFactCheck = false;
+    let completedSummary: SummaryDocument | null = null;
     setLoading(true);
     setStreamingText('');
     setStreamingProgress(null);
@@ -1232,7 +1273,6 @@ export function App() {
       }
 
       if (activeTabIdRef.current === originTabId) {
-        resetSectionState();
         setSummary(finalSummary);
         summaryDetailLevelRef.current = settings.summaryDetailLevel;
       } else if (originTabId != null) {
@@ -1262,6 +1302,16 @@ export function App() {
       }
       // Persist to session storage so it survives sidepanel close/reopen
       persistToSession(originTabId);
+
+      // Check if auto-search should fire (evaluated before finally clears loading)
+      if (settings.autoSearchFactCheck && finalSummary.factCheck) {
+        const cfg = getActiveProviderConfig(settings);
+        const me = getCatalogEntry(settings.activeProviderId, cfg.model);
+        if (me?.webSearch) {
+          autoSearchFactCheck = true;
+          completedSummary = finalSummary;
+        }
+      }
     } catch (err) {
       // Route failures to chat as assistant messages (silently swallow cancellation)
       const message = err instanceof Error ? err.message : String(err);
@@ -1284,6 +1334,16 @@ export function App() {
         const saved = tabStatesRef.current.get(originTabId);
         if (saved) saved.loading = false;
       }
+    }
+
+    // Fire auto-search AFTER main spinner is cleared — uses section-level action state
+    if (autoSearchFactCheck && completedSummary) {
+      setActiveSectionActions(prev => new Map(prev).set('Fact Check', 'search'));
+      const today = new Date().toISOString().slice(0, 10);
+      const ok = await handleChatSend(buildFactCheckSearchPrompt(today), { internal: true, webSearch: true, summaryOverride: completedSummary });
+      if (ok) setSearchedSections(prev => new Set(prev).add('Fact Check'));
+      setActiveSectionActions(prev => { const next = new Map(prev); next.delete('Fact Check'); return next; });
+      persistToSession(originTabId);
     }
   }, [content, resolvedTheme, persistToSession]);
 
@@ -1486,13 +1546,14 @@ export function App() {
     doExport();
   }, [summary, content, exporting, doExport]);
 
-  const handleChatSend = useCallback(async (text: string, opts?: { internal?: boolean; webSearch?: boolean }): Promise<boolean> => {
+  const handleChatSend = useCallback(async (text: string, opts?: { internal?: boolean; webSearch?: boolean; summaryOverride?: SummaryDocument }): Promise<boolean> => {
     if (!content) return false;
     const originTabId = activeTabIdRef.current;
     const isInternal = opts?.internal ?? false;
 
     // Snapshot the current summary so we can revert to this point later
-    const snapshotBefore = summary ? structuredClone(summary) : null;
+    const effectiveSummary = opts?.summaryOverride ?? summary;
+    const snapshotBefore = effectiveSummary ? structuredClone(effectiveSummary) : null;
 
     setChatMessages((prev) => [...prev, {
       role: 'user',
@@ -1519,7 +1580,7 @@ export function App() {
       const response = await sendMessage({
         type: 'CHAT_MESSAGE',
         messages: allMessages,
-        summary: summary || emptySummary,
+        summary: effectiveSummary || emptySummary,
         content,
         tabId: originTabId ?? undefined,
         webSearch: opts?.webSearch || undefined,
@@ -1542,14 +1603,14 @@ export function App() {
       // Merge updates into existing summary
       let updatedSummary: SummaryDocument | null = null;
       if (updates) {
-        const base = summary || emptySummary;
+        const base = effectiveSummary || emptySummary;
         updatedSummary = mergeSummaryUpdates(base, updates);
         // Resolve {{FILE_N}} / {{VIDEO_URL}} / {{IMG_N}} placeholders the LLM may use in chat
         updatedSummary = replacePlaceholders(updatedSummary, buildPlaceholders(content));
         // Preserve app-managed fields
-        if (summary) {
-          updatedSummary.llmProvider = summary.llmProvider;
-          updatedSummary.llmModel = summary.llmModel;
+        if (effectiveSummary) {
+          updatedSummary.llmProvider = effectiveSummary.llmProvider;
+          updatedSummary.llmModel = effectiveSummary.llmModel;
         }
       }
 
@@ -1919,7 +1980,16 @@ export function App() {
                   ? `Processing chunk ${streamingProgress.chunk} of ${streamingProgress.total}...`
                   : 'Generating summary...'
             } />
-            {streamingSummary && (
+            {/* During mermaid fixing, show the real summary (already being updated via setSummary);
+                during streaming, show the parsed preview at reduced opacity */}
+            {mermaidFixStatus && summary ? (
+              <div style={{ marginTop: '8px' }}>
+                <SummaryContent
+                  summary={summary}
+                  content={content}
+                />
+              </div>
+            ) : streamingSummary && (
               <div style={{ marginTop: '8px', opacity: 0.6 }}>
                 <SummaryContent
                   summary={streamingSummary}
@@ -1989,18 +2059,7 @@ export function App() {
                   const today = new Date().toISOString().slice(0, 10);
                   let prompt: string;
                   if (sectionTitle === 'Fact Check') {
-                    prompt = `Today is ${today}. Search the web for the LATEST information (as of ${today}) about each claim in the "${sectionTitle}" section. For each significant claim, run TWO types of searches:
-1. VERIFY — search for the claim directly to find supporting or contradicting evidence.
-2. CHALLENGE — actively search for contrarian views, counterarguments, opposing data, or critics of the claim. Try queries like "[claim topic] criticism", "[claim topic] debunked", "[claim topic] misleading", or "[claim topic] alternative view".
-
-Use search results to UPDATE verdicts, but apply evidentiary rigor:
-- Do NOT confuse repetition with verification. If many outlets repeat the same claim, trace it to the ORIGINAL source and note their stake.
-- ✅ Verified = only for claims backed by primary evidence (court filings, raw data, public records) or independent convergence (multiple parties with DIFFERENT incentives confirming). If contrarian search found credible disagreement → cannot be ✅.
-- ⚠️ Contested/Misleading = DEFAULT for political, geopolitical, corporate, or institutional claims — even if widely reported. Use when source has a stake, framing is misleading, or credible contrarian positions exist. When contrarian sources are found, briefly note their argument.
-- ❌ False = only when search results provide specific contradicting evidence.
-- ⛔ Omitted = flag if search reveals important context the article left out that would materially change the reader's conclusion.
-- If no relevant search results found → keep existing verdict unchanged.
-Prefer sources without a stake in the outcome. Mention source name and date in the explanation — do NOT use citation markup or reference tags, just plain text.`;
+                    prompt = buildFactCheckSearchPrompt(today);
                   } else if (sectionTitle === 'Notable Quotes') {
                     prompt = `Today is ${today}. Search the web to verify the quotes in the "${sectionTitle}" section. Check attribution accuracy and add context about any recent developments related to the quoted statements. Cite sources with dates.`;
                   } else {
@@ -2059,11 +2118,9 @@ Prefer sources without a stake in the outcome. Mention source name and date in t
                     font: 'var(--md-sys-typescale-body-medium)',
                     color: 'var(--md-sys-color-on-surface)',
                     lineHeight: 1.5,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
                     opacity: 0.85,
                   }}>
-                    {chatDisplayText}
+                    <MarkdownRenderer content={chatDisplayText} />
                   </div>
                 ) : (
                   <div style={{ font: 'var(--md-sys-typescale-body-medium)', color: 'var(--md-sys-color-on-surface-variant)' }}>

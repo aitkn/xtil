@@ -291,9 +291,21 @@ Every field value must be in the chosen output language. No mixing languages wit
     ? ''
     : d.factCheck === null
       ? '- "factCheck": Set to null.'
-      : `- "factCheck" — ${factCheckPreamble} the content makes specific, verifiable factual claims that matter to the reader's understanding (statistics, scientific claims, historical assertions, policy claims, attributed quotes). Set to null for: essays, opinion pieces, philosophical writing, personal narratives, advice/self-help, tutorials, reviews, humor, creative fiction, poetry, or any content where claims are primarily subjective or experiential. The test: "Would getting this wrong actually mislead the reader on something important?" If not, set to null.
+      : `- "factCheck" — NEVER set to null for news, journalism, or reporting of any kind. For non-news content, ${factCheckPreamble.toLowerCase()} any of the conditions below apply.
+  MANDATORY (never null):
+  - NEWS / JOURNALISM: ALL news sources carry editorial bias — ownership, audience, advertisers, and geopolitical alignment shape what gets covered, how it's framed, and what's omitted. No outlet is neutral. State-affiliated media (RT, Xinhua, Al Jazeera, Voice of America, etc.), partisan outlets, and outlets with known ownership stakes MUST get a ⛔ bullet noting the affiliation/lean. Even "reputable" outlets selectively frame — check what's emphasized vs buried vs omitted.
+  - POLITICAL / GEOPOLITICAL: government statements, policy claims, war/conflict reporting, election coverage, sanctions/diplomacy — competing narratives always exist.
+  - FINANCIAL INCENTIVE: product reviews, sponsored content, affiliate pages, company announcements, press releases, fundraising appeals.
+  - HEALTH / SCIENCE with stakes: medical claims, nutrition advice, drug efficacy, environmental data, pandemic coverage.
+  - INDUSTRY-FUNDED or LOBBYING-ADJACENT: think-tank reports, industry whitepapers, "studies show" without naming the funder.
+  - STATISTICS / DATA CLAIMS: specific numbers, percentages, rankings, "fastest growing", "most popular".
+  INCLUDE when:
+  - Content makes specific, verifiable factual claims that matter to the reader's understanding (historical assertions, attributed quotes, legal claims).
+  - Source has an identifiable stake in the reader's conclusion (institutional PR, advocacy, marketing disguised as journalism).
+  SET TO NULL ONLY for: essays, opinion pieces, philosophical writing, personal narratives, advice/self-help, tutorials, humor, creative fiction, poetry, or content where claims are purely subjective or experiential.
+  The test: "Does someone benefit from the reader believing this uncritically?" If yes → MUST include. "Would getting this wrong actually mislead the reader?" If yes → MUST include. Both no → may set to null.
   GOAL: Maximize information value per bullet. Skip obvious/trivial truths everybody knows. Focus on what would SURPRISE, CORRECT, or PROTECT a careful reader. The output should change the reader's knowledge state — if a bullet wouldn't, cut it.
-  Format: structured markdown list, one bullet per item. Pattern: **"Claim quote or paraphrase"** — [icon] [verdict], then a brief explanation. Icons: ✅ ⚠️ ❌ 🔍 ⛔ — translate verdict words to match the summary language.
+  Format: structured markdown list, one bullet per item. Pattern: [icon] [Verdict]: **"Claim quote or paraphrase"** — brief explanation. Icon and verdict word MUST come first so the reader sees the judgment immediately. Icons: ✅ ⚠️ ❌ 🔍 ⛔ — translate verdict words to match the summary language.
   HIGH-VALUE bullets (prioritize): ❌ claims widely believed but actually false (myth-busting); ⚠️ claims technically true but misleading (cherry-picked data, survivorship bias, misleading denominators, "up to X%" framing, correlation-as-causation); ⛔ important context the article omits that would materially change reader's conclusion; ✅ surprising truths most readers would doubt (confirms something counterintuitive); facts that WERE true but are now outdated.
   LOW-VALUE bullets (skip): obvious truths no informed reader would question; trivial details (exact dates, minor figures) unless the error is consequential; claims too recent to assess — do NOT pad with 🔍 bullets.
   TARGET: 3-6 bullets total. Quality over quantity. Every bullet must earn its place.
@@ -312,11 +324,11 @@ Every field value must be in the chosen output language. No mixing languages wit
   LANGUAGE PRECISION flags — note when the article uses hedging that implies more than stated: "No evidence of X" (nobody looked?), "linked to" (correlation only), "up to N%" (the max, not average), "studies show" (which studies? funded by whom?), "officials say" (which officials? what's their stake?). Mention the gap between wording and what it implies.
   Knowledge cutoff (today is ${today}): "I have no record" → 🔍 or ⚠️ Partial, NEVER → ❌. Absence of information means your data predates it, NOT that it didn't happen.
   Examples:
-  - **"Exposed 500M user records"** — ✅ Verified; confirmed by SEC filing and independent security audit
-  - **"Vaccine is 95% effective"** — ⚠️ Misleading; figure is relative risk reduction — absolute risk reduction was ~0.7%, a distinction the article does not make
-  - **"We only use 10% of our brains"** — ❌ False; neuroimaging shows most brain regions are active across 24h — persistent myth
-  - **"Crime dropped 77% in Memphis"** — 🔍 Unverifiable; no public dataset supports this specific figure
-  - ⛔ **Omitted: industry funding** — The cited study was funded by the manufacturer; no independent replication exists. Article presents findings as neutral science`;
+  - ✅ Verified: **"Exposed 500M user records"** — confirmed by SEC filing and independent security audit
+  - ⚠️ Misleading: **"Vaccine is 95% effective"** — figure is relative risk reduction — absolute risk reduction was ~0.7%, a distinction the article does not make
+  - ❌ False: **"We only use 10% of our brains"** — neuroimaging shows most brain regions are active across 24h — persistent myth
+  - 🔍 Unverifiable: **"Crime dropped 77% in Memphis"** — no public dataset supports this specific figure
+  - ⛔ Omitted: **industry funding** — The cited study was funded by the manufacturer; no independent replication exists. Article presents findings as neutral science`;
 
   // Quotes extra instructions (translation + timestamps) — only when quotes are included
   const quotesExtra = (skipQuotes || d.quotes === 'Set to null.') ? '' : ' When the summary language differs from the source language, append a translation in parentheses after each quote, e.g. "Original quote" (Translation). If you include a timestamp, always make it a clickable markdown link — never a bare number.';
