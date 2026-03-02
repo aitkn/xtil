@@ -3,7 +3,7 @@ import { getCatalogEntry } from './models';
 
 /** Strip Grok inline citation markup tags from response text. */
 function stripCitationTags(text: string): string {
-  return text.replace(/<grok:render[^>]*>[^<]*(?:<\/grok:render>)?/g, '');
+  return text.replace(/<grok:render[\s\S]*?<\/grok:render>/g, '');
 }
 
 /** Extract a clean error message from OpenAI-compatible API error JSON. */

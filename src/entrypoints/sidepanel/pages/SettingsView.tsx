@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import type { Settings, ThemeMode, ProviderConfig } from '@/lib/storage/types';
 import type { ModelInfo, VisionSupport } from '@/lib/llm/types';
 import { PROVIDER_DEFINITIONS } from '@/lib/llm/registry';
-import { filterChatModels, getCatalogModels, getCatalogVersion } from '@/lib/llm/models';
+import { filterChatModels, getCatalogModels, getCatalogVersion, getCatalogEntry } from '@/lib/llm/models';
 import { Button } from '@/components/Button';
 import { estimateArticlePrice, formatArticlePriceFixed } from '@/lib/pricing';
 
@@ -204,6 +204,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
   const visionKey = `${currentProviderId}:${currentConfig.model}`;
   const visionCapability: VisionSupport = local.modelCapabilities?.[visionKey]?.vision || 'unknown';
   const isSelfHosted = currentProviderId === 'self-hosted';
+  const modelSupportsWebSearch = !!getCatalogEntry(currentProviderId, currentConfig.model)?.webSearch;
 
   const isOnboarding = onboardingStep !== null;
   const currentStepIndex = isOnboarding ? ONBOARDING_STEPS.indexOf(onboardingStep) : -1;
@@ -810,8 +811,13 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             const maxNameLen = Math.max(...currentModels.map((m) => m.name.length), 0);
             return currentModels.map((m) => {
               const price = estimateArticlePrice(m.inputPrice, m.outputPrice, local.summaryDetailLevel);
-              const pad = nbsp.repeat(maxNameLen - m.name.length + 2);
-              const label = price != null ? `${m.name}${pad}${formatArticlePriceFixed(price)}` : m.name;
+              const namePad = nbsp.repeat(maxNameLen - m.name.length + 1);
+              // Fixed-width badge columns: 👁 = vision, 🌐 = web search
+              // Each emoji slot uses 2 nbsp when absent to match emoji width in monospace
+              const visionBadge = m.vision ? '\u{1F441}' : nbsp.repeat(2);
+              const webBadge = m.webSearch ? '\u{1F310}' : nbsp.repeat(2);
+              const suffix = price != null ? `${nbsp}${formatArticlePriceFixed(price)}` : '';
+              const label = `${m.name}${namePad}${visionBadge}${webBadge}${suffix}`;
               return <option key={m.id} value={m.id}>{label}</option>;
             });
           })()}
@@ -923,6 +929,29 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             : (visionCapability === 'base64' || visionCapability === 'url')
             ? 'Sends images to the LLM for analysis (increases token usage)'
             : 'Run Test Connection to check if this model supports images'}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+          <input
+            type="checkbox"
+            id="autoSearchFactCheck"
+            name="auto-search-fact-check"
+            checked={local.autoSearchFactCheck ?? false}
+            disabled={!modelSupportsWebSearch}
+            onChange={(e) => setLocal({ ...local, autoSearchFactCheck: (e.target as HTMLInputElement).checked })}
+            style={{ margin: 0 }}
+          />
+          <label
+            htmlFor="autoSearchFactCheck"
+            style={{ font: 'var(--md-sys-typescale-label-medium)', color: modelSupportsWebSearch ? 'var(--md-sys-color-on-surface)' : 'var(--md-sys-color-on-surface-variant)', cursor: modelSupportsWebSearch ? 'pointer' : 'default' }}
+          >
+            Auto-search fact checks
+          </label>
+        </div>
+        <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', marginTop: '2px', marginLeft: '26px' }}>
+          {modelSupportsWebSearch
+            ? 'Automatically verify claims with web search after summarizing'
+            : 'Web search not available for this model'}
         </div>
 
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
@@ -1284,6 +1313,30 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         </div>
 
         <StepHint step="detail" currentStep={onboardingStep} />
+
+        {modelSupportsWebSearch && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+              <input
+                type="checkbox"
+                id="wizardAutoSearchFactCheck"
+                name="wizard-auto-search-fact-check"
+                checked={local.autoSearchFactCheck ?? false}
+                onChange={(e) => setLocal({ ...local, autoSearchFactCheck: (e.target as HTMLInputElement).checked })}
+                style={{ margin: 0 }}
+              />
+              <label
+                htmlFor="wizardAutoSearchFactCheck"
+                style={{ font: 'var(--md-sys-typescale-label-medium)', color: 'var(--md-sys-color-on-surface)', cursor: 'pointer' }}
+              >
+                Auto-search fact checks
+              </label>
+            </div>
+            <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', marginTop: '2px', marginLeft: '26px' }}>
+              Automatically verify claims with web search after summarizing
+            </div>
+          </>
+        )}
 
         {/* Finish setup button during onboarding — only when detail was already selected */}
         {isOnboarding && onboardingStep === 'detail' && (

@@ -28,6 +28,7 @@ export interface Settings {
   catalogVersion?: string;
   modelCapabilities?: Record<string, ModelCapabilities>;
   enableImageAnalysis?: boolean;
+  autoSearchFactCheck?: boolean;
   onboardingCompleted?: boolean;
 }
 

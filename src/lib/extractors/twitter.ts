@@ -1,132 +1,300 @@
-import type { ContentExtractor, ExtractedContent, ExtractedImage } from './types';
+import type { ContentExtractor, ExtractedContent, ExtractedImage, ExtractOptions } from './types';
 
 const TWITTER_STATUS_RE = /(?:twitter\.com|x\.com)\/(\w+)\/status\/(\d+)/;
 
+/** Match any X/Twitter hostname */
+const TWITTER_HOSTNAME_RE = /(^|\.)(?:twitter\.com|x\.com)$/;
+
 export const twitterExtractor: ContentExtractor = {
-  canExtract(url: string): boolean {
-    return TWITTER_STATUS_RE.test(url);
+  canExtract(url: string, doc: Document): boolean {
+    try {
+      const hostname = new URL(url).hostname;
+      if (!TWITTER_HOSTNAME_RE.test(hostname)) return false;
+    } catch {
+      return false;
+    }
+
+    // Direct tweet URL
+    if (TWITTER_STATUS_RE.test(url)) return true;
+
+    // Feed/profile/search page with visible articles
+    return doc.querySelectorAll('article').length > 0;
   },
 
-  extract(url: string, doc: Document): ExtractedContent {
-    const urlMatch = url.match(TWITTER_STATUS_RE);
-    const mainAuthor = urlMatch?.[1] || '';
+  extract(url: string, doc: Document, options?: ExtractOptions): ExtractedContent {
+    const isDirectTweet = TWITTER_STATUS_RE.test(url);
 
-    // Find all article elements (tweets)
-    const articles = doc.querySelectorAll('article');
-    const tweets: ParsedTweet[] = [];
-
-    for (const article of articles) {
-      const tweet = parseArticle(article);
-      if (tweet) tweets.push(tweet);
+    if (isDirectTweet) {
+      return extractDirectTweet(url, doc);
     }
 
-    // First tweet in the conversation region is the main tweet
-    // It's the one whose author matches the URL, or simply the first one
-    let mainTweet: ParsedTweet | undefined;
-    let replies: ParsedTweet[] = [];
+    // Feed mode: pick the most visible article
+    return extractFeedTweet(url, doc, options);
+  },
+};
 
-    const mainIdx = tweets.findIndex(
-      (t) => t.handle.toLowerCase() === mainAuthor.toLowerCase(),
-    );
-    if (mainIdx >= 0) {
-      mainTweet = tweets[mainIdx];
-      replies = tweets.filter((_, i) => i !== mainIdx);
-    } else if (tweets.length > 0) {
-      mainTweet = tweets[0];
-      replies = tweets.slice(1);
-    }
+// ---------------------------------------------------------------------------
+// Direct tweet extraction (existing /status/ URL logic)
+// ---------------------------------------------------------------------------
 
-    // Detect threads: sequential replies by the same author as the main tweet
-    const threadParts: string[] = [];
-    const nonThreadReplies: ParsedTweet[] = [];
+function extractDirectTweet(url: string, doc: Document): ExtractedContent {
+  const urlMatch = url.match(TWITTER_STATUS_RE);
+  const mainAuthor = urlMatch?.[1] || '';
 
-    if (mainTweet) {
-      for (const reply of replies) {
-        if (reply.handle.toLowerCase() === mainTweet.handle.toLowerCase() && nonThreadReplies.length === 0) {
-          // Part of the thread (only consecutive same-author replies before other replies)
-          threadParts.push(reply.text);
-        } else {
-          nonThreadReplies.push(reply);
-        }
+  // Find all article elements (tweets)
+  const articles = doc.querySelectorAll('article');
+  const tweets: ParsedTweet[] = [];
+
+  for (const article of articles) {
+    const tweet = parseArticle(article);
+    if (tweet) tweets.push(tweet);
+  }
+
+  // First tweet in the conversation region is the main tweet
+  // It's the one whose author matches the URL, or simply the first one
+  let mainTweet: ParsedTweet | undefined;
+  let replies: ParsedTweet[] = [];
+
+  const mainIdx = tweets.findIndex(
+    (t) => t.handle.toLowerCase() === mainAuthor.toLowerCase(),
+  );
+  if (mainIdx >= 0) {
+    mainTweet = tweets[mainIdx];
+    replies = tweets.filter((_, i) => i !== mainIdx);
+  } else if (tweets.length > 0) {
+    mainTweet = tweets[0];
+    replies = tweets.slice(1);
+  }
+
+  // Detect threads: sequential replies by the same author as the main tweet
+  const threadParts: string[] = [];
+  const nonThreadReplies: ParsedTweet[] = [];
+
+  if (mainTweet) {
+    for (const reply of replies) {
+      if (reply.handle.toLowerCase() === mainTweet.handle.toLowerCase() && nonThreadReplies.length === 0) {
+        // Part of the thread (only consecutive same-author replies before other replies)
+        threadParts.push(reply.text);
+      } else {
+        nonThreadReplies.push(reply);
       }
     }
+  }
 
-    // Build content
-    const lines: string[] = [];
+  // Build content
+  const lines: string[] = [];
 
-    if (mainTweet) {
-      lines.push(`# ${mainTweet.displayName} (@${mainTweet.handle})`);
-      lines.push('');
-      lines.push(mainTweet.text);
-      if (threadParts.length > 0) {
-        for (const part of threadParts) {
-          lines.push('');
-          lines.push(part);
-        }
-      }
-      lines.push('');
-
-      // Engagement metrics
-      const metrics: string[] = [];
-      if (mainTweet.replies !== undefined) metrics.push(`${formatCount(mainTweet.replies)} replies`);
-      if (mainTweet.reposts !== undefined) metrics.push(`${formatCount(mainTweet.reposts)} reposts`);
-      if (mainTweet.likes !== undefined) metrics.push(`${formatCount(mainTweet.likes)} likes`);
-      if (mainTweet.views !== undefined) metrics.push(`${formatCount(mainTweet.views)} views`);
-      if (metrics.length > 0) {
-        lines.push(`---`);
-        lines.push(metrics.join(' | '));
+  if (mainTweet) {
+    lines.push(`# ${mainTweet.displayName} (@${mainTweet.handle})`);
+    lines.push('');
+    lines.push(mainTweet.text);
+    if (threadParts.length > 0) {
+      for (const part of threadParts) {
         lines.push('');
+        lines.push(part);
       }
     }
+    lines.push('');
 
-    // Replies section
-    if (nonThreadReplies.length > 0) {
-      lines.push('## Replies');
+    // Engagement metrics
+    const metrics: string[] = [];
+    if (mainTweet.replies !== undefined) metrics.push(`${formatCount(mainTweet.replies)} replies`);
+    if (mainTweet.reposts !== undefined) metrics.push(`${formatCount(mainTweet.reposts)} reposts`);
+    if (mainTweet.likes !== undefined) metrics.push(`${formatCount(mainTweet.likes)} likes`);
+    if (mainTweet.views !== undefined) metrics.push(`${formatCount(mainTweet.views)} views`);
+    if (metrics.length > 0) {
+      lines.push(`---`);
+      lines.push(metrics.join(' | '));
       lines.push('');
-
-      for (const reply of nonThreadReplies) {
-        const likes = reply.likes !== undefined ? ` (${formatCount(reply.likes)} likes)` : '';
-        lines.push(`**${reply.displayName}** (@${reply.handle})${likes}: ${reply.text}`);
-        lines.push('');
-      }
     }
+  }
 
-    const content = lines.join('\n');
-    const wordCount = content.split(/\s+/).filter(Boolean).length;
-    const title = mainTweet?.text
-      ? mainTweet.text.slice(0, 120).trim() + (mainTweet.text.length > 120 ? '...' : '')
-      : '';
+  // Replies section
+  if (nonThreadReplies.length > 0) {
+    lines.push('## Replies');
+    lines.push('');
 
-    // Extract images from tweets
-    const richImages = extractTweetImages(doc);
+    for (const reply of nonThreadReplies) {
+      const likes = reply.likes !== undefined ? ` (${formatCount(reply.likes)} likes)` : '';
+      lines.push(`**${reply.displayName}** (@${reply.handle})${likes}: ${reply.text}`);
+      lines.push('');
+    }
+  }
 
-    // Get only the main tweet's own attached media grid (excluding quoted tweet media)
-    const mainArticle = mainTweet ? findMainArticle(articles, mainTweet.handle) : undefined;
-    const thumbnailUrls = mainArticle ? extractMediaGridUrls(mainArticle).slice(0, 4) : [];
+  const content = lines.join('\n');
+  const wordCount = content.split(/\s+/).filter(Boolean).length;
+  const title = mainTweet?.text
+    ? mainTweet.text.slice(0, 120).trim() + (mainTweet.text.length > 120 ? '...' : '')
+    : '';
 
-    // X/Twitter og:image is always a generic logo — use actual tweet images instead
-    const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
-    const hasRealOgImage = ogImage && !ogImage.includes('abs.twimg.com/rweb/');
-    const thumbnailUrl =
-      (thumbnailUrls.length > 0 ? thumbnailUrls[0] : undefined) ||
-      (richImages.length > 0 ? richImages[0].url : undefined) ||
-      (hasRealOgImage ? ogImage : undefined);
+  // Extract images from tweets
+  const richImages = extractTweetImages(doc);
 
+  // Get only the main tweet's own attached media grid (excluding quoted tweet media)
+  const mainArticle = mainTweet ? findMainArticle(doc.querySelectorAll('article'), mainTweet.handle) : undefined;
+  const thumbnailUrls = mainArticle ? extractMediaGridUrls(mainArticle).slice(0, 4) : [];
+
+  // X/Twitter og:image is always a generic logo — use actual tweet images instead
+  const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
+  const hasRealOgImage = ogImage && !ogImage.includes('abs.twimg.com/rweb/');
+  const thumbnailUrl =
+    (thumbnailUrls.length > 0 ? thumbnailUrls[0] : undefined) ||
+    (richImages.length > 0 ? richImages[0].url : undefined) ||
+    (hasRealOgImage ? ogImage : undefined);
+
+  return {
+    type: 'twitter',
+    url: normalizeTwitterUrl(url),
+    title,
+    author: mainTweet?.displayName || mainAuthor || undefined,
+    language: doc.documentElement.lang || undefined,
+    content,
+    wordCount,
+    estimatedReadingTime: Math.ceil(wordCount / 200),
+    thumbnailUrl,
+    thumbnailUrls: thumbnailUrls.length > 1 ? thumbnailUrls : undefined,
+    richImages: richImages.length > 0 ? richImages : undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Feed-mode extraction (home, explore, profile, search)
+// ---------------------------------------------------------------------------
+
+function extractFeedTweet(url: string, doc: Document, options?: ExtractOptions): ExtractedContent {
+  const articles = Array.from(doc.querySelectorAll('article'));
+  const targetArticle = articles.length > 0 ? pickMostVisibleArticle(articles) : null;
+
+  if (!targetArticle) {
+    // No articles found — return minimal content
+    const title = doc.querySelector('title')?.textContent?.trim() || '';
     return {
       type: 'twitter',
       url: normalizeTwitterUrl(url),
       title,
-      author: mainTweet?.displayName || mainAuthor || undefined,
+      content: '',
+      wordCount: 0,
+      estimatedReadingTime: 0,
       language: doc.documentElement.lang || undefined,
-      content,
-      wordCount,
-      estimatedReadingTime: Math.ceil(wordCount / 200),
-      thumbnailUrl,
-      thumbnailUrls: thumbnailUrls.length > 1 ? thumbnailUrls : undefined,
-      richImages: richImages.length > 0 ? richImages : undefined,
     };
-  },
-};
+  }
+
+  const tweet = parseArticle(targetArticle);
+  if (!tweet) {
+    return {
+      type: 'twitter',
+      url: normalizeTwitterUrl(url),
+      title: '',
+      content: '',
+      wordCount: 0,
+      estimatedReadingTime: 0,
+      language: doc.documentElement.lang || undefined,
+    };
+  }
+
+  // Extract permalink from the article's status link
+  const postUrl = extractArticlePermalink(targetArticle, url);
+
+  // Build content
+  const lines: string[] = [];
+  lines.push(`# ${tweet.displayName} (@${tweet.handle})`);
+  lines.push('');
+  lines.push(tweet.text);
+  lines.push('');
+
+  // Engagement metrics
+  const metrics: string[] = [];
+  if (tweet.replies !== undefined) metrics.push(`${formatCount(tweet.replies)} replies`);
+  if (tweet.reposts !== undefined) metrics.push(`${formatCount(tweet.reposts)} reposts`);
+  if (tweet.likes !== undefined) metrics.push(`${formatCount(tweet.likes)} likes`);
+  if (tweet.views !== undefined) metrics.push(`${formatCount(tweet.views)} views`);
+  if (metrics.length > 0) {
+    lines.push('---');
+    lines.push(metrics.join(' | '));
+    lines.push('');
+  }
+
+  const content = lines.join('\n');
+  const wordCount = content.split(/\s+/).filter(Boolean).length;
+  const title = tweet.text.slice(0, 120).trim() + (tweet.text.length > 120 ? '...' : '');
+
+  // Images from the target article only
+  const richImages = extractArticleMedia(targetArticle);
+  const thumbnailUrls = extractMediaGridUrls(targetArticle).slice(0, 4);
+  const thumbnailUrl =
+    (thumbnailUrls.length > 0 ? thumbnailUrls[0] : undefined) ||
+    (richImages.length > 0 ? richImages[0].url : undefined);
+
+  return {
+    type: 'twitter',
+    url: postUrl,
+    title,
+    author: tweet.displayName || undefined,
+    language: doc.documentElement.lang || undefined,
+    content,
+    wordCount,
+    estimatedReadingTime: Math.ceil(wordCount / 200),
+    thumbnailUrl,
+    thumbnailUrls: thumbnailUrls.length > 1 ? thumbnailUrls : undefined,
+    richImages: richImages.length > 0 ? richImages : undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Most-visible article selection (same scoring as LinkedIn)
+// ---------------------------------------------------------------------------
+
+function pickMostVisibleArticle(articles: Element[]): Element {
+  const viewportHeight = window.innerHeight;
+
+  let best = articles[0];
+  let bestScore = -Infinity;
+
+  for (const el of articles) {
+    const rect = el.getBoundingClientRect();
+    if (rect.height === 0) continue;
+
+    const visibleTop = Math.max(rect.top, 0);
+    const visibleBottom = Math.min(rect.bottom, viewportHeight);
+    const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+    const visibleRatio = visibleHeight / rect.height; // 0..1
+
+    // Fully visible posts (ratio >= 0.95) get a large bonus over partial ones
+    const fullyVisible = visibleRatio >= 0.95 ? 1000 : 0;
+
+    // Among posts with equal visibility tier, prefer the one closest to the top.
+    const topScore = -Math.max(rect.top, 0);
+
+    // Tiebreaker: visible ratio (for partially visible posts)
+    const score = fullyVisible + topScore + visibleRatio * 100;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = el;
+    }
+  }
+
+  return best;
+}
+
+// ---------------------------------------------------------------------------
+// Extract permalink from an article element
+// ---------------------------------------------------------------------------
+
+function extractArticlePermalink(article: Element, fallbackUrl: string): string {
+  const links = article.querySelectorAll('a[href]');
+  for (const link of links) {
+    const href = link.getAttribute('href') || '';
+    if (TWITTER_STATUS_RE.test(href)) {
+      try {
+        return normalizeTwitterUrl(new URL(href, fallbackUrl).href);
+      } catch { /* skip */ }
+    }
+  }
+  return normalizeTwitterUrl(fallbackUrl);
+}
+
+// ---------------------------------------------------------------------------
 
 interface ParsedTweet {
   displayName: string;
