@@ -26,6 +26,9 @@ export default defineContentScript({
       try {
         const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url;
 
+        // Only process requests to YouTube domains (prevent cache poisoning)
+        if (!isYouTubeUrl(url)) return res;
+
         // Capture player responses
         if (url.includes('/youtubei/v1/player')) {
           const clone = res.clone();
@@ -61,7 +64,7 @@ export default defineContentScript({
 
     XHR.open = function (method: string, url: string | URL, ...rest: any[]) {
       const urlStr = typeof url === 'string' ? url : url.toString();
-      if (urlStr.includes('/api/timedtext') || urlStr.includes('/youtubei/v1/player')) {
+      if (isYouTubeUrl(urlStr) && (urlStr.includes('/api/timedtext') || urlStr.includes('/youtubei/v1/player'))) {
         xhrUrls.set(this, urlStr);
       }
       return (originalOpen as any).apply(this, [method, url, ...rest]);
@@ -306,6 +309,10 @@ async function fetchTimedtext(
 }
 
 // --- Helpers ---
+
+function isYouTubeUrl(url: string): boolean {
+  try { return new URL(url).hostname.endsWith('.youtube.com'); } catch { return false; }
+}
 
 /**
  * Get the full INNERTUBE_CONTEXT from ytcfg, with fallback to minimal context.
