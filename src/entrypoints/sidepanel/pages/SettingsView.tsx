@@ -18,9 +18,9 @@ const LANGUAGES = [
   { code: 'ko', name: 'Korean' },
 ];
 
-type OnboardingStep = 'provider' | 'apiKey' | 'endpoint' | 'model' | 'contextWindow' | 'test' | 'notionKey' | 'notionDb' | 'theme' | 'language' | 'detail' | null;
+type OnboardingStep = 'provider' | 'apiKey' | 'endpoint' | 'model' | 'contextWindow' | 'test' | 'factCheck' | 'notionKey' | 'notionDb' | 'theme' | 'language' | 'detail' | null;
 
-const ONBOARDING_STEPS: Exclude<OnboardingStep, null>[] = ['provider', 'apiKey', 'endpoint', 'model', 'contextWindow', 'test', 'notionKey', 'notionDb', 'theme', 'language', 'detail'];
+const ONBOARDING_STEPS: Exclude<OnboardingStep, null>[] = ['provider', 'apiKey', 'endpoint', 'model', 'contextWindow', 'test', 'factCheck', 'notionKey', 'notionDb', 'theme', 'language', 'detail'];
 
 const STEP_HELPERS: Record<Exclude<OnboardingStep, null>, { title: string; subtitle: string }> = {
   provider: {
@@ -47,24 +47,28 @@ const STEP_HELPERS: Record<Exclude<OnboardingStep, null>, { title: string; subti
     title: 'Step 4: Image analysis & connection test',
     subtitle: 'Image analysis lets xTil read images on the page and include them in summaries. Uncheck it to save tokens. If your model doesn\'t support vision, this setting is ignored. Press "Test Connection" to verify everything works.',
   },
+  factCheck: {
+    title: 'Step 5: Auto-verify facts with web search',
+    subtitle: 'When enabled, xTil will automatically run a web search to verify key claims after summarizing. This adds a "Fact Check" section with source links. Only available for models that support web search.',
+  },
   notionKey: {
-    title: 'Step 5: Save summaries to Notion (optional)',
+    title: 'Step 6: Save summaries to Notion (optional)',
     subtitle: "Connect a Notion integration to automatically save every summary as a Notion page. Great for building a personal knowledge base. You can skip this and set it up anytime later.",
   },
   notionDb: {
-    title: 'Step 6: Select a Notion database',
+    title: 'Step 7: Select a Notion database',
     subtitle: 'Pick an existing compatible database or create a new one. Compatible databases have all the columns xTil needs (Title, URL, Tags, etc.).',
   },
   theme: {
-    title: 'Step 7: Pick your look',
+    title: 'Step 8: Pick your look',
     subtitle: 'Choose light, dark, or let xTil follow your system setting. You can also keep the default and click Next.',
   },
   language: {
-    title: 'Step 8: Translation preferences',
+    title: 'Step 9: Translation preferences',
     subtitle: 'Want summaries in a specific language? Pick one below. You can also mark exception languages — pages already in those languages won\'t be translated, keeping the original voice.',
   },
   detail: {
-    title: 'Step 9: How detailed should summaries be?',
+    title: 'Step 10: How detailed should summaries be?',
     subtitle: 'Brief gives you a quick overview in a few sentences. Standard balances detail and length. Detailed captures more nuance. You can tweak this per-summary later too.',
   },
 };
@@ -204,7 +208,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
 
   // Determine which sections are visible during onboarding
   const sectionVisible = useMemo(() => {
-    if (!isOnboarding) return { provider: true, apiKey: true, endpoint: true, model: true, contextWindow: true, test: true, notionKey: true, notionDb: true, theme: true, language: true, detail: true };
+    if (!isOnboarding) return { provider: true, apiKey: true, endpoint: true, model: true, contextWindow: true, test: true, factCheck: true, notionKey: true, notionDb: true, theme: true, language: true, detail: true };
     const stepIdx = (s: Exclude<OnboardingStep, null>) => ONBOARDING_STEPS.indexOf(s);
     return {
       provider: currentStepIndex >= stepIdx('provider'),
@@ -213,6 +217,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       model: currentStepIndex >= stepIdx('model'),
       contextWindow: currentStepIndex >= stepIdx('contextWindow'),
       test: currentStepIndex >= stepIdx('test'),
+      factCheck: currentStepIndex >= stepIdx('factCheck'),
       notionKey: currentStepIndex >= stepIdx('notionKey'),
       notionDb: currentStepIndex >= stepIdx('notionDb'),
       theme: currentStepIndex >= stepIdx('theme'),
@@ -256,6 +261,8 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
       const candidate = ONBOARDING_STEPS[i];
       // Skip self-hosted-only steps for standard providers
       if (candidate === 'endpoint' && !selfHosted) continue;
+      // Skip factCheck step when model doesn't support web search
+      if (candidate === 'factCheck' && !getCatalogEntry(providerId, config.model)?.webSearch) continue;
       // Skip steps already completed for this provider
       if (isStepComplete(candidate, config, providerId)) continue;
       return candidate;
@@ -957,6 +964,23 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             : 'Run Test Connection to check if this model supports images'}
         </div>
 
+        <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
+          <Button onClick={handleTestLLM} loading={testingLLM} size="sm" variant="secondary" title="Test LLM connection">
+            Test Connection
+          </Button>
+          {llmStatus === 'success' && <StatusBadge type="success">Connected!</StatusBadge>}
+          {llmStatus === 'error' && <StatusBadge type="error">Failed</StatusBadge>}
+        </div>
+        {llmError && (
+          <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-error)', marginTop: '4px' }}>
+            {llmError}
+          </div>
+        )}
+        <StepHint step="test" currentStep={onboardingStep} />
+      </div>
+
+      {/* === Auto-search Fact Check Section === */}
+      <div style={getSectionStyle('factCheck')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
           <input
             type="checkbox"
@@ -976,23 +1000,20 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         </div>
         <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', marginTop: '2px', marginLeft: '26px' }}>
           {modelSupportsWebSearch
-            ? 'Automatically verify claims with web search after summarizing'
+            ? 'Automatically verify claims with web search after summarizing (may use more tokens)'
             : 'Web search not available for this model'}
         </div>
-
-        <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
-          <Button onClick={handleTestLLM} loading={testingLLM} size="sm" variant="secondary" title="Test LLM connection">
-            Test Connection
+        <StepHint step="factCheck" currentStep={onboardingStep} />
+        {isOnboarding && onboardingStep === 'factCheck' && (
+          <Button
+            onClick={() => advanceStep('factCheck')}
+            size="sm"
+            variant="secondary"
+            style={{ marginTop: '8px' }}
+          >
+            Continue
           </Button>
-          {llmStatus === 'success' && <StatusBadge type="success">Connected!</StatusBadge>}
-          {llmStatus === 'error' && <StatusBadge type="error">Failed</StatusBadge>}
-        </div>
-        {llmError && (
-          <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-error)', marginTop: '4px' }}>
-            {llmError}
-          </div>
         )}
-        <StepHint step="test" currentStep={onboardingStep} />
       </div>
 
       </SectionCard>
@@ -1339,30 +1360,6 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
         </div>
 
         <StepHint step="detail" currentStep={onboardingStep} />
-
-        {modelSupportsWebSearch && (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-              <input
-                type="checkbox"
-                id="wizardAutoSearchFactCheck"
-                name="wizard-auto-search-fact-check"
-                checked={local.autoSearchFactCheck ?? false}
-                onChange={(e) => setLocal({ ...local, autoSearchFactCheck: (e.target as HTMLInputElement).checked })}
-                style={{ margin: 0 }}
-              />
-              <label
-                htmlFor="wizardAutoSearchFactCheck"
-                style={{ font: 'var(--md-sys-typescale-label-medium)', color: 'var(--md-sys-color-on-surface)', cursor: 'pointer' }}
-              >
-                Auto-search fact checks
-              </label>
-            </div>
-            <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', marginTop: '2px', marginLeft: '26px' }}>
-              Automatically verify claims with web search after summarizing
-            </div>
-          </>
-        )}
 
         {/* Finish setup button during onboarding — only when detail was already selected */}
         {isOnboarding && onboardingStep === 'detail' && (

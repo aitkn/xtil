@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const OUTPUT_PATH = resolve(ROOT, 'src/lib/llm/model-catalog.json');
+const RAW_OUTPUT_PATH = resolve(ROOT, 'src/lib/llm/model-catalog-raw.json');
+const DIFF_OUTPUT_PATH = resolve(ROOT, 'src/lib/llm/.model-catalog-diff.json');
 const ENV_PATH = resolve(ROOT, '.env');
 
 // ---------------------------------------------------------------------------
@@ -997,17 +999,91 @@ async function processProvider(providerId, existingModels) {
   return merged;
 }
 
+// ---------------------------------------------------------------------------
+// Diff computation (raw catalog changes)
+// ---------------------------------------------------------------------------
+const DIFF_SKIP_FIELDS = new Set(['name', '_generated']);
+
+function computeDiff(previous, current) {
+  const newModels = {};
+  const removedModels = {};
+  const changedModels = {};
+
+  // Build flat maps: "provider/modelId" → specs
+  function flatMap(catalog) {
+    const map = {};
+    for (const [pid, pdata] of Object.entries(catalog.providers || {})) {
+      for (const [mid, specs] of Object.entries(pdata.models || {})) {
+        map[`${pid}/${mid}`] = specs;
+      }
+    }
+    return map;
+  }
+
+  const prev = flatMap(previous);
+  const curr = flatMap(current);
+
+  // New models
+  for (const key of Object.keys(curr)) {
+    if (!(key in prev)) {
+      newModels[key] = curr[key];
+    }
+  }
+
+  // Removed models
+  for (const key of Object.keys(prev)) {
+    if (!(key in curr)) {
+      removedModels[key] = prev[key];
+    }
+  }
+
+  // Changed models
+  for (const key of Object.keys(curr)) {
+    if (!(key in prev)) continue;
+    const changes = {};
+    const allFields = new Set([...Object.keys(prev[key]), ...Object.keys(curr[key])]);
+    for (const field of allFields) {
+      if (DIFF_SKIP_FIELDS.has(field)) continue;
+      const oldVal = prev[key][field];
+      const newVal = curr[key][field];
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        changes[field] = { old: oldVal ?? null, new: newVal ?? null };
+      }
+    }
+    if (Object.keys(changes).length > 0) {
+      changedModels[key] = changes;
+    }
+  }
+
+  const hasChanges =
+    Object.keys(newModels).length > 0 ||
+    Object.keys(removedModels).length > 0 ||
+    Object.keys(changedModels).length > 0;
+
+  return { newModels, removedModels, changedModels, hasChanges };
+}
+
 async function main() {
   console.log('=== xTil Model Catalog Update ===');
   console.log(`Flags: skipDocs=${skipDocs}, dryRun=${dryRun}, provider=${providerFlag || 'all'}`);
 
   const providerIds = providerFlag ? [providerFlag] : Object.keys(PROVIDERS);
 
-  // Always load existing catalog to preserve manually-curated fields
+  // Load existing curated catalog to preserve manually-curated fields
   let existingCatalog = null;
   if (existsSync(OUTPUT_PATH)) {
     try {
       existingCatalog = JSON.parse(readFileSync(OUTPUT_PATH, 'utf-8'));
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  // Load previous raw catalog for diffing
+  let previousRaw = null;
+  if (existsSync(RAW_OUTPUT_PATH)) {
+    try {
+      previousRaw = JSON.parse(readFileSync(RAW_OUTPUT_PATH, 'utf-8'));
     } catch {
       // ignore parse errors
     }
@@ -1053,8 +1129,8 @@ async function main() {
     console.log('\n--- DRY RUN OUTPUT ---');
     console.log(json);
   } else {
-    writeFileSync(OUTPUT_PATH, json, 'utf-8');
-    console.log(`\nWritten to ${OUTPUT_PATH}`);
+    writeFileSync(RAW_OUTPUT_PATH, json, 'utf-8');
+    console.log(`\nWritten to ${RAW_OUTPUT_PATH}`);
   }
 
   // Summary
@@ -1063,6 +1139,56 @@ async function main() {
     total += Object.keys(p.models).length;
   }
   console.log(`Total: ${total} models across ${Object.keys(catalog.providers).length} providers`);
+
+  // Compute and write diff
+  if (!dryRun) {
+    if (previousRaw) {
+      const diff = computeDiff(previousRaw, catalog);
+      writeFileSync(DIFF_OUTPUT_PATH, JSON.stringify(diff, null, 2) + '\n', 'utf-8');
+
+      if (!diff.hasChanges) {
+        console.log('\nNo changes detected — curation not needed.');
+      } else {
+        const nNew = Object.keys(diff.newModels).length;
+        const nRemoved = Object.keys(diff.removedModels).length;
+        const nChanged = Object.keys(diff.changedModels).length;
+        console.log(`\nDiff: +${nNew} new, -${nRemoved} removed, ~${nChanged} changed`);
+        if (nNew > 0) {
+          console.log('  New models:');
+          for (const key of Object.keys(diff.newModels)) console.log(`    + ${key}`);
+        }
+        if (nRemoved > 0) {
+          console.log('  Removed models:');
+          for (const key of Object.keys(diff.removedModels)) console.log(`    - ${key}`);
+        }
+        if (nChanged > 0) {
+          console.log('  Changed models:');
+          for (const [key, changes] of Object.entries(diff.changedModels)) {
+            const fields = Object.keys(changes).join(', ');
+            console.log(`    ~ ${key} (${fields})`);
+          }
+        }
+        console.log(`\nDiff written to ${DIFF_OUTPUT_PATH}`);
+      }
+    } else {
+      // No previous raw — first run, write diff with everything as new
+      const allNew = {};
+      for (const [pid, pdata] of Object.entries(catalog.providers)) {
+        for (const [mid, specs] of Object.entries(pdata.models)) {
+          allNew[`${pid}/${mid}`] = specs;
+        }
+      }
+      const diff = {
+        newModels: allNew,
+        removedModels: {},
+        changedModels: {},
+        hasChanges: Object.keys(allNew).length > 0,
+      };
+      writeFileSync(DIFF_OUTPUT_PATH, JSON.stringify(diff, null, 2) + '\n', 'utf-8');
+      console.log(`\nFirst run — all ${Object.keys(allNew).length} models marked as new in diff.`);
+      console.log(`Diff written to ${DIFF_OUTPUT_PATH}`);
+    }
+  }
 }
 
 main().catch((err) => {

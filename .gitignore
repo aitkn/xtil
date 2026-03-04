@@ -9,3 +9,4 @@ demo-output/
 *.zip
 website/verify-*.png
 website/check-*.png
+src/lib/llm/.model-catalog-diff.json

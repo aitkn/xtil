@@ -4,6 +4,12 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.3
+
+**Wizard bug fix**
+
+- Fixed setup wizard skipping the fact-check step — it now has its own dedicated onboarding screen
+
 ## 1.1.2
 
 **Clean model list & fact-check polish**
