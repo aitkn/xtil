@@ -36,7 +36,7 @@ export default defineContentScript({
               playerCache.set(vid, data);
               console.log(`[xTil] Intercepted player for ${vid}: ${tracks?.length ?? 0} caption tracks`);
             }
-          }).catch(() => {});
+          }).catch((err) => { console.warn('[xTil bridge] Failed to process player response:', err); });
         }
 
         // Capture timedtext responses (YouTube's own caption fetches)
@@ -46,10 +46,10 @@ export default defineContentScript({
             const clone = res.clone();
             clone.text().then((text) => {
               if (text.length > 0) timedtextCache.set(vidMatch[1], text);
-            }).catch(() => {});
+            }).catch((err) => { console.warn('[xTil bridge] Failed to process timedtext response:', err); });
           }
         }
-      } catch { /* don't break YouTube */ }
+      } catch (err) { console.warn('[xTil bridge] fetch intercept failed:', err); }
       return res;
     };
 
@@ -83,7 +83,7 @@ export default defineContentScript({
               const vid = data?.videoDetails?.videoId;
               if (vid) playerCache.set(vid, data);
             }
-          } catch { /* ignore */ }
+          } catch (err) { console.warn('[xTil bridge] XHR intercept failed:', err); }
         });
       }
       return (originalSend as any).apply(this, args);
@@ -98,13 +98,13 @@ export default defineContentScript({
         const { videoId, hintLang, requestId } = event.data;
         try {
           const data = await getPlayerData(videoId, hintLang, playerCache, originalFetch);
-          window.postMessage({ type: 'XTIL_PLAYER_RESPONSE', requestId, data }, '*');
+          window.postMessage({ type: 'XTIL_PLAYER_RESPONSE', requestId, data }, window.location.origin);
         } catch (err) {
           window.postMessage({
             type: 'XTIL_PLAYER_RESPONSE',
             requestId,
             error: err instanceof Error ? err.message : String(err),
-          }, '*');
+          }, window.location.origin);
         }
       }
 
@@ -113,13 +113,13 @@ export default defineContentScript({
         const { videoId, langCode, requestId } = event.data;
         try {
           const text = await fetchTranscript(videoId, langCode, originalFetch, playerCache, timedtextCache);
-          window.postMessage({ type: 'XTIL_TRANSCRIPT_RESPONSE', requestId, text }, '*');
+          window.postMessage({ type: 'XTIL_TRANSCRIPT_RESPONSE', requestId, text }, window.location.origin);
         } catch (err) {
           window.postMessage({
             type: 'XTIL_TRANSCRIPT_RESPONSE',
             requestId,
             error: err instanceof Error ? err.message : String(err),
-          }, '*');
+          }, window.location.origin);
         }
       }
     });
@@ -149,7 +149,7 @@ async function getPlayerData(
       const tracks = (pr as any)?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
       if (tracks?.length > 0) {
         const vid = (pr as any)?.videoDetails?.videoId;
-        if (!vid || vid === videoId) return pr;
+        if (vid === videoId) return pr;
       }
     } catch { /* not ready */ }
   }
@@ -159,7 +159,7 @@ async function getPlayerData(
     const tracks = initial?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
     if (tracks?.length > 0) {
       const vid = initial?.videoDetails?.videoId;
-      if (!vid || vid === videoId) return initial;
+      if (vid === videoId) return initial;
     }
   }
 
@@ -291,7 +291,8 @@ async function fetchTimedtext(
     if (match) track = match;
   }
 
-  const baseUrl: string = track.baseUrl;
+  const baseUrl: string | undefined = track.baseUrl;
+  if (!baseUrl) return null;
 
   // Try with no additional params first, then different formats
   for (const suffix of ['', '&fmt=srv3', '&fmt=json3', '&fmt=vtt']) {

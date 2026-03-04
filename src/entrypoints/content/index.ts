@@ -338,7 +338,7 @@ function bridgeRequest<T>(
     }
 
     window.addEventListener('message', handler);
-    window.postMessage({ type: requestType, requestId, ...payload }, '*');
+    window.postMessage({ type: requestType, requestId, ...payload }, window.location.origin);
   });
 }
 
@@ -376,6 +376,7 @@ async function fetchYouTubeTranscript(
   if (cached) return cached;
 
   // Step 1: Get player data to find available caption tracks & pick best language
+  let data: Record<string, unknown> | undefined;
   let tracks: CaptionTrack[] | undefined;
   let originalLang: string | undefined;
   let lastError: unknown;
@@ -383,7 +384,7 @@ async function fetchYouTubeTranscript(
   for (const delay of [0, 500, 1500, 3000]) {
     if (delay > 0) await new Promise(r => setTimeout(r, delay));
     try {
-      const data = await fetchPlayerData(videoId, hintLang);
+      data = await fetchPlayerData(videoId, hintLang);
       tracks = (data as any)?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
       originalLang = (data as any)?.videoDetails?.defaultAudioLanguage;
       if (tracks && tracks.length > 0) break;
@@ -395,7 +396,8 @@ async function fetchYouTubeTranscript(
   // Step 2: Pick best language from available tracks
   let targetLang: string | undefined;
   if (tracks && tracks.length > 0) {
-    const best = pickBestTrack(tracks, langPrefs, summaryLang, originalLang, undefined);
+    const defaultTrackIndex = (data as any)?.captions?.playerCaptionsTracklistRenderer?.audioTracks?.[0]?.defaultCaptionTrackIndex;
+    const best = pickBestTrack(tracks, langPrefs, summaryLang, originalLang, defaultTrackIndex);
     targetLang = best.languageCode;
   }
 
@@ -412,9 +414,7 @@ async function fetchYouTubeTranscript(
     }
   } catch (err) {
     console.warn(`[xTil] Transcript fetch failed: ${err instanceof Error ? err.message : err}`);
-    if (!tracks || tracks.length === 0) {
-      throw lastError ?? err;
-    }
+    throw lastError ?? err ?? new Error('No transcript available');
   }
 
   throw new Error('No transcript available');
