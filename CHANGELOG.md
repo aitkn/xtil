@@ -4,6 +4,12 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.5
+
+**Mobile browser fix**
+
+- Fixed YouTube transcripts not loading on mobile browsers (e.g., Yandex Browser)
+
 ## 1.1.4
 
 **YouTube transcript fix**
