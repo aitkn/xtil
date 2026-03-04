@@ -10,15 +10,21 @@ export default defineContentScript({
   main() {
     const chromeRuntime = (globalThis as unknown as { chrome: { runtime: typeof chrome.runtime } }).chrome.runtime;
 
+    // Guard: stop stale content scripts from looping after extension reload
+    function isContextValid(): boolean {
+      try { return !!chromeRuntime.id; } catch { return false; }
+    }
+
     // Watch for Gmail email changes in reading pane → notify sidepanel
     if (window.location.hostname === 'mail.google.com') {
       let lastThreadId = '';
       let gmailDebounce: ReturnType<typeof setTimeout> | null = null;
 
       const checkGmailThread = () => {
-        if (gmailDebounce) return;
+        if (gmailDebounce || !isContextValid()) return;
         gmailDebounce = setTimeout(() => {
           gmailDebounce = null;
+          if (!isContextValid()) return;
           const threadEl = document.querySelector('h2[data-legacy-thread-id]');
           const currentId = threadEl?.getAttribute('data-legacy-thread-id') || '';
           if (currentId && currentId !== lastThreadId) {
@@ -43,9 +49,10 @@ export default defineContentScript({
       let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
       const observer = new MutationObserver(() => {
-        if (debounceTimer) return; // debounce — skip if a check is already scheduled
+        if (debounceTimer || !isContextValid()) return;
         debounceTimer = setTimeout(() => {
           debounceTimer = null;
+          if (!isContextValid()) return;
           const headings = document.querySelectorAll('h2');
           let currentHeading = '';
           for (const h of headings) {
@@ -70,9 +77,11 @@ export default defineContentScript({
     {
       let activityTimer: ReturnType<typeof setTimeout> | null = null;
       const onActivity = () => {
+        if (!isContextValid()) return;
         if (activityTimer) clearTimeout(activityTimer);
         activityTimer = setTimeout(() => {
           activityTimer = null;
+          if (!isContextValid()) return;
           chromeRuntime.sendMessage({ type: 'CONTENT_ACTIVITY' }).catch(() => {});
         }, 1000);
       };
@@ -301,35 +310,60 @@ function preferManual(tracks: CaptionTrack[]): CaptionTrack {
   return tracks.find(t => t.kind !== 'asr') || tracks[0];
 }
 
-async function fetchPlayerData(videoId: string, hintLang?: string) {
-  // This is YouTube's public Innertube API key, embedded in YouTube's own frontend JS.
-  // It is not a private credential — it is shipped to every YouTube visitor.
-  // nosemgrep: generic-api-key
-  const YOUTUBE_INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'; // gitleaks:allow
-  const playerResponse = await fetch(
-    `https://www.youtube.com/youtubei/v1/player?key=${YOUTUBE_INNERTUBE_KEY}&prettyPrint=false`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        context: {
-          client: {
-            clientName: 'ANDROID',
-            clientVersion: '19.02.39',
-            androidSdkVersion: 34,
-            hl: hintLang || 'en',
-          },
-        },
-        videoId,
-        contentCheckOk: true,
-        racyCheckOk: true,
-      }),
-    },
-  );
+/**
+ * Send a bridge request via postMessage and wait for a typed response.
+ */
+function bridgeRequest<T>(
+  requestType: string,
+  responseType: string,
+  payload: Record<string, unknown>,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const requestId = `xtil_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const timeout = setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error(`Bridge ${requestType}: timed out`));
+    }, 15000);
 
-  if (!playerResponse.ok) throw new Error(`Innertube API: ${playerResponse.status}`);
-  return playerResponse.json();
+    function handler(event: MessageEvent) {
+      if (event.source !== window) return;
+      if (event.data?.type !== responseType) return;
+      if (event.data.requestId !== requestId) return;
+
+      window.removeEventListener('message', handler);
+      clearTimeout(timeout);
+
+      if (event.data.error) reject(new Error(event.data.error));
+      else resolve(event.data as T);
+    }
+
+    window.addEventListener('message', handler);
+    window.postMessage({ type: requestType, requestId, ...payload }, '*');
+  });
 }
+
+/**
+ * Fetch player data via the MAIN world bridge script (youtube-bridge.content.ts).
+ */
+async function fetchPlayerData(videoId: string, hintLang?: string) {
+  const resp = await bridgeRequest<{ data: Record<string, unknown> }>(
+    'XTIL_PLAYER_REQUEST', 'XTIL_PLAYER_RESPONSE', { videoId, hintLang },
+  );
+  return resp.data;
+}
+
+/**
+ * Fetch transcript text via the get_transcript innertube endpoint (through bridge).
+ */
+async function fetchTranscriptViaBridge(videoId: string, langCode?: string): Promise<string> {
+  const resp = await bridgeRequest<{ text: string }>(
+    'XTIL_TRANSCRIPT_REQUEST', 'XTIL_TRANSCRIPT_RESPONSE', { videoId, langCode },
+  );
+  return resp.text;
+}
+
+// Per-video transcript cache to avoid redundant fetches
+const transcriptCache = new Map<string, string>();
 
 async function fetchYouTubeTranscript(
   videoId: string,
@@ -337,53 +371,53 @@ async function fetchYouTubeTranscript(
   langPrefs?: string[],
   summaryLang?: string,
 ): Promise<string> {
-  // Use ANDROID innertube client from page context.
-  // - ANDROID client bypasses age-restriction checks
-  // - Page context provides YouTube cookies (avoids 403 from service worker)
-  // - Returns fresh caption URLs (unlike ytInitialPlayerResponse which has expired tokens)
+  // Return cached transcript if we already fetched for this video
+  const cached = transcriptCache.get(videoId);
+  if (cached) return cached;
 
-  // Retry with progressive delays — during SPA navigation or cold start the
-  // innertube API may throw (network not ready) or return empty caption tracks
-  // before YouTube's backend has fully resolved the video.
-  let data: Awaited<ReturnType<typeof fetchPlayerData>>;
-  let captionsRenderer: { captionTracks?: CaptionTrack[]; audioTracks?: { defaultCaptionTrackIndex?: number }[] } | undefined;
+  // Step 1: Get player data to find available caption tracks & pick best language
   let tracks: CaptionTrack[] | undefined;
+  let originalLang: string | undefined;
   let lastError: unknown;
 
-  for (const delay of [0, 1000, 2000, 3000]) {
+  for (const delay of [0, 500, 1500, 3000]) {
     if (delay > 0) await new Promise(r => setTimeout(r, delay));
     try {
-      data = await fetchPlayerData(videoId, hintLang);
-      captionsRenderer = data?.captions?.playerCaptionsTracklistRenderer;
-      tracks = captionsRenderer?.captionTracks;
+      const data = await fetchPlayerData(videoId, hintLang);
+      tracks = (data as any)?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      originalLang = (data as any)?.videoDetails?.defaultAudioLanguage;
       if (tracks && tracks.length > 0) break;
     } catch (err) {
       lastError = err;
     }
   }
 
-  if (!tracks || tracks.length === 0) {
-    throw lastError ?? new Error('No caption tracks available');
+  // Step 2: Pick best language from available tracks
+  let targetLang: string | undefined;
+  if (tracks && tracks.length > 0) {
+    const best = pickBestTrack(tracks, langPrefs, summaryLang, originalLang, undefined);
+    targetLang = best.languageCode;
   }
 
-  // Extract original language and YouTube's default track index
-  const originalLang: string | undefined = data?.videoDetails?.defaultAudioLanguage;
-  const defaultTrackIndex: number | undefined = captionsRenderer?.audioTracks?.[0]?.defaultCaptionTrackIndex;
-
-  const track = pickBestTrack(tracks, langPrefs, summaryLang, originalLang, defaultTrackIndex);
-
-  let captionUrl: string = track.baseUrl;
-  if (!captionUrl.includes('fmt=')) {
-    captionUrl += (captionUrl.includes('?') ? '&' : '?') + 'fmt=srv3';
+  // Step 3: Fetch transcript via bridge
+  try {
+    const raw = await fetchTranscriptViaBridge(videoId, targetLang);
+    if (raw) {
+      // Parse XML/SRV3 format into timestamped text
+      const parsed = parseTranscriptXml(raw);
+      const transcript = parsed || raw; // fallback to raw if parsing fails
+      transcriptCache.set(videoId, transcript);
+      console.log(`[xTil] Transcript ready: ${transcript.length} chars`);
+      return transcript;
+    }
+  } catch (err) {
+    console.warn(`[xTil] Transcript fetch failed: ${err instanceof Error ? err.message : err}`);
+    if (!tracks || tracks.length === 0) {
+      throw lastError ?? err;
+    }
   }
 
-  const captionResponse = await fetch(captionUrl);
-  if (!captionResponse.ok) throw new Error(`Caption fetch: ${captionResponse.status}`);
-
-  const xml = await captionResponse.text();
-  const transcript = parseTranscriptXml(xml);
-  if (!transcript) throw new Error('Empty transcript');
-  return transcript;
+  throw new Error('No transcript available');
 }
 
 function parseTranscriptXml(xml: string): string {
