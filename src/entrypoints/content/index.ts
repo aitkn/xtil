@@ -312,18 +312,23 @@ function preferManual(tracks: CaptionTrack[]): CaptionTrack {
 
 /**
  * Send a bridge request via postMessage and wait for a typed response.
+ * Returns null if the bridge is unavailable (e.g., MAIN world not supported).
  */
+let bridgeAvailable = true; // false after first timeout — skip bridge on subsequent calls
 function bridgeRequest<T>(
   requestType: string,
   responseType: string,
   payload: Record<string, unknown>,
-): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
+): Promise<T | null> {
+  if (!bridgeAvailable) return Promise.resolve(null);
+  return new Promise<T | null>((resolve) => {
     const requestId = `xtil_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const timeout = setTimeout(() => {
       window.removeEventListener('message', handler);
-      reject(new Error(`Bridge ${requestType}: timed out`));
-    }, 15000);
+      bridgeAvailable = false;
+      console.warn('[xTil] Bridge unavailable (MAIN world not supported?) — using direct API');
+      resolve(null);
+    }, 5000);
 
     function handler(event: MessageEvent) {
       if (event.source !== window) return;
@@ -333,7 +338,7 @@ function bridgeRequest<T>(
       window.removeEventListener('message', handler);
       clearTimeout(timeout);
 
-      if (event.data.error) reject(new Error(event.data.error));
+      if (event.data.error) resolve(null); // fall through to direct method
       else resolve(event.data as T);
     }
 
@@ -342,24 +347,61 @@ function bridgeRequest<T>(
   });
 }
 
+// This is YouTube's public Innertube API key, embedded in YouTube's own frontend JS.
+// It is not a private credential — it is shipped to every YouTube visitor.
+// nosemgrep: generic-api-key
+const YOUTUBE_INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'; // gitleaks:allow
+
 /**
- * Fetch player data via the MAIN world bridge script (youtube-bridge.content.ts).
+ * Fetch player data: try MAIN-world bridge first, fall back to direct innertube API.
  */
 async function fetchPlayerData(videoId: string, hintLang?: string) {
+  // Try bridge (MAIN world — has YouTube cookies/session)
   const resp = await bridgeRequest<{ data: Record<string, unknown> }>(
     'XTIL_PLAYER_REQUEST', 'XTIL_PLAYER_RESPONSE', { videoId, hintLang },
   );
-  return resp.data;
+  if (resp?.data) return resp.data;
+
+  // Fallback: direct innertube API from content script
+  const playerResponse = await fetch(
+    `https://www.youtube.com/youtubei/v1/player?key=${YOUTUBE_INNERTUBE_KEY}&prettyPrint=false`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        context: { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00', hl: hintLang || 'en' } },
+        videoId,
+        contentCheckOk: true,
+        racyCheckOk: true,
+      }),
+    },
+  );
+  if (!playerResponse.ok) throw new Error(`Innertube API: ${playerResponse.status}`);
+  return playerResponse.json();
 }
 
 /**
- * Fetch transcript text via the get_transcript innertube endpoint (through bridge).
+ * Fetch transcript: try bridge first, fall back to direct timedtext URL fetch.
  */
-async function fetchTranscriptViaBridge(videoId: string, langCode?: string): Promise<string> {
+async function fetchTranscriptViaBridge(videoId: string, langCode?: string, captionBaseUrl?: string): Promise<string> {
+  // Try bridge
   const resp = await bridgeRequest<{ text: string }>(
     'XTIL_TRANSCRIPT_REQUEST', 'XTIL_TRANSCRIPT_RESPONSE', { videoId, langCode },
   );
-  return resp.text;
+  if (resp?.text) return resp.text;
+
+  // Fallback: fetch timedtext URL directly from content script
+  if (captionBaseUrl) {
+    let url = captionBaseUrl;
+    if (!url.includes('fmt=')) url += (url.includes('?') ? '&' : '?') + 'fmt=srv3';
+    const res = await fetch(url);
+    if (res.ok) {
+      const text = await res.text();
+      if (text.length > 0) return text;
+    }
+  }
+
+  throw new Error('No transcript available');
 }
 
 // Per-video transcript cache to avoid redundant fetches
@@ -395,15 +437,17 @@ async function fetchYouTubeTranscript(
 
   // Step 2: Pick best language from available tracks
   let targetLang: string | undefined;
+  let captionBaseUrl: string | undefined;
   if (tracks && tracks.length > 0) {
     const defaultTrackIndex = (data as any)?.captions?.playerCaptionsTracklistRenderer?.audioTracks?.[0]?.defaultCaptionTrackIndex;
     const best = pickBestTrack(tracks, langPrefs, summaryLang, originalLang, defaultTrackIndex);
     targetLang = best.languageCode;
+    captionBaseUrl = best.baseUrl;
   }
 
-  // Step 3: Fetch transcript via bridge
+  // Step 3: Fetch transcript via bridge, with direct URL fallback
   try {
-    const raw = await fetchTranscriptViaBridge(videoId, targetLang);
+    const raw = await fetchTranscriptViaBridge(videoId, targetLang, captionBaseUrl);
     if (raw) {
       // Parse XML/SRV3 format into timestamped text
       const parsed = parseTranscriptXml(raw);
