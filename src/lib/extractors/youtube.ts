@@ -72,7 +72,7 @@ export const youtubeExtractor: ContentExtractor = {
 
     const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
-    // Always emit transcript marker — background will fetch via innertube ANDROID API.
+    // Always emit transcript marker — content script will fetch via innertube API.
     // Video ID comes from the URL (always current, even during SPA navigation).
     const transcript = `[YOUTUBE_TRANSCRIPT:${videoId}]`;
 
