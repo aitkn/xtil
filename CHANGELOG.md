@@ -4,6 +4,12 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.4
+
+**YouTube transcript fix**
+
+- Fixed YouTube video transcripts not loading — captions now work reliably again for all videos
+
 ## 1.1.3
 
 **Wizard bug fix**
