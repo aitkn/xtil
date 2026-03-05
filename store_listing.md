@@ -23,17 +23,14 @@ Every page produces a structured breakdown: concise overview, key takeaways with
 
 ────────────────────────────────────────
 
-PLATFORM AWARENESS
-Every platform gets special treatment:
-• PDFs — Summarize academic papers, reports, and any PDF opened in Chrome, with figure extraction
-• YouTube — Full transcript summary with clickable timestamp links
-• GitHub — Six modes: PRs, issues, code files, repos, commits, and releases
-• Reddit — Complete threads with nested comments, scores, and engagement metrics
-• Twitter/X — Thread reconstruction with engagement data and notable replies
-• Google Docs — Reads content directly from your authenticated session
-• Facebook — Extracts posts from feed overlays with reaction counts
-• LinkedIn — Summarize posts from feed or direct URLs with engagement metrics
-• Gmail — Summarize emails and threaded conversations from the reading pane
+WORKS EVERYWHERE YOU READ
+xTil adapts to the page you're on:
+• PDFs — Academic papers, reports, and documents with figure extraction
+• YouTube — Transcript-based summary with clickable timestamp links
+• GitHub — PRs, issues, code files, repos, commits, and releases
+• Social media — Posts, threads, nested comments, and engagement metrics
+• Gmail — Email conversations and threaded discussions
+…and many more. Full list of supported platforms: github.com/aitkn/xtil
 
 ────────────────────────────────────────
 
