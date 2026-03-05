@@ -4,6 +4,12 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.6
+
+**YouTube transcript reliability**
+
+- Improved YouTube transcript loading on mobile YouTube and alternative browsers
+
 ## 1.1.5
 
 **Mobile browser fix**

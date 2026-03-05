@@ -152,7 +152,10 @@ async function getPlayerData(
       const tracks = (pr as any)?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
       if (tracks?.length > 0) {
         const vid = (pr as any)?.videoDetails?.videoId;
-        if (vid === videoId) return pr;
+        if (vid === videoId) {
+          cache.set(videoId, pr); // cache for fetchTimedtext
+          return pr;
+        }
       }
     } catch { /* not ready */ }
   }
@@ -162,11 +165,16 @@ async function getPlayerData(
     const tracks = initial?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
     if (tracks?.length > 0) {
       const vid = initial?.videoDetails?.videoId;
-      if (vid === videoId) return initial;
+      if (vid === videoId) {
+        cache.set(videoId, initial); // cache for fetchTimedtext
+        return initial;
+      }
     }
   }
 
-  return await fetchInnertubePlayer(videoId, hintLang, fetchFn);
+  const fetched = await fetchInnertubePlayer(videoId, hintLang, fetchFn);
+  cache.set(videoId, fetched); // cache for fetchTimedtext
+  return fetched;
 }
 
 async function fetchInnertubePlayer(
