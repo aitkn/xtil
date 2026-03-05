@@ -353,16 +353,45 @@ function bridgeRequest<T>(
 const YOUTUBE_INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'; // gitleaks:allow
 
 /**
- * Fetch player data: try MAIN-world bridge first, fall back to direct innertube API.
+ * Extract ytInitialPlayerResponse from the page's <script> tags.
+ * Works from the isolated world — no MAIN world access needed.
+ */
+function extractPlayerFromDOM(videoId: string): Record<string, unknown> | null {
+  for (const script of document.querySelectorAll('script')) {
+    const text = script.textContent || '';
+    const match = text.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});\s*(?:var\s|let\s|const\s|<\/script>|$)/s);
+    if (match) {
+      try {
+        const data = JSON.parse(match[1]);
+        const vid = data?.videoDetails?.videoId;
+        if (vid === videoId) return data;
+      } catch { /* parse failed */ }
+    }
+  }
+  return null;
+}
+
+/**
+ * Fetch player data: try MAIN-world bridge first, then DOM extraction, then direct API.
  */
 async function fetchPlayerData(videoId: string, hintLang?: string) {
   // Try bridge (MAIN world — has YouTube cookies/session)
   const resp = await bridgeRequest<{ data: Record<string, unknown> }>(
     'XTIL_PLAYER_REQUEST', 'XTIL_PLAYER_RESPONSE', { videoId, hintLang },
   );
-  if (resp?.data) return resp.data;
+  if (resp?.data) {
+    const tracks = (resp.data as any)?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    if (tracks?.length > 0) return resp.data;
+  }
 
-  // Fallback: direct innertube API from content script
+  // Fallback 1: extract from page HTML (works without MAIN world)
+  const domData = extractPlayerFromDOM(videoId);
+  if (domData) {
+    const tracks = (domData as any)?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    if (tracks?.length > 0) return domData;
+  }
+
+  // Fallback 2: direct innertube API from content script
   const playerResponse = await fetch(
     `https://www.youtube.com/youtubei/v1/player?key=${YOUTUBE_INNERTUBE_KEY}&prettyPrint=false`,
     {
