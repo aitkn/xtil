@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-02T22:00:00.000Z",
+  "_generated": "2026-03-05T12:00:00.000Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -154,22 +154,22 @@
     },
     "openai": {
       "models": {
+        "gpt-5.4": {
+          "name": "GPT-5.4",
+          "contextWindow": 1050000,
+          "maxOutput": 128000,
+          "inputPrice": 2.5,
+          "outputPrice": 15,
+          "vision": true,
+          "reasoning": true,
+          "webSearch": true
+        },
         "gpt-5.1": {
           "name": "GPT-5.1",
           "contextWindow": 200000,
           "maxOutput": 100000,
           "inputPrice": 1.25,
           "outputPrice": 10,
-          "vision": true,
-          "reasoning": true,
-          "webSearch": true
-        },
-        "gpt-5.2": {
-          "name": "GPT-5.2",
-          "contextWindow": 200000,
-          "maxOutput": 100000,
-          "inputPrice": 1.75,
-          "outputPrice": 14,
           "vision": true,
           "reasoning": true,
           "webSearch": true
@@ -264,8 +264,10 @@
         "gpt-5-pro",
         "gpt-5-search-api",
         "gpt-5.1-chat-latest",
+        "gpt-5.2",
         "gpt-5.2-chat-latest",
         "gpt-5.2-pro",
+        "gpt-5.4-pro",
         "o1-2024-12-17",
         "o1-pro",
         "o3-2025-04-16",

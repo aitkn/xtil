@@ -4,6 +4,13 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.7
+
+**Transcript fix & new model**
+
+- Fixed YouTube transcripts sometimes being sent as raw data instead of clean text, improving summary quality and reducing token usage
+- Added GPT-5.4 to the model catalog
+
 ## 1.1.6
 
 **YouTube transcript reliability**

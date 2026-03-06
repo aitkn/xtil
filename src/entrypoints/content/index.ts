@@ -494,6 +494,23 @@ async function fetchYouTubeTranscript(
 }
 
 function parseTranscriptXml(xml: string): string {
+  // 0. JSON3 format: {"wireMagic":"pb3","events":[{"tStartMs":...,"segs":[{"utf8":"..."}]}]}
+  if (xml.trimStart().startsWith('{')) {
+    try {
+      const json = JSON.parse(xml);
+      if (json.events) {
+        const segments: string[] = [];
+        for (const event of json.events) {
+          if (!event.segs) continue;
+          const text = event.segs.map((s: any) => (s.utf8 || '')).join('').replace(/\n/g, ' ').trim();
+          if (!text) continue;
+          segments.push(`[${formatTimestamp((event.tStartMs ?? 0) / 1000)}] ${text}`);
+        }
+        if (segments.length > 0) return segments.join('\n');
+      }
+    } catch { /* not valid JSON, fall through to XML parsing */ }
+  }
+
   const segments: string[] = [];
 
   // 1. Standard format: <text start="..." dur="...">words</text>

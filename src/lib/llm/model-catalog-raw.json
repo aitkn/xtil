@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-04T10:59:26.888Z",
+  "_generated": "2026-03-06T06:55:57.640Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -681,6 +681,18 @@
         },
         "gpt-5.3-codex": {
           "name": "gpt-5.3-codex"
+        },
+        "gpt-5.4": {
+          "name": "gpt-5.4"
+        },
+        "gpt-5.4-2026-03-05": {
+          "name": "gpt-5.4-2026-03-05"
+        },
+        "gpt-5.4-pro": {
+          "name": "gpt-5.4-pro"
+        },
+        "gpt-5.4-pro-2026-03-05": {
+          "name": "gpt-5.4-pro-2026-03-05"
         },
         "gpt-audio": {
           "name": "gpt-audio"
