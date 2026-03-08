@@ -203,15 +203,6 @@
           "vision": true,
           "webSearch": true
         },
-        "gpt-4.1": {
-          "name": "GPT-4.1",
-          "contextWindow": 1047576,
-          "maxOutput": 32768,
-          "inputPrice": 2,
-          "outputPrice": 8,
-          "vision": true,
-          "webSearch": true
-        },
         "gpt-5-nano": {
           "name": "GPT-5 nano",
           "contextWindow": 200000,
@@ -251,6 +242,7 @@
         "gpt-4-1106-preview",
         "gpt-4-turbo",
         "gpt-4-turbo-preview",
+        "gpt-4.1",
         "gpt-4o",
         "gpt-4o-audio-preview",
         "gpt-4o-mini",

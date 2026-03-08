@@ -391,12 +391,13 @@ async function fetchPlayerData(videoId: string, hintLang?: string) {
     if (tracks?.length > 0) return domData;
   }
 
-  // Fallback 2: direct innertube API from content script
+  // Fallback 2: direct innertube API from content script (with cookies)
   const playerResponse = await fetch(
     `https://www.youtube.com/youtubei/v1/player?key=${YOUTUBE_INNERTUBE_KEY}&prettyPrint=false`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({
         context: { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00', hl: hintLang || 'en' } },
         videoId,
@@ -423,11 +424,17 @@ async function fetchTranscriptViaBridge(videoId: string, langCode?: string, capt
   if (captionBaseUrl) {
     let url = captionBaseUrl;
     if (!url.includes('fmt=')) url += (url.includes('?') ? '&' : '?') + 'fmt=srv3';
-    const res = await fetch(url);
+    const res = await fetch(url, { credentials: 'include' });
     if (res.ok) {
       const text = await res.text();
       if (text.length > 0) return text;
     }
+  }
+
+  // Mobile YouTube (m.youtube.com) doesn't support transcript extraction —
+  // captions are embedded in the video stream, not served via API.
+  if (window.location.hostname === 'm.youtube.com') {
+    throw new Error('Transcripts are not available on mobile YouTube. Switch to desktop mode in your browser settings to get the transcript.');
   }
 
   throw new Error('No transcript available');

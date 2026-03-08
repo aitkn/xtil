@@ -34,11 +34,7 @@ export default defineContentScript({
           const clone = res.clone();
           clone.json().then((data: Record<string, unknown>) => {
             const vid = (data as any)?.videoDetails?.videoId;
-            const tracks = (data as any)?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-            if (vid) {
-              playerCache.set(vid, data);
-              console.log(`[xTil] Intercepted player for ${vid}: ${tracks?.length ?? 0} caption tracks`);
-            }
+            if (vid) playerCache.set(vid, data);
           }).catch((err) => { console.warn('[xTil bridge] Failed to process player response:', err); });
         }
 
@@ -79,7 +75,6 @@ export default defineContentScript({
               const vidMatch = trackedUrl.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
               if (vidMatch && this.responseText.length > 0) {
                 timedtextCache.set(vidMatch[1], this.responseText);
-                console.log(`[xTil] Intercepted XHR timedtext for ${vidMatch[1]}: ${this.responseText.length} chars`);
               }
             } else if (trackedUrl.includes('/youtubei/v1/player')) {
               const data = JSON.parse(this.responseText);
@@ -153,7 +148,7 @@ async function getPlayerData(
       if (tracks?.length > 0) {
         const vid = (pr as any)?.videoDetails?.videoId;
         if (vid === videoId) {
-          cache.set(videoId, pr); // cache for fetchTimedtext
+          cache.set(videoId, pr);
           return pr;
         }
       }
@@ -166,14 +161,14 @@ async function getPlayerData(
     if (tracks?.length > 0) {
       const vid = initial?.videoDetails?.videoId;
       if (vid === videoId) {
-        cache.set(videoId, initial); // cache for fetchTimedtext
+        cache.set(videoId, initial);
         return initial;
       }
     }
   }
 
   const fetched = await fetchInnertubePlayer(videoId, hintLang, fetchFn);
-  cache.set(videoId, fetched); // cache for fetchTimedtext
+  cache.set(videoId, fetched);
   return fetched;
 }
 
@@ -236,22 +231,20 @@ async function callGetTranscript(
   langCode: string | undefined,
   fetchFn: typeof fetch,
 ): Promise<string | null> {
-  const context = getInnertubeContext();
   const ytcfg = (window as any).ytcfg;
   const apiKey = ytcfg?.get?.('INNERTUBE_API_KEY') || 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+  const url = `https://www.youtube.com/youtubei/v1/get_transcript?key=${apiKey}&prettyPrint=false`;
 
   // protobuf params: field 1 = videoId (11 bytes)
   const basicParams = btoa(String.fromCharCode(0x0a, 0x0b) + videoId);
 
-  const res = await fetchFn.call(window,
-    `https://www.youtube.com/youtubei/v1/get_transcript?key=${apiKey}&prettyPrint=false`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ context, params: basicParams }),
-    },
-  );
+  const context = getInnertubeContext();
+  const res = await fetchFn.call(window, url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ context, params: basicParams }),
+  });
 
   if (!res.ok) throw new Error(`get_transcript: ${res.status}`);
 
@@ -266,16 +259,12 @@ async function callGetTranscript(
         item.languageCode?.split('-')[0] === langCode.split('-')[0],
       );
       if (target?.continuation) {
-        console.log(`[xTil] Switching transcript to ${target.languageCode}`);
-        const res2 = await fetchFn.call(window,
-          `https://www.youtube.com/youtubei/v1/get_transcript?key=${apiKey}&prettyPrint=false`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ context, params: target.continuation }),
-          },
-        );
+        const res2 = await fetchFn.call(window, url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ context, params: target.continuation }),
+        });
         if (res2.ok) data = await res2.json();
       }
     }
@@ -305,7 +294,7 @@ async function fetchTimedtext(
   const baseUrl: string | undefined = track.baseUrl;
   if (!baseUrl) return null;
 
-  // Try with no additional params first, then different formats
+  // Try the original baseUrl with different formats
   for (const suffix of ['', '&fmt=srv3', '&fmt=json3', '&fmt=vtt']) {
     try {
       const res = await fetchFn.call(window, baseUrl + suffix, { credentials: 'include' });
@@ -313,6 +302,7 @@ async function fetchTimedtext(
       if (text.length > 0) return text;
     } catch { /* try next */ }
   }
+
   return null;
 }
 
