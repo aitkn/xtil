@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-06T06:55:57.640Z",
+  "_generated": "2026-03-08T22:12:30.851Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -119,7 +119,7 @@
           "reasoning": false
         },
         "deepseek-reasoner": {
-          "name": "DeepSeek-V3.2 Reasoning",
+          "name": "DeepSeek-V3.2 (Thinking Mode)",
           "contextWindow": 128000,
           "maxOutput": 64000,
           "inputPrice": 0.28,
@@ -683,6 +683,8 @@
           "name": "gpt-5.3-codex"
         },
         "gpt-5.4": {
+          "reasoning": true,
+          "webSearch": true,
           "name": "gpt-5.4"
         },
         "gpt-5.4-2026-03-05": {

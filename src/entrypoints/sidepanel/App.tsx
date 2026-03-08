@@ -2592,7 +2592,8 @@ function ContentIndicators({ content, settings }: { content: ExtractedContent; s
       {isYouTube ? (
         <IndicatorChip
           icon={transcriptLoaded ? '\u2713' : '\u2717'}
-          label={transcriptLoaded ? `Transcript \u00B7 ${content.wordCount.toLocaleString()} words` : 'No transcript'}
+          label={transcriptLoaded ? `Transcript \u00B7 ${content.wordCount.toLocaleString()} words`
+            : content.content.includes('mobile YouTube') ? 'No transcript \u2014 switch to desktop version' : 'No transcript'}
           variant={transcriptLoaded ? 'success' : 'warning'}
         />
       ) : (

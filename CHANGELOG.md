@@ -4,6 +4,12 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.8
+
+**Mobile YouTube experience**
+
+- On mobile YouTube, video info now loads normally with a clear hint to switch to desktop version for transcripts
+
 ## 1.1.7
 
 **Transcript fix & new model**

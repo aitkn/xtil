@@ -177,7 +177,13 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
       const videoId = parts[0];
       const hintLang = parts[1];
 
+      // Mobile YouTube embeds captions in the video stream — API transcript not available
+      const isMobileYouTube = window.location.hostname === 'm.youtube.com';
+
       try {
+        if (isMobileYouTube) {
+          throw new Error('Transcripts are not available on mobile YouTube. Use "Request Desktop Site" in your browser menu, then try again.');
+        }
         const transcript = await fetchYouTubeTranscript(videoId, hintLang, langPrefs, summaryLang);
         content.content = content.content.replace(
           /\[Transcript available - fetching\.\.\.\]\n\n\[YOUTUBE_TRANSCRIPT:[^\]]+\]/,
@@ -429,12 +435,6 @@ async function fetchTranscriptViaBridge(videoId: string, langCode?: string, capt
       const text = await res.text();
       if (text.length > 0) return text;
     }
-  }
-
-  // Mobile YouTube (m.youtube.com) doesn't support transcript extraction —
-  // captions are embedded in the video stream, not served via API.
-  if (window.location.hostname === 'm.youtube.com') {
-    throw new Error('Transcripts are not available on mobile YouTube. Switch to desktop mode in your browser settings to get the transcript.');
   }
 
   throw new Error('No transcript available');
