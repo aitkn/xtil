@@ -176,7 +176,7 @@ async function getModelVision(
 async function handleMessage(message: Message): Promise<Message> {
   switch (message.type) {
     case 'EXTRACT_CONTENT':
-      return handleExtractContent(message.readonly);
+      return handleExtractContent(message.readonly, message.refresh);
     case 'EXTRACT_COMMENTS':
       return handleExtractComments();
     case 'SEEK_VIDEO':
@@ -384,7 +384,7 @@ function isRestrictedUrl(url?: string): boolean {
   } catch { return false; }
 }
 
-async function handleExtractContent(readonly?: boolean): Promise<ExtractResultMessage> {
+async function handleExtractContent(readonly?: boolean, refresh?: boolean): Promise<ExtractResultMessage> {
   try {
     const [tab, settings] = await Promise.all([resolveTargetTab(), getSettings()]);
 
@@ -392,11 +392,35 @@ async function handleExtractContent(readonly?: boolean): Promise<ExtractResultMe
       return { type: 'EXTRACT_RESULT', success: false, error: 'restricted', tabId: tab.id } as ExtractResultMessage;
     }
 
+    const chromeScripting = (globalThis as unknown as { chrome: { scripting: typeof chrome.scripting } }).chrome.scripting;
+
+    // On refresh: reinject content scripts for a completely fresh state (empty caches).
+    if (refresh) {
+      const injections: Promise<unknown>[] = [
+        chromeScripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content-scripts/content.js'],
+        }).catch(() => {}),
+      ];
+      // Also reinject YouTube bridge (MAIN world) for YouTube pages
+      if (tab.url?.includes('youtube.com')) {
+        injections.push(
+          chromeScripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content-scripts/youtube-bridge.js'],
+            world: 'MAIN' as chrome.scripting.ExecutionWorld,
+          }).catch(() => {}),
+        );
+      }
+      await Promise.all(injections);
+    }
+
     const extractMsg = {
       type: 'EXTRACT_CONTENT' as const,
       langPrefs: settings.summaryLanguageExcept,
       summaryLang: settings.summaryLanguage,
       readonly,
+      refresh,
     };
 
     let response: unknown;
@@ -405,7 +429,6 @@ async function handleExtractContent(readonly?: boolean): Promise<ExtractResultMe
     } catch {
       // Content script not injected yet (page was open before extension loaded).
       // Inject it programmatically and retry.
-      const chromeScripting = (globalThis as unknown as { chrome: { scripting: typeof chrome.scripting } }).chrome.scripting;
       await chromeScripting.executeScript({
         target: { tabId: tab.id },
         files: ['content-scripts/content.js'],

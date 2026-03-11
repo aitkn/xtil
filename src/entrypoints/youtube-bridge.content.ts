@@ -207,20 +207,36 @@ async function fetchTranscript(
   const cachedText = timedtextCache.get(videoId);
   if (cachedText) return cachedText;
 
-  // 2. Try get_transcript innertube endpoint (uses full INNERTUBE_CONTEXT)
+  // 2. Try local/fast methods first (no network, no 400 errors)
+  const embeddedResult = extractTranscriptFromInitialData(videoId);
+  if (embeddedResult) return embeddedResult;
+  const domResult = scrapeTranscriptFromDOM();
+  if (domResult) return domResult;
+
+  // 3. Try get_transcript innertube endpoint (uses full INNERTUBE_CONTEXT)
   try {
     const result = await callGetTranscript(videoId, langCode, fetchFn);
     if (result) return result;
-  } catch (err) {
-    console.warn(`[xTil] get_transcript failed: ${err instanceof Error ? err.message : err}`);
+  } catch {
+    // Expected fallback — some videos don't support this endpoint
   }
 
-  // 3. Try timedtext baseUrl from player response
+  // 4. Try timedtext baseUrl from player response
   try {
     const result = await fetchTimedtext(videoId, langCode, fetchFn, playerCache);
     if (result) return result;
-  } catch (err) {
-    console.warn(`[xTil] timedtext fallback failed: ${err instanceof Error ? err.message : err}`);
+  } catch {
+    // Expected fallback
+  }
+
+  // 5. Last resort: trigger YouTube's own "Show transcript" UI and scrape the result.
+  // This works for is_servable=false videos where all API methods fail but
+  // YouTube's frontend can still load the transcript internally.
+  try {
+    const result = await triggerAndScrapeTranscript();
+    if (result) return result;
+  } catch {
+    // Expected fallback
   }
 
   throw new Error('No transcript available');
@@ -301,6 +317,176 @@ async function fetchTimedtext(
       const text = await res.text();
       if (text.length > 0) return text;
     } catch { /* try next */ }
+  }
+
+  return null;
+}
+
+/**
+ * Last-resort: programmatically click "Show transcript" to trigger YouTube's own
+ * transcript loading, then scrape the result from the DOM.
+ * This works because YouTube's frontend sends proper auth headers that our
+ * fetch calls cannot replicate (SAPISIDHASH, PoToken, etc.).
+ */
+async function triggerAndScrapeTranscript(): Promise<string | null> {
+  // Check if transcript panel already has content
+  const existing = scrapeTranscriptFromDOM();
+  if (existing) return existing;
+
+  // Check if "Show transcript" button exists (may be inside collapsed description)
+  let btn = findTranscriptButton();
+  if (!btn) {
+    // Try expanding description first
+    const expandBtn = document.querySelector('#expand') as HTMLElement | null;
+    if (expandBtn) {
+      expandBtn.click();
+      await sleep(800);
+      btn = findTranscriptButton();
+    }
+  }
+  if (!btn) return null;
+
+  // Remember which panel was expanded before (to restore state)
+  const prevExpanded = document.querySelector(
+    'ytd-engagement-panel-section-list-renderer[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"]',
+  );
+
+  btn.click();
+
+  // Wait for transcript segments to appear (up to 8s)
+  for (let i = 0; i < 16; i++) {
+    await sleep(500);
+    const result = scrapeTranscriptFromDOM();
+    if (result) {
+      // Close the transcript panel to avoid UI disruption (close button = X)
+      const closeBtn = document.querySelector(
+        'ytd-engagement-panel-section-list-renderer[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"] #visibility-button button',
+      ) as HTMLElement | null;
+      if (closeBtn && !prevExpanded) closeBtn.click();
+      return result;
+    }
+  }
+
+  return null;
+}
+
+function findTranscriptButton(): HTMLElement | null {
+  const buttons = document.querySelectorAll('button');
+  for (const btn of buttons) {
+    if (btn.getAttribute('aria-label') === 'Show transcript') return btn;
+  }
+  return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+/**
+ * Extract transcript from ytInitialData engagement panels.
+ * YouTube embeds transcript data in the page even when captions are marked
+ * as is_servable=false (which causes timedtext API to return empty and
+ * get_transcript to fail with "Precondition check failed").
+ */
+function extractTranscriptFromInitialData(_videoId: string): string | null {
+  const initialData = (window as any).ytInitialData;
+  if (!initialData?.engagementPanels) return null;
+
+  for (const panel of initialData.engagementPanels) {
+    const renderer = panel?.engagementPanelSectionListRenderer;
+    if (renderer?.panelIdentifier !== 'engagement-panel-searchable-transcript') continue;
+
+    const segmentList =
+      renderer.content?.transcriptRenderer?.content?.transcriptSearchPanelRenderer
+        ?.body?.transcriptSegmentListRenderer ??
+      renderer.content?.transcriptRenderer?.body?.transcriptBodyRenderer;
+    const segments = segmentList?.initialSegments ?? segmentList?.cueGroups;
+    if (!segments?.length) continue;
+
+    const lines: string[] = [];
+    for (const seg of segments) {
+      // Standard segment renderer (from initialSegments)
+      const sr = seg.transcriptSegmentRenderer;
+      if (sr) {
+        const text = sr.snippet?.runs?.map((r: any) => r.text).join('')
+          ?? sr.snippet?.simpleText ?? '';
+        const clean = text.replace(/\n/g, ' ').trim();
+        if (!clean) continue;
+        const startMs = parseInt(sr.startMs || '0', 10);
+        lines.push(`[${formatMs(startMs)}] ${clean}`);
+        continue;
+      }
+      // CueGroup renderer (from cueGroups — same format as get_transcript response)
+      const cg = seg.transcriptCueGroupRenderer;
+      if (cg?.cues) {
+        for (const cue of cg.cues) {
+          const cr = cue.transcriptCueRenderer;
+          if (!cr) continue;
+          const text = (cr.cue?.simpleText ?? '').trim();
+          if (!text) continue;
+          const startMs = parseInt(cr.startOffsetMs || '0', 10);
+          lines.push(`[${formatMs(startMs)}] ${text}`);
+        }
+      }
+    }
+    if (lines.length > 0) return lines.join('\n');
+  }
+  return null;
+}
+
+function formatMs(ms: number): string {
+  const totalSec = ms / 1000;
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = Math.floor(totalSec % 60);
+  return h > 0
+    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * Scrape transcript segments directly from the rendered DOM.
+ * Works when YouTube's transcript panel is visible (user clicked "Show transcript"
+ * or the panel was rendered by the SPA framework).
+ *
+ * Supports both the classic UI (ytd-transcript-segment-renderer) and the modern
+ * "In this video" panel (macro-markers-panel-item-view-model).
+ */
+function scrapeTranscriptFromDOM(): string | null {
+  // Classic transcript panel
+  const classicSegments = document.querySelectorAll('ytd-transcript-segment-renderer');
+  if (classicSegments.length > 0) {
+    const lines: string[] = [];
+    for (const seg of classicSegments) {
+      const time = (seg.querySelector('.segment-timestamp') as HTMLElement)?.textContent?.trim();
+      const text = (seg.querySelector('.segment-text') as HTMLElement)?.textContent?.trim();
+      if (!text) continue;
+      lines.push(time ? `[${time}] ${text}` : text);
+    }
+    if (lines.length > 0) return lines.join('\n');
+  }
+
+  // Modern "In this video" transcript panel (macro-markers-panel-item-view-model)
+  // Find the expanded engagement panel containing transcript items
+  const panels = document.querySelectorAll('ytd-engagement-panel-section-list-renderer');
+  for (const panel of panels) {
+    if (panel.getAttribute('visibility') !== 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED') continue;
+    const items = panel.querySelectorAll('macro-markers-panel-item-view-model');
+    if (items.length === 0) continue;
+
+    const lines: string[] = [];
+    for (const item of items) {
+      // Use innerText (not textContent) — it preserves newlines between timestamp and text
+      const raw = (item as HTMLElement).innerText?.trim();
+      if (!raw || !/^\d/.test(raw)) continue; // skip chapter headers (no timestamp)
+      const parts = raw.split('\n').map(p => p.trim()).filter(Boolean);
+      const timestamp = parts[0];
+      // Skip the accessibility duration text (e.g. "8 seconds", "3 minutes, 25 seconds")
+      const textStart = (parts.length >= 3 && /^\d+\s*(second|minute|hour)/.test(parts[1])) ? 2 : 1;
+      const text = parts.slice(textStart).join(' ');
+      if (timestamp && text) lines.push(`[${timestamp}] ${text}`);
+    }
+    if (lines.length > 0) return lines.join('\n');
   }
 
   return null;

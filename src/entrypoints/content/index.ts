@@ -95,8 +95,14 @@ export default defineContentScript({
           sendResponse({ success: false, error: 'Unauthorized sender' });
           return;
         }
-        const msg = message as { type: string; videoId?: string; hintLang?: string; langPrefs?: string[]; summaryLang?: string; readonly?: boolean };
+        const msg = message as { type: string; videoId?: string; hintLang?: string; langPrefs?: string[]; summaryLang?: string; readonly?: boolean; refresh?: boolean };
         if (msg.type === 'EXTRACT_CONTENT') {
+          if (msg.refresh) {
+            // User clicked Refresh — clear all caches for a fresh extraction
+            transcriptCache.clear();
+            transcriptFailCache.clear();
+            bridgeAvailable = true;
+          }
           extractAndResolve(msg.langPrefs, msg.summaryLang, msg.readonly)
             .then((content) => {
               sendResponse({ type: 'EXTRACT_RESULT', success: true, data: content } as ExtractResultMessage);
@@ -182,7 +188,7 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
 
       try {
         if (isMobileYouTube) {
-          throw new Error('Transcripts are not available on mobile YouTube. Use "Request Desktop Site" in your browser menu, then try again.');
+          throw new Error('Transcripts are not available on mobile YouTube. Use "Request Desktop Site" in your browser menu to switch to YouTube desktop version, then try again.');
         }
         const transcript = await fetchYouTubeTranscript(videoId, hintLang, langPrefs, summaryLang);
         content.content = content.content.replace(
@@ -440,8 +446,11 @@ async function fetchTranscriptViaBridge(videoId: string, langCode?: string, capt
   throw new Error('No transcript available');
 }
 
-// Per-video transcript cache to avoid redundant fetches
+// Per-video transcript cache to avoid redundant fetches (successes AND failures)
 const transcriptCache = new Map<string, string>();
+const transcriptFailCache = new Map<string, { error: string; time: number }>();
+const transcriptInFlight = new Map<string, Promise<string>>(); // dedup parallel calls
+const FAIL_CACHE_TTL = 60_000; // don't retry failed transcripts for 60s
 
 async function fetchYouTubeTranscript(
   videoId: string,
@@ -453,7 +462,44 @@ async function fetchYouTubeTranscript(
   const cached = transcriptCache.get(videoId);
   if (cached) return cached;
 
-  // Step 1: Get player data to find available caption tracks & pick best language
+  // Don't retry recently failed transcripts
+  const failEntry = transcriptFailCache.get(videoId);
+  if (failEntry && Date.now() - failEntry.time < FAIL_CACHE_TTL) {
+    throw new Error(failEntry.error);
+  }
+
+  // Dedup: if a fetch is already in progress for this video, wait for it
+  const inFlight = transcriptInFlight.get(videoId);
+  if (inFlight) return inFlight;
+
+  const promise = fetchYouTubeTranscriptImpl(videoId, hintLang, langPrefs, summaryLang);
+  transcriptInFlight.set(videoId, promise);
+  try {
+    return await promise;
+  } finally {
+    transcriptInFlight.delete(videoId);
+  }
+}
+
+async function fetchYouTubeTranscriptImpl(
+  videoId: string,
+  hintLang?: string,
+  langPrefs?: string[],
+  summaryLang?: string,
+): Promise<string> {
+  // Step 1: Try fast local extraction first (no network, no errors in console)
+  const embedded = extractTranscriptFromPageData();
+  if (embedded) {
+    transcriptCache.set(videoId, embedded);
+    return embedded;
+  }
+  const domTranscript = scrapeTranscriptFromDOM();
+  if (domTranscript) {
+    transcriptCache.set(videoId, domTranscript);
+    return domTranscript;
+  }
+
+  // Step 2: Get player data to find available caption tracks & pick best language
   let data: Record<string, unknown> | undefined;
   let tracks: CaptionTrack[] | undefined;
   let originalLang: string | undefined;
@@ -471,7 +517,7 @@ async function fetchYouTubeTranscript(
     }
   }
 
-  // Step 2: Pick best language from available tracks
+  // Step 3: Pick best language from available tracks
   let targetLang: string | undefined;
   let captionBaseUrl: string | undefined;
   if (tracks && tracks.length > 0) {
@@ -481,7 +527,7 @@ async function fetchYouTubeTranscript(
     captionBaseUrl = best.baseUrl;
   }
 
-  // Step 3: Fetch transcript via bridge, with direct URL fallback
+  // Step 4: Fetch transcript via bridge, with direct URL fallback
   try {
     const raw = await fetchTranscriptViaBridge(videoId, targetLang, captionBaseUrl);
     if (raw) {
@@ -489,15 +535,176 @@ async function fetchYouTubeTranscript(
       const parsed = parseTranscriptXml(raw);
       const transcript = parsed || raw; // fallback to raw if parsing fails
       transcriptCache.set(videoId, transcript);
-      console.log(`[xTil] Transcript ready: ${transcript.length} chars`);
       return transcript;
     }
-  } catch (err) {
-    console.warn(`[xTil] Transcript fetch failed: ${err instanceof Error ? err.message : err}`);
-    throw lastError ?? err ?? new Error('No transcript available');
+  } catch {
+    // Expected — bridge/timedtext unavailable for this video
   }
 
-  throw new Error('No transcript available');
+  // Step 5: Last resort — trigger YouTube's "Show transcript" UI and scrape DOM.
+  // Works for is_servable=false videos where all API methods fail.
+  try {
+    const triggered = await triggerAndScrapeTranscript();
+    if (triggered) {
+      transcriptCache.set(videoId, triggered);
+      return triggered;
+    }
+  } catch {
+    // Expected fallback
+  }
+
+  const errorMsg = lastError instanceof Error ? lastError.message : 'No transcript available';
+  transcriptFailCache.set(videoId, { error: errorMsg, time: Date.now() });
+  throw lastError ?? new Error('No transcript available');
+}
+
+/**
+ * Extract transcript from ytInitialData embedded in <script> tags.
+ * YouTube embeds transcript segments in engagement panels even when
+ * captions are is_servable=false (timedtext returns empty, get_transcript 400s).
+ */
+function extractTranscriptFromPageData(): string | null {
+  for (const script of document.querySelectorAll('script')) {
+    const text = script.textContent || '';
+    const match = text.match(/ytInitialData\s*=\s*(\{.+?\});\s*(?:var\s|let\s|const\s|window\[|<\/script>|$)/s);
+    if (!match) continue;
+
+    let data: any;
+    try { data = JSON.parse(match[1]); } catch { continue; }
+
+    const panels = data?.engagementPanels;
+    if (!panels) continue;
+
+    for (const panel of panels) {
+      const renderer = panel?.engagementPanelSectionListRenderer;
+      if (renderer?.panelIdentifier !== 'engagement-panel-searchable-transcript') continue;
+
+      const segmentList =
+        renderer.content?.transcriptRenderer?.content?.transcriptSearchPanelRenderer
+          ?.body?.transcriptSegmentListRenderer ??
+        renderer.content?.transcriptRenderer?.body?.transcriptBodyRenderer;
+      const segments = segmentList?.initialSegments ?? segmentList?.cueGroups;
+      if (!segments?.length) continue;
+
+      const lines: string[] = [];
+      for (const seg of segments) {
+        const sr = seg.transcriptSegmentRenderer;
+        if (sr) {
+          const segText = sr.snippet?.runs?.map((r: any) => r.text).join('')
+            ?? sr.snippet?.simpleText ?? '';
+          const clean = segText.replace(/\n/g, ' ').trim();
+          if (!clean) continue;
+          const startMs = parseInt(sr.startMs || '0', 10);
+          lines.push(`[${formatTimestamp(startMs / 1000)}] ${clean}`);
+          continue;
+        }
+        const cg = seg.transcriptCueGroupRenderer;
+        if (cg?.cues) {
+          for (const cue of cg.cues) {
+            const cr = cue.transcriptCueRenderer;
+            if (!cr) continue;
+            const cueText = (cr.cue?.simpleText ?? '').trim();
+            if (!cueText) continue;
+            const startMs = parseInt(cr.startOffsetMs || '0', 10);
+            lines.push(`[${formatTimestamp(startMs / 1000)}] ${cueText}`);
+          }
+        }
+      }
+      if (lines.length > 0) return lines.join('\n');
+    }
+  }
+  return null;
+}
+
+/**
+ * Scrape transcript from the visible YouTube transcript panel DOM.
+ * Supports classic (ytd-transcript-segment-renderer) and modern
+ * "In this video" panel (macro-markers-panel-item-view-model).
+ */
+/**
+ * Last-resort: programmatically click "Show transcript" to trigger YouTube's own
+ * transcript loading, then scrape the result.
+ */
+async function triggerAndScrapeTranscript(): Promise<string | null> {
+  const existing = scrapeTranscriptFromDOM();
+  if (existing) return existing;
+
+  let btn = findTranscriptButton();
+  if (!btn) {
+    const expandBtn = document.querySelector('#expand') as HTMLElement | null;
+    if (expandBtn) {
+      expandBtn.click();
+      await new Promise<void>(r => setTimeout(r, 800));
+      btn = findTranscriptButton();
+    }
+  }
+  if (!btn) return null;
+
+  const prevExpanded = document.querySelector(
+    'ytd-engagement-panel-section-list-renderer[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"]',
+  );
+
+  btn.click();
+
+  for (let i = 0; i < 16; i++) {
+    await new Promise<void>(r => setTimeout(r, 500));
+    const result = scrapeTranscriptFromDOM();
+    if (result) {
+      const closeBtn = document.querySelector(
+        'ytd-engagement-panel-section-list-renderer[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"] #visibility-button button',
+      ) as HTMLElement | null;
+      if (closeBtn && !prevExpanded) closeBtn.click();
+      return result;
+    }
+  }
+
+  return null;
+}
+
+function findTranscriptButton(): HTMLElement | null {
+  const buttons = document.querySelectorAll('button');
+  for (const btn of buttons) {
+    if (btn.getAttribute('aria-label') === 'Show transcript') return btn;
+  }
+  return null;
+}
+
+function scrapeTranscriptFromDOM(): string | null {
+  // Classic transcript panel
+  const classicSegments = document.querySelectorAll('ytd-transcript-segment-renderer');
+  if (classicSegments.length > 0) {
+    const lines: string[] = [];
+    for (const seg of classicSegments) {
+      const time = (seg.querySelector('.segment-timestamp') as HTMLElement)?.textContent?.trim();
+      const text = (seg.querySelector('.segment-text') as HTMLElement)?.textContent?.trim();
+      if (!text) continue;
+      lines.push(time ? `[${time}] ${text}` : text);
+    }
+    if (lines.length > 0) return lines.join('\n');
+  }
+
+  // Modern "In this video" transcript panel
+  const panels = document.querySelectorAll('ytd-engagement-panel-section-list-renderer');
+  for (const panel of panels) {
+    if (panel.getAttribute('visibility') !== 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED') continue;
+    const items = panel.querySelectorAll('macro-markers-panel-item-view-model');
+    if (items.length === 0) continue;
+
+    const lines: string[] = [];
+    for (const item of items) {
+      // Use innerText (not textContent) — it preserves newlines between timestamp and text
+      const raw = (item as HTMLElement).innerText?.trim();
+      if (!raw || !/^\d/.test(raw)) continue; // skip chapter headers (no timestamp)
+      const parts = raw.split('\n').map(p => p.trim()).filter(Boolean);
+      const timestamp = parts[0];
+      const textStart = (parts.length >= 3 && /^\d+\s*(second|minute|hour)/.test(parts[1])) ? 2 : 1;
+      const text = parts.slice(textStart).join(' ');
+      if (timestamp && text) lines.push(`[${timestamp}] ${text}`);
+    }
+    if (lines.length > 0) return lines.join('\n');
+  }
+
+  return null;
 }
 
 function parseTranscriptXml(xml: string): string {

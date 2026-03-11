@@ -769,7 +769,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           <Button
             onClick={() => { doFetchModels(); advanceStep('apiKey'); }}
             size="sm"
-            variant="secondary"
+            variant="primary"
             style={{ marginTop: '8px' }}
           >
             Continue
@@ -795,7 +795,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             <Button
               onClick={() => { doFetchModels(); advanceStep('endpoint'); }}
               size="sm"
-              variant="secondary"
+              variant="primary"
               style={{ marginTop: '8px' }}
             >
               Continue
@@ -903,7 +903,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           <Button
             onClick={() => advanceStep('model')}
             size="sm"
-            variant="secondary"
+            variant="primary"
             style={{ marginTop: '8px' }}
           >
             Continue
@@ -930,7 +930,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           <Button
             onClick={() => advanceStep('contextWindow')}
             size="sm"
-            variant="secondary"
+            variant="primary"
             style={{ marginTop: '8px' }}
           >
             Continue
@@ -1008,7 +1008,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           <Button
             onClick={() => advanceStep('factCheck')}
             size="sm"
-            variant="secondary"
+            variant="primary"
             style={{ marginTop: '8px' }}
           >
             Continue
@@ -1091,7 +1091,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
               <Button
                 onClick={() => advanceStep('notionKey')}
                 size="sm"
-                variant="secondary"
+                variant="primary"
               >
                 Continue
               </Button>
@@ -1177,7 +1177,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
               <Button
                 onClick={() => advanceStep('notionDb')}
                 size="sm"
-                variant="secondary"
+                variant="primary"
               >
                 Continue
               </Button>
@@ -1238,7 +1238,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           <Button
             onClick={() => advanceStep('theme')}
             size="sm"
-            variant="secondary"
+            variant="primary"
             style={{ marginTop: '8px' }}
           >
             Continue
@@ -1306,7 +1306,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
           <Button
             onClick={() => advanceStep('language')}
             size="sm"
-            variant="secondary"
+            variant="primary"
             style={{ marginTop: '8px' }}
           >
             Continue

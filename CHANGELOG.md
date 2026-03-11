@@ -4,6 +4,18 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.9
+
+**YouTube transcript reliability & UX improvements**
+
+- Fixed YouTube transcript extraction for videos where standard methods fail — the extension now automatically opens YouTube's transcript panel as a last resort
+- Supports YouTube's new "In this video" transcript design (modern panel with chapters)
+- Fixed video description auto-closing when the extension is open
+- Stopped repeated transcript fetch attempts that spammed the console
+- Refresh button now fully re-reads page content (including re-fetching transcripts)
+- Made Continue buttons in setup wizard more visually distinct
+- Improved mobile YouTube error message to clarify switching to YouTube desktop version
+
 ## 1.1.8
 
 **Mobile YouTube experience**

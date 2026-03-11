@@ -1,4 +1,4 @@
-import type { ContentExtractor, ExtractedContent } from './types';
+import type { ContentExtractor, ExtractedContent, ExtractOptions } from './types';
 
 const YOUTUBE_URL_RE = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 
@@ -7,7 +7,7 @@ export const youtubeExtractor: ContentExtractor = {
     return YOUTUBE_URL_RE.test(url);
   },
 
-  extract(url: string, doc: Document): ExtractedContent {
+  extract(url: string, doc: Document, options?: ExtractOptions): ExtractedContent {
     const videoId = url.match(YOUTUBE_URL_RE)?.[1];
     if (!videoId) throw new Error('Could not extract YouTube video ID');
 
@@ -33,14 +33,11 @@ export const youtubeExtractor: ContentExtractor = {
       doc.querySelector('link[itemprop="name"]')?.getAttribute('content') ||
       undefined;
 
-    // YouTube's description is collapsed by default (#snippet shows truncated text,
-    // #content has the full text but is hidden). Click "...more" to expand it first.
+    // Read description without manipulating the DOM. Try #content first (visible
+    // when already expanded), then #snippet (always present, may be truncated),
+    // then meta tags (~155 chars). Never click expand/collapse — it interferes
+    // with the user's UI state and causes the description to close unexpectedly.
     const expander = doc.querySelector('ytd-text-inline-expander');
-    const expandBtn = expander?.querySelector('tp-yt-paper-button#expand') as HTMLElement | null;
-    if (expandBtn) expandBtn.click();
-
-    // Read full description from the expanded #content container;
-    // fall back to #snippet, then meta tags (~155 chars truncated by YouTube).
     const fullDescEl =
       expander?.querySelector('#content yt-attributed-string') ||
       expander?.querySelector('#content yt-formatted-string') ||
@@ -51,10 +48,6 @@ export const youtubeExtractor: ContentExtractor = {
       doc.querySelector('meta[name="description"]')?.getAttribute('content') ||
       doc.querySelector('meta[property="og:description"]')?.getAttribute('content') ||
       undefined;
-
-    // Collapse it back to avoid visual side-effects
-    const collapseBtn = expander?.querySelector('tp-yt-paper-button#collapse') as HTMLElement | null;
-    if (collapseBtn) collapseBtn.click();
 
     const liveDateText = doc.querySelector('#info-strings yt-formatted-string')?.textContent?.trim();
     const publishDate =

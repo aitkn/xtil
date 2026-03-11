@@ -786,10 +786,10 @@ export function App() {
   }, []);
 
   // Extract content from active tab
-  const extractContent = useCallback(async (quiet = false) => {
+  const extractContent = useCallback(async (quiet = false, refresh = false) => {
     if (!quiet) setExtracting(true);
     try {
-      const response = await sendMessage({ type: 'EXTRACT_CONTENT', ...(quiet && { readonly: true }) }) as ExtractResultMessage;
+      const response = await sendMessage({ type: 'EXTRACT_CONTENT', ...(quiet && { readonly: true }), ...(refresh && { refresh: true }) }) as ExtractResultMessage;
       if (response.success && response.data) {
         // Discard if user switched tabs during extraction
         if (response.tabId && activeTabIdRef.current != null && response.tabId !== activeTabIdRef.current) {
@@ -887,7 +887,7 @@ export function App() {
     setLastResponseBody('');
     setNotionUrl(null);
     setPendingResummarize(false);
-    extractContent();
+    extractContent(false, true);
   }, [extractContent]);
 
   // Load settings on mount
@@ -2593,7 +2593,7 @@ function ContentIndicators({ content, settings }: { content: ExtractedContent; s
         <IndicatorChip
           icon={transcriptLoaded ? '\u2713' : '\u2717'}
           label={transcriptLoaded ? `Transcript \u00B7 ${content.wordCount.toLocaleString()} words`
-            : content.content.includes('mobile YouTube') ? 'No transcript \u2014 switch to desktop version' : 'No transcript'}
+            : content.content.includes('mobile YouTube') ? 'No transcript \u2014 switch to YouTube desktop version' : 'No transcript'}
           variant={transcriptLoaded ? 'success' : 'warning'}
         />
       ) : (

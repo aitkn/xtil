@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-08T22:12:30.851Z",
+  "_generated": "2026-03-11T00:18:53.734Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -165,11 +165,6 @@
         },
         "gemini-2.0-flash-001": {
           "name": "Gemini 2.0 Flash 001",
-          "contextWindow": 1048576,
-          "maxOutput": 8192
-        },
-        "gemini-2.0-flash-exp-image-generation": {
-          "name": "Gemini 2.0 Flash (Image Generation) Experimental",
           "contextWindow": 1048576,
           "maxOutput": 8192
         },
@@ -862,7 +857,7 @@
           "contextWindow": 131072,
           "inputPrice": 3,
           "outputPrice": 15,
-          "vision": false,
+          "vision": true,
           "textGeneration": true,
           "webSearch": true
         },
@@ -871,7 +866,7 @@
           "contextWindow": 131072,
           "inputPrice": 0.3,
           "outputPrice": 0.5,
-          "vision": false,
+          "vision": true,
           "textGeneration": true,
           "webSearch": true
         },

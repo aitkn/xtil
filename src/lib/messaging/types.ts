@@ -45,6 +45,8 @@ export interface ExtractContentMessage {
   summaryLang?: string;
   /** When true, extractor must not mutate the DOM (e.g. clicking "see more"). */
   readonly?: boolean;
+  /** When true, clear all caches and re-extract everything fresh (user clicked Refresh). */
+  refresh?: boolean;
 }
 
 export interface ExtractResultMessage {
