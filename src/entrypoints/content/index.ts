@@ -183,13 +183,7 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
       const videoId = parts[0];
       const hintLang = parts[1];
 
-      // Mobile YouTube embeds captions in the video stream — API transcript not available
-      const isMobileYouTube = window.location.hostname === 'm.youtube.com';
-
       try {
-        if (isMobileYouTube) {
-          throw new Error('Transcripts are not available on mobile YouTube. Use "Request Desktop Site" in your browser menu to switch to YouTube desktop version, then try again.');
-        }
         const transcript = await fetchYouTubeTranscript(videoId, hintLang, langPrefs, summaryLang);
         content.content = content.content.replace(
           /\[Transcript available - fetching\.\.\.\]\n\n\[YOUTUBE_TRANSCRIPT:[^\]]+\]/,
@@ -404,8 +398,10 @@ async function fetchPlayerData(videoId: string, hintLang?: string) {
   }
 
   // Fallback 2: direct innertube API from content script (with cookies)
+  // Use page origin (works on both www.youtube.com and m.youtube.com)
+  const ytOrigin = window.location.origin;
   const playerResponse = await fetch(
-    `https://www.youtube.com/youtubei/v1/player?key=${YOUTUBE_INNERTUBE_KEY}&prettyPrint=false`,
+    `${ytOrigin}/youtubei/v1/player?key=${YOUTUBE_INNERTUBE_KEY}&prettyPrint=false`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

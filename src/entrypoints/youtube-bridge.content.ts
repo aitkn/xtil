@@ -124,6 +124,8 @@ export default defineContentScript({
   },
 });
 
+const YT_ORIGIN = window.location.origin;
+
 // --- Player data ---
 
 async function getPlayerData(
@@ -182,7 +184,7 @@ async function fetchInnertubePlayer(
   const apiKey = ytcfg?.get?.('INNERTUBE_API_KEY') || 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
 
   const res = await fetchFn.call(window,
-    `https://www.youtube.com/youtubei/v1/player?key=${apiKey}&prettyPrint=false`,
+    `${YT_ORIGIN}/youtubei/v1/player?key=${apiKey}&prettyPrint=false`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -249,7 +251,7 @@ async function callGetTranscript(
 ): Promise<string | null> {
   const ytcfg = (window as any).ytcfg;
   const apiKey = ytcfg?.get?.('INNERTUBE_API_KEY') || 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
-  const url = `https://www.youtube.com/youtubei/v1/get_transcript?key=${apiKey}&prettyPrint=false`;
+  const url = `${YT_ORIGIN}/youtubei/v1/get_transcript?key=${apiKey}&prettyPrint=false`;
 
   // protobuf params: field 1 = videoId (11 bytes)
   const basicParams = btoa(String.fromCharCode(0x0a, 0x0b) + videoId);
