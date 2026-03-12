@@ -27,10 +27,18 @@ export const youtubeExtractor: ContentExtractor = {
       'Untitled Video';
 
     const channelName =
-      doc.querySelector('ytd-channel-name yt-formatted-string a')?.textContent?.trim() ||
+      // Desktop YouTube — scope to watch area to avoid picking up sidebar recommendations
+      doc.querySelector('#above-the-fold ytd-channel-name yt-formatted-string a')?.textContent?.trim() ||
+      doc.querySelector('ytd-watch-metadata ytd-channel-name yt-formatted-string a')?.textContent?.trim() ||
+      doc.querySelector('#top-row ytd-channel-name yt-formatted-string a')?.textContent?.trim() ||
       doc.querySelector('#channel-name a')?.textContent?.trim() ||
       doc.querySelector('#owner-name a')?.textContent?.trim() ||
+      // Mobile YouTube (ytm-* custom elements)
+      doc.querySelector('ytm-slim-owner-renderer a')?.textContent?.trim() ||
+      doc.querySelector('.slim-owner-icon-and-title a')?.textContent?.trim() ||
+      // Meta tags (work on both desktop and mobile)
       doc.querySelector('link[itemprop="name"]')?.getAttribute('content') ||
+      doc.querySelector('meta[name="author"]')?.getAttribute('content') ||
       undefined;
 
     // Read description without manipulating the DOM. Try #content first (visible

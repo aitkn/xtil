@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-11T00:18:53.734Z",
+  "_generated": "2026-03-12T02:32:10.240Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -119,7 +119,7 @@
           "reasoning": false
         },
         "deepseek-reasoner": {
-          "name": "DeepSeek-V3.2 (Thinking Mode)",
+          "name": "DeepSeek-V3.2 Reasoning",
           "contextWindow": 128000,
           "maxOutput": 64000,
           "inputPrice": 0.28,
@@ -857,7 +857,7 @@
           "contextWindow": 131072,
           "inputPrice": 3,
           "outputPrice": 15,
-          "vision": true,
+          "vision": false,
           "textGeneration": true,
           "webSearch": true
         },
@@ -866,7 +866,7 @@
           "contextWindow": 131072,
           "inputPrice": 0.3,
           "outputPrice": 0.5,
-          "vision": true,
+          "vision": false,
           "textGeneration": true,
           "webSearch": true
         },
@@ -908,6 +908,13 @@
           "reasoning": true,
           "webSearch": true
         },
+        "grok-4-20-beta": {
+          "name": "Grok 4.20 Beta",
+          "contextWindow": 2000000,
+          "reasoning": true,
+          "vision": true,
+          "webSearch": true
+        },
         "grok-4-fast-non-reasoning": {
           "name": "Grok 4 Fast (Non-Reasoning)",
           "contextWindow": 2097152,
@@ -926,6 +933,15 @@
           "textGeneration": true,
           "reasoning": true,
           "webSearch": true
+        },
+        "grok-4.20-beta-0309-non-reasoning": {
+          "name": "grok-4.20-beta-0309-non-reasoning"
+        },
+        "grok-4.20-beta-0309-reasoning": {
+          "name": "grok-4.20-beta-0309-reasoning"
+        },
+        "grok-4.20-multi-agent-beta-0309": {
+          "name": "grok-4.20-multi-agent-beta-0309"
         },
         "grok-code-fast-1": {
           "name": "Grok Code Fast 1",

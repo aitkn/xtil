@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-10T12:00:00.000Z",
+  "_generated": "2026-03-11T12:00:00.000Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -11,7 +11,7 @@
           "outputPrice": 5,
           "vision": true,
           "reasoning": false,
-          "webSearch": false
+          "webSearch": true
         },
         "claude-sonnet-4-6": {
           "name": "Claude Sonnet 4.6",
@@ -21,7 +21,7 @@
           "outputPrice": 15,
           "vision": true,
           "reasoning": false,
-          "webSearch": false
+          "webSearch": true
         },
         "claude-3-haiku-20240307": {
           "name": "Claude Haiku 3",
@@ -39,7 +39,7 @@
           "outputPrice": 25,
           "vision": true,
           "reasoning": false,
-          "webSearch": false
+          "webSearch": true
         }
       },
       "excluded": [
@@ -306,8 +306,12 @@
         "grok-3",
         "grok-3-mini",
         "grok-4-0709",
+        "grok-4-20-beta",
         "grok-4-fast-non-reasoning",
         "grok-4-fast-reasoning",
+        "grok-4.20-beta-0309-non-reasoning",
+        "grok-4.20-beta-0309-reasoning",
+        "grok-4.20-multi-agent-beta-0309",
         "grok-code-fast-1"
       ]
     }

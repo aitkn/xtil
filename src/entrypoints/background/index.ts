@@ -832,7 +832,7 @@ async function handleChatMessage(
 - Use "updates" or "summary", not both. Use neither if just answering a question.
 - To add a new section, use "extraSections" with a plain-text title key and markdown string value, e.g. {"updates":{"extraSections":{"Comment Highlights":"- Great video!\\n- Love this series"}}}. Do NOT invent new top-level camelCase field names — always use "extraSections" for custom sections.
 - To delete a specific extra section: {"updates":{"extraSections":{"Section Title":"__DELETE__"}}}. To delete ALL extra sections: {"updates":{"extraSections":"__DELETE__"}}. To delete any other field: {"updates":{"fieldName":"__DELETE__"}}.`
-      + (schemaEnforced ? '' : '\n- IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.');
+      + ((schemaEnforced && !webSearch) ? '' : '\n- IMPORTANT: Always respond with valid JSON. No markdown fences, no extra text.');
 
     const rulesSystem = `${summarizationPrompt}
 
@@ -872,6 +872,22 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
       ...messages,
     ];
 
+    // Web search responses tend to ignore format/language instructions from the
+    // system prompt (search results flood the context). Append a reminder to the
+    // last user message so it's closest to the model's response.
+    if (webSearch) {
+      const langLabel = summaryLang ? (langNames[summaryLang] || summaryLang) : '';
+      const langReminder = langLabel ? ` Write ALL content in ${langLabel}.` : '';
+      const lastUserIdx = chatMessages.length - 1 - [...chatMessages].reverse().findIndex(m => m.role === 'user');
+      if (lastUserIdx >= 0 && lastUserIdx < chatMessages.length) {
+        chatMessages[lastUserIdx] = {
+          ...chatMessages[lastUserIdx],
+          content: chatMessages[lastUserIdx].content
+            + `\n\nRESPONSE FORMAT — MANDATORY:\n- Respond with raw JSON only. NO markdown code fences (\`\`\`json), NO text before or after the JSON.\n- Use "updates" to modify the relevant summary field:\n  {"text": "Brief note about what changed", "updates": {"factCheck": "Full updated markdown content"}}\n- Put the COMPLETE updated content in the appropriate "updates" field (e.g. factCheck, notableQuotes, summary, etc.).\n- "text" is only for a short conversational note — do NOT put the analysis there.${langReminder}`,
+        };
+      }
+    }
+
     // Attach cached images to the first user message so the model has visual context
     if (hasImages) {
       const firstUserIdx = chatMessages.findIndex((m) => m.role === 'user');
@@ -895,6 +911,13 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
 
     const generator = provider.streamChat(chatMessages, chatOpts);
     for await (const chunk of generator) {
+      // Anthropic web search: reset signal means model started a new text block
+      // after searching — discard pre-search text and show only the final response.
+      if (chunk === '\x00RESET\x00') {
+        accumulated = '';
+        broadcastMessage({ type: 'CHAT_CHUNK', chunk: '', tabId });
+        continue;
+      }
       accumulated += chunk;
       const now = Date.now();
       if (now - lastChatPush >= CHAT_THROTTLE_MS) {

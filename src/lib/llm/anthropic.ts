@@ -46,6 +46,16 @@ export class AnthropicProvider implements LLMProvider {
       body.tool_choice = { type: 'tool', name: schema.name };
     }
 
+    // Add server-side web search tool
+    if (options?.webSearch) {
+      const tools = (body.tools as unknown[]) || [];
+      tools.push({ type: 'web_search_20250305', name: 'web_search', max_uses: 5 });
+      body.tools = tools;
+      // Don't force a specific tool when web search is active — Claude needs
+      // freedom to call web_search before responding with the schema tool.
+      if (options?.jsonSchema) body.tool_choice = { type: 'auto' };
+    }
+
     const timeoutController = new AbortController();
     const timer = setTimeout(() => timeoutController.abort(), 90_000);
     const signal = options?.signal
@@ -85,6 +95,15 @@ export class AnthropicProvider implements LLMProvider {
         }
       }
 
+      // Web search responses have multiple text blocks (reasoning + answer);
+      // concatenate all of them instead of taking only the first.
+      if (options?.webSearch) {
+        return (data.content || [])
+          .filter((b: Record<string, unknown>) => b.type === 'text')
+          .map((b: Record<string, unknown>) => b.text)
+          .join('') || '';
+      }
+
       return data.content?.[0]?.text || '';
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -113,6 +132,12 @@ export class AnthropicProvider implements LLMProvider {
     };
     if (system) body.system = system;
 
+    // Server-side web search — Claude decides when to search; results stream
+    // as server_tool_use / web_search_tool_result blocks (skipped by text parser).
+    if (options?.webSearch) {
+      body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }];
+    }
+
     const bodyJson = JSON.stringify(body);
     options?.onRequestBody?.(bodyJson);
 
@@ -138,6 +163,9 @@ export class AnthropicProvider implements LLMProvider {
     const decoder = new TextDecoder();
     let buffer = '';
     let accumulated = '';
+    // Track content block types so we can reset when web search produces a new text block
+    let hadSearchBlock = false;
+    let inTextBlock = false;
 
     try {
       while (true) {
@@ -155,7 +183,29 @@ export class AnthropicProvider implements LLMProvider {
 
           try {
             const parsed = JSON.parse(data);
-            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+
+            // Track block boundaries for web search responses
+            if (parsed.type === 'content_block_start') {
+              const blockType = parsed.content_block?.type;
+              if (blockType === 'text') {
+                // New text block after search — the model is rewriting its response
+                // with search results. Reset so we only keep the final text.
+                if (hadSearchBlock && options?.webSearch) {
+                  accumulated = '';
+                  yield '\x00RESET\x00';
+                }
+                inTextBlock = true;
+              } else {
+                inTextBlock = false;
+                if (blockType === 'server_tool_use' || blockType === 'web_search_tool_result') {
+                  hadSearchBlock = true;
+                }
+              }
+            } else if (parsed.type === 'content_block_stop') {
+              inTextBlock = false;
+            }
+
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text && inTextBlock) {
               accumulated += parsed.delta.text;
               yield parsed.delta.text;
             }

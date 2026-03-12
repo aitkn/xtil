@@ -30,7 +30,7 @@ export interface ChatOptions {
   jsonMode?: boolean;
   /** When set, enforce a specific JSON schema on the response (provider-specific mechanism). */
   jsonSchema?: JsonSchema;
-  /** Enable web search / grounding for providers that support it (Google, OpenAI, xAI). */
+  /** Enable web search / grounding for providers that support it (Anthropic, Google, OpenAI, xAI). */
   webSearch?: boolean;
   /** External abort signal to cancel the request (e.g. user navigated away). */
   signal?: AbortSignal;

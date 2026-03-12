@@ -4,6 +4,14 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.10
+
+**Web search for Anthropic & YouTube fixes**
+
+- Anthropic models (Claude Haiku/Sonnet/Opus) now support web search for fact-checking and research
+- Fixed web search chat responses sometimes breaking mid-stream when the model searches during a reply
+- Fixed "By ..." author metadata showing a wrong channel name on YouTube videos
+
 ## 1.1.9
 
 **YouTube transcript reliability & UX improvements**
