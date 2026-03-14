@@ -277,6 +277,7 @@ Every field value must be in the chosen output language. No mixing languages wit
   }
 
   // Netflix-specific field overrides
+  let netflixOverrides: { tldr: string; takeaways: string; summary: string; quotes: string; conclusion: string; extraSections: string } | undefined;
   if (isNetflix) {
     gProsCons = 'Set to null.';
     gComments = 'Set to null.';
@@ -313,8 +314,7 @@ Every field value must be in the chosen output language. No mixing languages wit
   - "Similar Titles" — 5-7 recommendations with explanations.`,
     };
     gExtraSections = nf.extraSections;
-    // Override the standard `d` values — we store Netflix overrides and apply them in guidelines
-    (d as any)._netflixOverrides = nf;
+    netflixOverrides = nf;
   }
 
   // Skip fields from schema+guidelines when they're just "Set to null"
@@ -403,19 +403,17 @@ Every field value must be in the chosen output language. No mixing languages wit
   const schemaFields = schema.map(f => `    ${f}`).join(',\n');
 
   // Build guidelines
-  const nfOverrides = (d as any)._netflixOverrides as { tldr: string; takeaways: string; summary: string; quotes: string; conclusion: string; extraSections: string } | undefined;
-
-  const guidelines: string[] = nfOverrides ? [
-    `- "tldr": ${nfOverrides.tldr}`,
-    `- "keyTakeaways": ${nfOverrides.takeaways}`,
-    `- "summary": ${nfOverrides.summary}`,
+  const guidelines: string[] = netflixOverrides ? [
+    `- "tldr": ${netflixOverrides.tldr}`,
+    `- "keyTakeaways": ${netflixOverrides.takeaways}`,
+    `- "summary": ${netflixOverrides.summary}`,
   ] : [
     `- "tldr": ${d.tldr}. Each sentence standalone — never one compound run-on. Bold the most critical terms.`,
     `- "keyTakeaways": ${d.takeaways} items. Each: ${d.takeawayFormat}.`,
     `- "summary": ${d.summary}. Bold key terms, names, and statistics throughout.`,
   ];
-  if (!skipQuotes) guidelines.push(`- "notableQuotes": ${nfOverrides?.quotes || d.quotes}${quotesExtra}`);
-  guidelines.push(`- "conclusion": ${nfOverrides?.conclusion || gConclusion || `${d.conclusion}.`}`);
+  if (!skipQuotes) guidelines.push(`- "notableQuotes": ${netflixOverrides?.quotes || d.quotes}${quotesExtra}`);
+  guidelines.push(`- "conclusion": ${netflixOverrides?.conclusion || gConclusion || `${d.conclusion}.`}`);
   if (!skipProsCons) guidelines.push(`- "prosAndCons": ${gProsCons}`);
   if (factCheckGuideline) guidelines.push(factCheckGuideline);
   if (!skipComments) guidelines.push(`- "commentsHighlights": ${gComments}`);

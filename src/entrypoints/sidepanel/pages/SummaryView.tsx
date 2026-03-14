@@ -113,7 +113,7 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
                       color: 'var(--md-sys-color-on-surface)',
                       padding: '3px 0',
                       borderBottom: '1px solid var(--md-sys-color-outline-variant)',
-                    }}><NetflixInfoValue text={value} /></span>
+                    }}><NetflixInfoValue text={value} label={label} /></span>
                   </Fragment>
                 );
               })}
@@ -672,17 +672,19 @@ const badgeStyle = (colors: { bg: string; fg: string }) => ({
 });
 
 /** Render text with color-coded badges for content ratings & review scores. */
-function NetflixInfoValue({ text }: { text: string }) {
+function NetflixInfoValue({ text, label }: { text: string; label?: string }) {
   // Split text into segments, replacing known patterns with badges
   const parts: preact.ComponentChildren[] = [];
   let key = 0;
 
-  // Content ratings: TV-MA, TV-14, PG-13, R, etc.
-  // Review scores: IMDb 7.8/10, Rotten Tomatoes 85%, Metacritic 72/100, etc.
+  // Only match standalone R/G when the label indicates a rating context
+  const isRatingLabel = /rating|rated/i.test(label || '');
+
   const badgePatterns = [
-    // Content ratings — all safe in Netflix Show Info context
+    // Content ratings — hyphenated ones are always unambiguous
     { re: /\b(TV-MA|TV-14|TV-PG|TV-G|TV-Y7|TV-Y|NC-17|PG-13|PG|NR|UR)\b/g, type: 'content' as const },
-    { re: /\b(R|G)\b/g, type: 'content' as const },
+    // Standalone R/G only in rating-labeled rows to avoid false positives
+    ...(isRatingLabel ? [{ re: /\b(R|G)\b/g, type: 'content' as const }] : []),
     // IMDb ~x.x/10 or x/10 or just IMDb x.x (with optional ~, approx, etc.)
     { re: /\bIMDb\s*[~≈]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*10)?\b/gi, type: 'imdb' as const },
     // Rotten Tomatoes / RT xx%
@@ -707,8 +709,9 @@ function NetflixInfoValue({ text }: { text: string }) {
         badges.push({ start: m.index, end: m.index + m[0].length, node: <span key={key++} style={badgeStyle(colors)}>IMDb {m[1]}/10</span> });
       } else if (type === 'rt') {
         const val = parseInt(m[1], 10);
-        const colors = scoreColor(val, 100);
-        badges.push({ start: m.index, end: m.index + m[0].length, node: <span key={key++} style={{ ...badgeStyle(colors), backgroundColor: val >= 60 ? '#d32f2f' : '#546e7a' }}>🍅 {m[1]}%</span> });
+        // RT uses "fresh" (>=60%) = red tomato, "rotten" (<60%) = grey-green
+        const rtColors = { bg: val >= 60 ? '#d32f2f' : '#546e7a', fg: '#fff' };
+        badges.push({ start: m.index, end: m.index + m[0].length, node: <span key={key++} style={badgeStyle(rtColors)}>🍅 {m[1]}%</span> });
       } else if (type === 'meta') {
         const val = parseInt(m[1], 10);
         const colors = scoreColor(val, 100);
@@ -723,6 +726,7 @@ function NetflixInfoValue({ text }: { text: string }) {
   badges.sort((a, b) => a.start - b.start);
   let pos = 0;
   for (const b of badges) {
+    if (b.start < pos) continue; // skip overlapping matches
     if (b.start > pos) {
       const seg = text.slice(pos, b.start);
       parts.push(<InlineMarkdown key={key++} text={seg} />);
