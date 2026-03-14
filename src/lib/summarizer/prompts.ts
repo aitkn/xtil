@@ -192,8 +192,9 @@ Every field value must be in the chosen output language. No mixing languages wit
 
   // Content-type-aware field exclusions
   const isGitHub = contentType === 'github';
+  const isNetflix = contentType === 'netflix';
   const skipQuotes = isGitHub;
-  const skipFactCheck = isGitHub;
+  const skipFactCheck = isGitHub || isNetflix;
 
   // Apply GitHub-specific field guidelines — replace generic instructions with page-type-specific ones
   // (moves field overrides from user prompt into system prompt for clarity and token savings)
@@ -273,6 +274,47 @@ Every field value must be in the chosen output language. No mixing languages wit
             : 'Include "What\'s New", "Breaking Changes" (if any), "Bug Fixes", and "Migration Notes" (if applicable).';
         break;
     }
+  }
+
+  // Netflix-specific field overrides
+  if (isNetflix) {
+    gProsCons = 'Set to null.';
+    gComments = 'Set to null.';
+    const nf = detailLevel === 'brief' ? {
+      tldr: 'Spoiler-free overview: genre, tone, premise. 2-3 sentences. Include year, director/showrunner, and lead cast names inline. Do NOT reveal plot twists or endings.',
+      takeaways: '3-5 items. Each: "**Label** — explanation". Use for: show metadata (year, content rating like TV-MA/PG-13/R, genre), main themes, tone/mood, notable aspects. Keep spoiler-free.',
+      summary: 'Brief spoiler-free synopsis only — what the show/movie is about without revealing key plot points. 2-3 sentences.',
+      quotes: 'Set to null.',
+      conclusion: '1-2 sentences — overall impression, who would enjoy this.',
+      extraSections: 'Set to null.',
+    } : detailLevel === 'standard' ? {
+      tldr: 'Spoiler-free overview: genre, tone, premise, year, director/showrunner, lead cast. 2-3 sentences. Do NOT reveal plot twists or endings.',
+      takeaways: '5-7 items. Each: "**Label** — explanation". Include: year/seasons, director/showrunner, main cast (actor as Character), genre, content rating (TV-MA/PG-13/R etc.), review scores (IMDb/RT if known), key themes. Keep spoiler-free.',
+      summary: 'FULL PLOT SUMMARY with spoilers. Include all major plot points, twists, and resolution. Structure with ### subheadings for acts/major sequences. This section WILL be hidden behind a spoiler warning in the UI.',
+      quotes: '3-5 memorable lines of dialogue with timestamps.',
+      conclusion: '2-3 sentences — critical assessment, thematic significance, who would enjoy this.',
+      extraSections: `Include these sections IN THIS ORDER:
+  - "[SPOILER] Condensed Script" — Rewrite the transcript as a condensed play script. Include key dialogue (with character names in bold), brief stage directions in italics, and emotional beats. Omit repetitive/filler dialogue but preserve the dramatic flow. Target ~40% of original transcript length. Add "(more)" at the end to indicate a longer version is available in Detailed mode.
+  - "Cast & Characters" — List main characters as "**Actor Name** as **Character Name** — brief role description from what we see". Use your knowledge of the cast.
+  - "Themes" — Major themes explored, with brief analysis.
+  - "Similar Titles" — 4-5 similar shows/movies with brief explanations of why they're similar.`,
+    } : /* detailed */ {
+      tldr: 'Spoiler-free overview: genre, tone, premise, year, director/showrunner, lead cast, awards/acclaim. 3-4 sentences. Do NOT reveal plot twists.',
+      takeaways: '7-10 items covering: year/seasons, director/showrunner/writer, full main cast (actor as Character), genre/subgenre, content rating (TV-MA/PG-13/R etc.), review scores (IMDb/RT if known), awards, production notes, key themes. Spoiler-free.',
+      summary: 'COMPREHENSIVE PLOT SUMMARY with full spoilers. Cover every significant scene, character arc, twist, and the resolution. Use ### subheadings for acts/major sequences. Include emotional beats and character motivations. This section WILL be hidden behind a spoiler warning.',
+      quotes: '5-10 memorable or significant lines of dialogue with timestamps.',
+      conclusion: '3-5 sentences — critical assessment, thematic depth, cultural significance, comparison to similar works.',
+      extraSections: `Include these sections IN THIS ORDER:
+  - "[SPOILER] Condensed Script" — Rewrite the FULL transcript as a condensed play script. Format: character names in **bold**, stage directions and scene descriptions in *italics*, key dialogue preserved verbatim where impactful. Compress mundane exchanges but keep ALL dramatically significant scenes. Target ~60% of original transcript length. This should read as an enjoyable, aesthetically pleasant dramatic text.
+  - "Cast & Characters" — Detailed list: "**Actor Name** as **Character Name** — character description, arc, relationships". Use your knowledge of the cast and what we see in the transcript.
+  - "Themes & Analysis" — In-depth thematic analysis: major themes, symbolism, cultural references, narrative techniques.
+  - "Show Context" — Where this fits in the series (if TV): season arc, connections to other episodes, cliffhangers, character development across the season. For movies: place in director's filmography, genre context.
+  - "Reception" — Critical and audience reception, awards, notable reviews. Use your knowledge; note if information may be outdated.
+  - "Similar Titles" — 5-7 recommendations with explanations.`,
+    };
+    gExtraSections = nf.extraSections;
+    // Override the standard `d` values — we store Netflix overrides and apply them in guidelines
+    (d as any)._netflixOverrides = nf;
   }
 
   // Skip fields from schema+guidelines when they're just "Set to null"
@@ -361,20 +403,27 @@ Every field value must be in the chosen output language. No mixing languages wit
   const schemaFields = schema.map(f => `    ${f}`).join(',\n');
 
   // Build guidelines
-  const guidelines: string[] = [
+  const nfOverrides = (d as any)._netflixOverrides as { tldr: string; takeaways: string; summary: string; quotes: string; conclusion: string; extraSections: string } | undefined;
+
+  const guidelines: string[] = nfOverrides ? [
+    `- "tldr": ${nfOverrides.tldr}`,
+    `- "keyTakeaways": ${nfOverrides.takeaways}`,
+    `- "summary": ${nfOverrides.summary}`,
+  ] : [
     `- "tldr": ${d.tldr}. Each sentence standalone — never one compound run-on. Bold the most critical terms.`,
     `- "keyTakeaways": ${d.takeaways} items. Each: ${d.takeawayFormat}.`,
     `- "summary": ${d.summary}. Bold key terms, names, and statistics throughout.`,
   ];
-  if (!skipQuotes) guidelines.push(`- "notableQuotes": ${d.quotes}${quotesExtra}`);
-  guidelines.push(`- "conclusion": ${gConclusion || `${d.conclusion}.`}`);
+  if (!skipQuotes) guidelines.push(`- "notableQuotes": ${nfOverrides?.quotes || d.quotes}${quotesExtra}`);
+  guidelines.push(`- "conclusion": ${nfOverrides?.conclusion || gConclusion || `${d.conclusion}.`}`);
   if (!skipProsCons) guidelines.push(`- "prosAndCons": ${gProsCons}`);
   if (factCheckGuideline) guidelines.push(factCheckGuideline);
   if (!skipComments) guidelines.push(`- "commentsHighlights": ${gComments}`);
-  guidelines.push(`- "relatedTopics": ${d.relatedTopics} topics.`);
+  if (!isNetflix) guidelines.push(`- "relatedTopics": ${d.relatedTopics} topics.`);
+  else guidelines.push(`- "relatedTopics": Similar shows/movies — ${d.relatedTopics} recommendations with brief reason why they're similar.`);
   if (!skipExtraSections) guidelines.push(`- "extraSections": ${gExtraSections}`);
   guidelines.push(
-    `- "tags": ${d.tags} short, lowercase tags.`,
+    `- "tags": ${d.tags} short, lowercase tags.` + (isNetflix ? ' Include genre, mood, and content warnings.' : ''),
     `- "sourceLanguage" must be the ISO 639-1 code of the language the MAJORITY of the original content is written in (e.g. "en", "ru", "fr"). A few foreign words, proper names, or technical terms do not change the source language — only the dominant language of the body text counts.`,
     `- "summaryLanguage" must be the ISO 639-1 code of the language you actually wrote the summary in. It must match the output language you chose in the LANGUAGE RULE (Step 2) at the top.`,
   );
@@ -402,7 +451,9 @@ Every field value must be in the chosen output language. No mixing languages wit
     `- IMPORTANT: If the user's additional instructions explicitly ask you NOT to summarize, or say they only want to ask questions / chat about the content, RESPECT their request. Respond with: {"text": "Your conversational response here"}. Do NOT include "summary" in this case.`,
   );
 
-  const role = isGitHub ? 'an expert software engineer and content summarizer' : 'an expert content summarizer';
+  const role = isGitHub ? 'an expert software engineer and content summarizer'
+    : isNetflix ? 'an expert film/TV critic and content summarizer with deep knowledge of cinema, television, actors, directors, and entertainment industry'
+    : 'an expert content summarizer';
 
   // Build a short, punchy language reminder for the very end of the prompt (recency bias)
   let langReminder: string;
@@ -444,6 +495,7 @@ Image Analysis Instructions:
 export function getSummarizationPrompt(content: ExtractedContent, detailLevel: 'brief' | 'standard' | 'detailed' = 'standard'): string {
   const isDiscussion = ['reddit', 'twitter', 'linkedin'].includes(content.type);
   const contentLabel = content.type === 'youtube' ? 'YouTube video'
+    : content.type === 'netflix' ? 'Netflix video (transcript from closed captions)'
     : content.type === 'reddit' ? 'Reddit discussion'
     : content.type === 'twitter' ? 'X thread'
     : content.type === 'linkedin' ? 'LinkedIn post'
@@ -463,6 +515,18 @@ export function getSummarizationPrompt(content: ExtractedContent, detailLevel: '
 
   if (content.type === 'youtube') {
     prompt += `\n**IMPORTANT — Timestamp Links:** When referencing specific moments, include clickable timestamp links using this exact format: [MM:SS]({{VIDEO_URL}}&t=SECONDS) (e.g. [2:15]({{VIDEO_URL}}&t=135)). Use them in any section for key moments, notable quotes, and important transitions — but don't overdo it, only where they add genuine value.\n`;
+  }
+  if (content.type === 'netflix') {
+    prompt += `\n**IMPORTANT — Netflix Content:** This is a transcript from Netflix closed captions. Use your general knowledge to enrich the summary with:
+- Full cast information (actor names → character names)
+- Director, showrunner, writers
+- Release year, number of seasons/episodes
+- Critical reception (IMDb, Rotten Tomatoes scores if you know them)
+- Awards and nominations
+- Cultural context and genre classification
+The transcript is dialogue-only — infer scene descriptions, emotions, and context from the dialogue.
+Sections with titles starting with "[SPOILER]" will be hidden behind a spoiler warning in the UI — include full spoilers freely in those sections. The "[SPOILER]" prefix will be stripped from the displayed title.
+**Netflix Links:** In "Cast & Characters", make each actor name a Netflix search link: [Actor Name](https://www.netflix.com/search?q=Actor%20Name). In "Similar Titles", make each title a Netflix search link: [Title](https://www.netflix.com/search?q=Title). This lets users quickly find related content on Netflix. IMPORTANT: Never translate names or titles inside link URLs — always use the original (usually English/romanized) name in the URL query parameter, even when the summary is written in another language.\n`;
   }
   if (content.subreddit) prompt += `**Subreddit:** r/${content.subreddit}\n`;
   if (content.postScore !== undefined) prompt += `**Post Score:** ${content.postScore}\n`;
