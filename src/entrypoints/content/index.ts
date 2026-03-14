@@ -134,15 +134,23 @@ export default defineContentScript({
         }
 
         if (msg.type === 'SEEK_VIDEO') {
+          const seconds = (msg as { seconds: number }).seconds;
+          // Netflix: use player API via bridge (direct video.currentTime crashes DRM)
+          if (window.location.hostname.includes('netflix.com')) {
+            netflixBridgeRequest('seek', { seconds })
+              .then(() => sendResponse({ success: true }))
+              .catch(() => sendResponse({ success: false, error: 'Netflix seek failed' }));
+            return true;
+          }
           const video = document.querySelector('video');
           if (video) {
-            video.currentTime = (msg as { seconds: number }).seconds;
+            video.currentTime = seconds;
             video.play().catch(() => {});
             sendResponse({ success: true });
           } else {
             sendResponse({ success: false, error: 'No video element found' });
           }
-          return;
+          return true;
         }
 
         if (msg.type === 'FETCH_TRANSCRIPT') {

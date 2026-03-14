@@ -544,6 +544,7 @@ export function App() {
 
       // Check if this is a same-video YouTube timestamp link
       const cur = contentRef.current;
+      // YouTube timestamp links: seek the player
       if (cur?.type === 'youtube') {
         const linkVideoId = href.match(YT_VIDEO_RE)?.[1];
         const curVideoId = cur.url.match(YT_VIDEO_RE)?.[1];
@@ -560,7 +561,20 @@ export function App() {
           }
         }
       }
+      // Netflix timestamp links: seek the player
+      if (cur?.type === 'netflix' && href.includes('netflix.com')) {
+        const tMatch = href.match(/[?&]t=(\d+)/);
+        console.log('[xTil] useEffect handler - Netflix:', { href, tMatch: tMatch?.[1] });
+        if (tMatch) {
+          const seconds = parseInt(tMatch[1], 10);
+          if (!isNaN(seconds)) {
+            sendMessage({ type: 'SEEK_VIDEO', seconds } as SeekVideoMessage).catch(() => {});
+            return;
+          }
+        }
+      }
 
+      console.log('[xTil] useEffect handler - fallthrough to window.open:', href);
       window.open(href, '_blank', 'noopener,noreferrer');
     };
     document.addEventListener('click', handler);
@@ -1453,6 +1467,19 @@ export function App() {
             }
           }
         } catch { /* malformed URL — fall through */ }
+      }
+    }
+
+    // Netflix timestamp links: seek the player
+    if (cur?.type === 'netflix' && url.includes('netflix.com')) {
+      const tMatch = url.match(/[?&]t=(\d+)/);
+      console.log('[xTil] handleNavigate - Netflix:', { url, tMatch: tMatch?.[1] });
+      if (tMatch) {
+        const seconds = parseInt(tMatch[1], 10);
+        if (!isNaN(seconds)) {
+          sendMessage({ type: 'SEEK_VIDEO', seconds } as SeekVideoMessage).catch(() => {});
+          return;
+        }
       }
     }
 

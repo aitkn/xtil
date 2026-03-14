@@ -524,7 +524,8 @@ export function getSummarizationPrompt(content: ExtractedContent, detailLevel: '
 - Cultural context and genre classification
 The transcript is dialogue-only — infer scene descriptions, emotions, and context from the dialogue.
 Sections with titles starting with "[SPOILER]" will be hidden behind a spoiler warning in the UI — include full spoilers freely in those sections. The "[SPOILER]" prefix will be stripped from the displayed title.
-**Netflix Links:** In "Cast & Characters", make each actor name a Netflix search link: [Actor Name](https://www.netflix.com/search?q=Actor%20Name). In "Similar Titles", make each title a Netflix search link: [Title](https://www.netflix.com/search?q=Title). This lets users quickly find related content on Netflix. IMPORTANT: Never translate names or titles inside link URLs — always use the original (usually English/romanized) name in the URL query parameter, even when the summary is written in another language.\n`;
+**Netflix Links:** In "Cast & Characters", make each actor name a Netflix search link: [Actor Name](https://www.netflix.com/search?q=Actor%20Name). In "Similar Titles", make each title a Netflix search link: [Title](https://www.netflix.com/search?q=Title). This lets users quickly find related content on Netflix. IMPORTANT: Never translate names or titles inside link URLs — always use the original (usually English/romanized) name in the URL query parameter, even when the summary is written in another language.
+**Timestamp Links:** When referencing specific moments (notable dialogue, key scenes), include clickable timestamp links using this exact format: [MM:SS]({{VIDEO_URL}}&t=SECONDS) (e.g. [2:15]({{VIDEO_URL}}&t=135)). Clicking these will seek the Netflix player to that moment.\n`;
   }
   if (content.subreddit) prompt += `**Subreddit:** r/${content.subreddit}\n`;
   if (content.postScore !== undefined) prompt += `**Post Score:** ${content.postScore}\n`;
