@@ -2569,6 +2569,9 @@ function ContentIndicators({ content, settings }: { content: ExtractedContent; s
   const hasTranscriptError = content.content.includes('*Transcript could not be loaded:');
   const transcriptLoaded = isYouTube && !hasTranscriptMarker && !hasTranscriptError;
 
+  const hasVideoTranscript = !isYouTube && (content.transcriptWordCount ?? 0) > 0;
+  const articleOnlyWords = hasVideoTranscript ? content.wordCount - content.transcriptWordCount! : content.wordCount;
+
   const commentWords = content.comments
     ? content.comments.reduce((sum, c) => sum + c.text.split(/\s+/).length, 0)
     : 0;
@@ -2596,6 +2599,17 @@ function ContentIndicators({ content, settings }: { content: ExtractedContent; s
             : content.content.includes('mobile YouTube') ? 'No transcript \u2014 switch to YouTube desktop version' : 'No transcript'}
           variant={transcriptLoaded ? 'success' : 'warning'}
         />
+      ) : hasVideoTranscript ? (
+        <>
+          {articleOnlyWords > 50 && (
+            <IndicatorChip icon={'\u2713'} label={`${articleOnlyWords.toLocaleString()} words`} variant="success" />
+          )}
+          <IndicatorChip
+            icon={'\u2713'}
+            label={`Transcript \u00B7 ${content.transcriptWordCount!.toLocaleString()} words`}
+            variant="success"
+          />
+        </>
       ) : (
         <IndicatorChip icon={'\u2713'} label={`${content.wordCount.toLocaleString()} words`} variant="success" />
       )}

@@ -4,6 +4,19 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.11
+
+**Video transcript extraction beyond YouTube**
+
+- Extract closed captions from Cloudflare Stream videos (used by many media and corporate sites)
+- Extract captions from Vimeo videos (supports multi-language track selection)
+- Extract subtitles from Dailymotion videos
+- Extract captions from X/Twitter video posts with auto-generated CC
+- Generic HTML5 video caption support — works on any site with standard subtitle tracks
+- New "Transcript" indicator chip shows when video captions were captured on non-YouTube pages
+- Smart language selection uses the same preferences across all video platforms
+- Updated Claude Opus 4.6 and Sonnet 4.6 context windows to 1M tokens
+
 ## 1.1.10
 
 **Web search for Anthropic & YouTube fixes**

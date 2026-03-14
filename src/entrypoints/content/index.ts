@@ -3,6 +3,11 @@ import { extractComments } from '@/lib/extractors/comments';
 import { isFacebookPostContext, extractVisibleComments } from '@/lib/extractors/facebook';
 import type { ExtractedContent } from '@/lib/extractors/types';
 import type { ExtractResultMessage, Message } from '@/lib/messaging/types';
+import { pickBestTrack, type CaptionTrack } from '@/lib/transcript-lang';
+import { detectCloudflareStreamVideo, fetchCloudflareStreamTranscript } from '@/lib/cloudflare-stream';
+import { detectVimeoVideo, fetchVimeoTranscript } from '@/lib/vimeo';
+import { detectDailymotionVideo, fetchDailymotionTranscript } from '@/lib/dailymotion';
+import { detectHTML5VideoWithTracks, fetchHTML5VideoTranscript } from '@/lib/html5-video';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -200,126 +205,100 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
     }
   }
 
+  // Resolve video transcript from embedded players (non-YouTube)
+  if (content.type !== 'youtube') {
+    const transcript = await fetchEmbeddedVideoTranscript(document, window.location.href, langPrefs, summaryLang);
+    if (transcript) {
+      content.transcriptWordCount = transcript.split(/\s+/).filter(Boolean).length;
+      content.content += `\n\n## Transcript\n\n${transcript}`;
+      content.wordCount = content.content.split(/\s+/).filter(Boolean).length;
+    }
+  }
+
   return content;
-}
-
-// --- Language family constants for closeness heuristic ---
-const LATIN_LANGS = ['en', 'es', 'fr', 'de', 'pt'];
-const SLAVIC_LANGS = ['ru'];
-const CJK_LANGS = ['zh', 'ja', 'ko'];
-// Popularity order for final tiebreaking
-const POPULARITY_ORDER = ['en', 'es', 'fr', 'de', 'pt', 'ru', 'zh', 'ja', 'ko'];
-
-type CaptionTrack = {
-  baseUrl: string;
-  languageCode: string;
-  kind?: string;
-  name?: { simpleText?: string };
-};
-
-function langFamily(code: string): 'latin' | 'slavic' | 'cjk' | 'other' {
-  const base = code.split('-')[0].toLowerCase();
-  if (LATIN_LANGS.includes(base)) return 'latin';
-  if (SLAVIC_LANGS.includes(base)) return 'slavic';
-  if (CJK_LANGS.includes(base)) return 'cjk';
-  return 'other';
-}
-
-function familyDistance(a: string, b: string): number {
-  const fa = langFamily(a);
-  const fb = langFamily(b);
-  if (fa === fb) return 0;
-  if (fa === 'other' || fb === 'other') return 2;
-  // Latin ↔ Slavic = 1, either ↔ CJK = 2
-  if ((fa === 'latin' && fb === 'slavic') || (fa === 'slavic' && fb === 'latin')) return 1;
-  return 2;
-}
-
-function popularityRank(code: string): number {
-  const base = code.split('-')[0].toLowerCase();
-  const idx = POPULARITY_ORDER.indexOf(base);
-  return idx >= 0 ? idx : POPULARITY_ORDER.length;
-}
-
-/**
- * Pick the best caption track based on user language preferences.
- *
- * Algorithm:
- * 1. Filter to tracks matching langPrefs (languages user understands)
- * 2. Tiebreak: prefer video's original language, then summaryLang, then closeness/popularity
- * 3. Within chosen language, prefer manual (non-ASR) over auto-generated
- * 4. Fallback: YouTube's default track, then first manual, then first
- */
-function pickBestTrack(
-  tracks: CaptionTrack[],
-  langPrefs?: string[],
-  summaryLang?: string,
-  originalLang?: string,
-  defaultTrackIndex?: number,
-): CaptionTrack {
-  if (tracks.length === 1) return tracks[0];
-
-  // Normalize lang codes to base (e.g. "en-US" → "en")
-  const baseCode = (c: string) => c.split('-')[0].toLowerCase();
-
-  // Step 1: filter to tracks matching langPrefs
-  if (langPrefs?.length) {
-    const prefBases = new Set(langPrefs.map(baseCode));
-    const matched = tracks.filter(t => prefBases.has(baseCode(t.languageCode)));
-
-    if (matched.length === 1) {
-      // Single match — prefer manual within it
-      return preferManual(matched);
-    }
-
-    if (matched.length > 1) {
-      // Step 2: tiebreak multiple matches
-      // Group by base language code
-      const byLang = new Map<string, CaptionTrack[]>();
-      for (const t of matched) {
-        const b = baseCode(t.languageCode);
-        if (!byLang.has(b)) byLang.set(b, []);
-        byLang.get(b)!.push(t);
-      }
-      const langCodes = [...byLang.keys()];
-
-      // Prefer video's original language
-      if (originalLang && langCodes.includes(baseCode(originalLang))) {
-        return preferManual(byLang.get(baseCode(originalLang))!);
-      }
-      // Prefer summaryLang
-      if (summaryLang && summaryLang !== 'auto' && langCodes.includes(baseCode(summaryLang))) {
-        return preferManual(byLang.get(baseCode(summaryLang))!);
-      }
-      // Closeness to summaryLang, then popularity
-      const refLang = (summaryLang && summaryLang !== 'auto') ? summaryLang : 'en';
-      langCodes.sort((a, b) => {
-        const distDiff = familyDistance(a, refLang) - familyDistance(b, refLang);
-        if (distDiff !== 0) return distDiff;
-        return popularityRank(a) - popularityRank(b);
-      });
-      return preferManual(byLang.get(langCodes[0])!);
-    }
-  }
-
-  // Step 4: no langPrefs match — fallback
-  // YouTube's default track index
-  if (defaultTrackIndex != null && defaultTrackIndex >= 0 && defaultTrackIndex < tracks.length) {
-    return tracks[defaultTrackIndex];
-  }
-  // First manual track, then first track
-  return preferManual(tracks);
-}
-
-/** Within a set of tracks, prefer manual (non-ASR) over auto-generated. */
-function preferManual(tracks: CaptionTrack[]): CaptionTrack {
-  return tracks.find(t => t.kind !== 'asr') || tracks[0];
 }
 
 /**
  * Send a bridge request via postMessage and wait for a typed response.
  * Returns null if the bridge is unavailable (e.g., MAIN world not supported).
  */
+/**
+ * Filter out invisible/stale video elements from a root.
+ * X/Twitter keeps old video elements in the DOM after SPA navigation.
+ * Returns a wrapper element containing only visible videos, or the
+ * original root if no filtering is needed.
+ */
+function findVideoRoot(doc: Document, _url: string): Document | Element {
+  // Only filter on X/Twitter where stale SPA videos are a problem
+  if (!/(twitter\.com|x\.com)/.test(doc.location?.hostname || '')) return doc;
+
+  // Find the video that's actually visible in the viewport
+  const videos = doc.querySelectorAll('video');
+  for (const video of videos) {
+    const rect = video.getBoundingClientRect();
+    // Must have non-zero dimensions and be at least partially in viewport
+    if (rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight) {
+      // Scope to this video's closest article (tweet container)
+      const article = video.closest('article');
+      if (article) return article;
+    }
+  }
+
+  // No visible video — return empty element
+  return doc.createElement('div');
+}
+
+/**
+ * Try to extract a transcript from an embedded video player on the page.
+ * Checks: Cloudflare Stream, Vimeo, Dailymotion, then generic HTML5 <video>.
+ * Returns null if no supported video or no captions found.
+ */
+async function fetchEmbeddedVideoTranscript(
+  doc: Document,
+  url: string,
+  langPrefs?: string[],
+  summaryLang?: string,
+): Promise<string | null> {
+  // Cloudflare Stream
+  const cfVideoId = detectCloudflareStreamVideo(doc);
+  if (cfVideoId) {
+    try {
+      const t = await fetchCloudflareStreamTranscript(cfVideoId, langPrefs, summaryLang);
+      if (t) return t;
+    } catch { /* fall through */ }
+  }
+
+  // Vimeo
+  const vimeo = detectVimeoVideo(url, doc);
+  if (vimeo) {
+    try {
+      const t = await fetchVimeoTranscript(vimeo.videoId, langPrefs, summaryLang, vimeo.hash);
+      if (t) return t;
+    } catch { /* fall through */ }
+  }
+
+  // Dailymotion
+  const dmVideoId = detectDailymotionVideo(url, doc);
+  if (dmVideoId) {
+    try {
+      const t = await fetchDailymotionTranscript(dmVideoId, langPrefs, summaryLang);
+      if (t) return t;
+    } catch { /* fall through */ }
+  }
+
+  // Generic HTML5 <video> with <track> elements (last — catches everything else)
+  // On X/Twitter, scope to the focal tweet's article to avoid picking up other videos
+  const videoRoot = findVideoRoot(doc, url);
+  if (detectHTML5VideoWithTracks(videoRoot)) {
+    try {
+      const t = await fetchHTML5VideoTranscript(videoRoot, langPrefs, summaryLang);
+      if (t) return t;
+    } catch { /* fall through */ }
+  }
+
+  return null;
+}
+
 let bridgeAvailable = true; // false after first timeout — skip bridge on subsequent calls
 function bridgeRequest<T>(
   requestType: string,

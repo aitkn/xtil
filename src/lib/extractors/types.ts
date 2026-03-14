@@ -31,6 +31,9 @@ export interface ExtractedContent {
   issueState?: 'open' | 'closed';
   repoStars?: number;
 
+  // Video transcript (non-YouTube: CF Stream, Vimeo, Dailymotion, HTML5)
+  transcriptWordCount?: number;
+
   // Comments
   comments?: ExtractedComment[];
 
