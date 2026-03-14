@@ -213,7 +213,6 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
   if (nfMarkerIndex !== -1) {
     const nfEndIndex = content.content.indexOf(']', nfMarkerIndex + nfMarker.length);
     if (nfEndIndex !== -1) {
-      const nfVideoId = content.content.slice(nfMarkerIndex + nfMarker.length, nfEndIndex);
       try {
         const result = await fetchNetflixTranscript(langPrefs, summaryLang);
         // Update title & metadata from bridge info

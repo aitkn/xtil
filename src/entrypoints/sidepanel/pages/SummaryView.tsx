@@ -675,7 +675,6 @@ const badgeStyle = (colors: { bg: string; fg: string }) => ({
 function NetflixInfoValue({ text }: { text: string }) {
   // Split text into segments, replacing known patterns with badges
   const parts: preact.ComponentChildren[] = [];
-  let remaining = text;
   let key = 0;
 
   // Content ratings: TV-MA, TV-14, PG-13, R, etc.

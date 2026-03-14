@@ -1542,14 +1542,9 @@ export function App() {
     // For video content (Netflix, YouTube), open external links in a new tab
     // to avoid navigating away from the video
     if (cur && (cur.type === 'netflix' || cur.type === 'youtube')) {
-      try {
-        const linkHost = new URL(url).hostname;
-        const curHost = new URL(cur.url).hostname;
-        // Same host (e.g. netflix.com search) or different — open new tab either way
-        // Only exception: YouTube same-video timestamp links (handled above)
-        chromeObj.tabs.create({ url });
-        return;
-      } catch { /* fall through */ }
+      // Open in new tab — YouTube timestamp links are already handled above
+      chromeObj.tabs.create({ url });
+      return;
     }
 
     chromeObj.tabs.update(tabId, { url });
