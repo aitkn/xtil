@@ -89,9 +89,11 @@ export default defineContentScript({
       if (detail.type === 'seek') {
         try {
           const nf = (window as any).netflix;
+          if (!nf?.appContext?.state?.playerApp) throw new Error('Netflix player not available');
           const api = nf.appContext.state.playerApp.getAPI();
           const vp = api.videoPlayer;
           const sessions = vp.getAllPlayerSessionIds();
+          if (sessions.length === 0) throw new Error('No active player session');
           const player = vp.getVideoPlayerBySessionId(sessions[0]);
           // Netflix player seek expects milliseconds
           player.seek(detail.seconds * 1000);

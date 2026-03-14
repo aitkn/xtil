@@ -564,7 +564,6 @@ export function App() {
       // Netflix timestamp links: seek the player
       if (cur?.type === 'netflix' && href.includes('netflix.com')) {
         const tMatch = href.match(/[?&]t=(\d+)/);
-        console.log('[xTil] useEffect handler - Netflix:', { href, tMatch: tMatch?.[1] });
         if (tMatch) {
           const seconds = parseInt(tMatch[1], 10);
           if (!isNaN(seconds)) {
@@ -574,7 +573,6 @@ export function App() {
         }
       }
 
-      console.log('[xTil] useEffect handler - fallthrough to window.open:', href);
       window.open(href, '_blank', 'noopener,noreferrer');
     };
     document.addEventListener('click', handler);
@@ -1473,7 +1471,6 @@ export function App() {
     // Netflix timestamp links: seek the player
     if (cur?.type === 'netflix' && url.includes('netflix.com')) {
       const tMatch = url.match(/[?&]t=(\d+)/);
-      console.log('[xTil] handleNavigate - Netflix:', { url, tMatch: tMatch?.[1] });
       if (tMatch) {
         const seconds = parseInt(tMatch[1], 10);
         if (!isNaN(seconds)) {
