@@ -5,6 +5,15 @@ import { GoogleProvider } from './google';
 
 export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
   {
+    id: 'xai',
+    name: 'xAI (Grok)',
+    defaultEndpoint: 'https://api.x.ai',
+    defaultContextWindow: 128000,
+    apiKeyUrl: 'https://console.x.ai/',
+    supportsVision: true,
+    description: 'Fast, web search, great quality (Recommended)',
+  },
+  {
     id: 'openai',
     name: 'OpenAI',
     defaultEndpoint: 'https://api.openai.com',
@@ -30,15 +39,6 @@ export const PROVIDER_DEFINITIONS: ProviderDefinition[] = [
     apiKeyUrl: 'https://aistudio.google.com/apikey',
     supportsVision: true,
     description: 'Huge 1M token context window',
-  },
-  {
-    id: 'xai',
-    name: 'xAI (Grok)',
-    defaultEndpoint: 'https://api.x.ai',
-    defaultContextWindow: 128000,
-    apiKeyUrl: 'https://console.x.ai/',
-    supportsVision: true,
-    description: 'Fast inference speed',
   },
   {
     id: 'deepseek',

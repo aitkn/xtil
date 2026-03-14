@@ -16,6 +16,8 @@ export const netflixExtractor: ContentExtractor = {
     // For now, use a placeholder that gets replaced.
     const title = 'Netflix Video';
 
+    // Thumbnail extracted later via Netflix bridge API + DOM fallback (in content script)
+
     const content = `# ${title}\n\n## Transcript\n\n[Transcript available - fetching...]\n\n[NETFLIX_TRANSCRIPT:${videoId}]`;
     const wordCount = content.split(/\s+/).filter(Boolean).length;
 

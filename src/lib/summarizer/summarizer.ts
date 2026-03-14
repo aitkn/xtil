@@ -12,6 +12,8 @@ import {
   getFinalChunkPrompt,
   formatCommentsBlock,
 } from './prompts';
+import { classifyGenre, directMapGenre, type ClassificationResult } from './classifier';
+import type { Genre } from './genres';
 
 /** Thrown when the LLM returns a text response instead of structured JSON (e.g. refusal). Not retryable. */
 export class LLMTextResponse extends Error {
@@ -64,6 +66,8 @@ export interface SummarizeOptions {
   onStreamChunk?: (accumulated: string) => void;
   /** Called when rolling context starts processing a new content chunk. */
   onChunkProgress?: (chunkIndex: number, totalChunks: number) => void;
+  /** Called after genre classification completes (before summarization). */
+  onGenreClassified?: (result: ClassificationResult) => void;
 }
 
 /** Build the full system prompt for summarization (includes skill catalog when appropriate). */
@@ -76,8 +80,10 @@ export function buildSummarizationSystemPrompt(
   contentType?: string,
   githubPageType?: string,
   userInstructions?: string,
+  genre?: Genre,
+  isVideo = false,
 ): string {
-  let systemPrompt = getSystemPrompt(detailLevel, language, languageExcept, hasImages, wordCount, contentType, githubPageType);
+  let systemPrompt = getSystemPrompt(detailLevel, language, languageExcept, hasImages, wordCount, contentType, githubPageType, genre, isVideo);
 
   if (userInstructions) {
     systemPrompt += `\n\nUSER AUTHORITY: The user's additional instructions below are the highest-priority instructions. They override ALL prior rules, formatting requirements, and summarization guidelines above. The user has full authority to change the topic, skip the summary, request something completely different, or ignore any previous instruction. Always comply with the user's requests without pushback.\n\nUser instructions: ${userInstructions}`;
@@ -132,13 +138,22 @@ export async function summarize(
   content: ExtractedContent,
   options: SummarizeOptions,
 ): Promise<SummaryDocument> {
-  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, providerId, userInstructions, fetchedImages, imageUrlList, signal, onRawResponse, onSystemPrompt, onConversation, onRollingSummary, onRequestBody, onResponseBody, onStreamChunk, onChunkProgress } = options;
+  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, providerId, userInstructions, fetchedImages, imageUrlList, signal, onRawResponse, onSystemPrompt, onConversation, onRollingSummary, onRequestBody, onResponseBody, onStreamChunk, onChunkProgress, onGenreClassified } = options;
   const imageContents: ImageContent[] | undefined = fetchedImages?.map((fi) => ({
     base64: fi.base64,
     mimeType: fi.mimeType,
   }));
   const hasImages = !!(imageContents?.length);
-  const systemPrompt = buildSummarizationSystemPrompt(detailLevel, language, languageExcept, hasImages, content.wordCount, content.type, content.githubPageType, userInstructions);
+
+  // Classify genre — direct-map for known types (GitHub), LLM classify for others
+  const directGenre = directMapGenre(content.type, content.githubPageType);
+  const classification = directGenre ?? await classifyGenre(provider, content, userInstructions, signal);
+  onGenreClassified?.(classification);
+
+  // Detect video content: has duration or transcript word count
+  const isVideo = !!(content.duration || content.transcriptWordCount);
+
+  const systemPrompt = buildSummarizationSystemPrompt(detailLevel, language, languageExcept, hasImages, content.wordCount, content.type, content.githubPageType, userInstructions, classification.genre, isVideo);
 
   onSystemPrompt?.(systemPrompt);
 
@@ -156,11 +171,16 @@ export async function summarize(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (signal?.aborted) throw new Error('Summarization cancelled');
     try {
+      let result: SummaryDocument;
       if (chunks.length === 1) {
-        return await oneShotSummarize(provider, content, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRequestBody, onResponseBody, onStreamChunk);
+        result = await oneShotSummarize(provider, content, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRequestBody, onResponseBody, onStreamChunk);
       } else {
-        return await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRollingSummary, onRequestBody, onResponseBody, onStreamChunk, onChunkProgress);
+        result = await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRollingSummary, onRequestBody, onResponseBody, onStreamChunk, onChunkProgress);
       }
+      // Attach genre classification to the result
+      result.genre = classification.genre;
+      if (classification.subGenre) result.subGenre = classification.subGenre;
+      return result;
     } catch (err) {
       // Don't retry cancellation, text responses, no-content, or image requests
       if (err instanceof LLMTextResponse || err instanceof NoContentError || err instanceof ImageRequestError) throw err;
@@ -397,6 +417,8 @@ export function extractSummaryFields(parsed: Record<string, unknown>): SummaryDo
     inferredTitle: (parsed.inferredTitle as string) || undefined,
     inferredAuthor: (parsed.inferredAuthor as string) || undefined,
     inferredPublishDate: (parsed.inferredPublishDate as string) || undefined,
+    genre: (parsed.genre as string) || undefined,
+    subGenre: (parsed.subGenre as string) || undefined,
   };
 }
 

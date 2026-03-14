@@ -33,11 +33,13 @@ export type MessageType =
   | 'CHECK_NOTION_DUPLICATE_RESULT'
   | 'SEEK_VIDEO'
   | 'CANCEL_SUMMARIZE'
+  | 'CANCEL_CHAT'
   | 'OPEN_TAB'
   | 'OPEN_TAB_RESULT'
   | 'CLOSE_ONBOARDING_TABS'
   | 'CLOSE_ONBOARDING_TABS_RESULT'
-  | 'IFRAME_COMMENTS';
+  | 'IFRAME_COMMENTS'
+  | 'GENRE_CLASSIFIED';
 
 export interface ExtractContentMessage {
   type: 'EXTRACT_CONTENT';
@@ -251,6 +253,11 @@ export interface CancelSummarizeMessage {
   tabId: number;
 }
 
+export interface CancelChatMessage {
+  type: 'CANCEL_CHAT';
+  tabId: number;
+}
+
 export interface OpenTabMessage {
   type: 'OPEN_TAB';
   url: string;
@@ -276,6 +283,14 @@ export interface IframeCommentsMessage {
   type: 'IFRAME_COMMENTS';
   source: 'disqus' | 'giscus' | 'utterances';
   comments: ExtractedComment[];
+}
+
+export interface GenreClassifiedMessage {
+  type: 'GENRE_CLASSIFIED';
+  genre: string;
+  subGenre?: string;
+  confidence: number;
+  tabId?: number;
 }
 
 export type Message =
@@ -308,8 +323,10 @@ export type Message =
   | CheckNotionDuplicateResultMessage
   | SeekVideoMessage
   | CancelSummarizeMessage
+  | CancelChatMessage
   | OpenTabMessage
   | OpenTabResultMessage
   | CloseOnboardingTabsMessage
   | CloseOnboardingTabsResultMessage
-  | IframeCommentsMessage;
+  | IframeCommentsMessage
+  | GenreClassifiedMessage;

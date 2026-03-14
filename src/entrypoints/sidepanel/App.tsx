@@ -294,6 +294,8 @@ async function runMermaidFixAttempt(
       const merged = mergeSummaryUpdates(finalSummary, fixUpdates);
       merged.llmProvider = originalSummary.llmProvider;
       merged.llmModel = originalSummary.llmModel;
+      merged.genre = originalSummary.genre;
+      merged.subGenre = originalSummary.subGenre;
       return { summary: merged, fixMessages };
     }
   }
@@ -584,6 +586,7 @@ export function App() {
   const [extracting, setExtracting] = useState(false);
   const [restricted, setRestricted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [earlyGenre, setEarlyGenre] = useState<string | null>(null);
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
   const [extractEpoch, setExtractEpoch] = useState(0);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -602,6 +605,9 @@ export function App() {
   const [chatLoading, setChatLoading] = useState(false);
   const [searchedSections, setSearchedSections] = useState<Set<string>>(new Set());
   const [activeSectionActions, setActiveSectionActions] = useState<Map<string, 'search' | 'more' | 'less'>>(new Map());
+
+  // Abort controller for auto web search — cancelled on URL change / tab switch
+  const autoSearchAbortRef = useRef<AbortController | null>(null);
 
   // Settings drawer
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -786,7 +792,7 @@ export function App() {
 
     setContent(null);
     resetSectionState();
-    setSummary(null);
+    setSummary(null); setEarlyGenre(null);
     setChatMessages([]);
     setRawResponses([]);
     setActualSystemPrompt('');
@@ -813,7 +819,9 @@ export function App() {
           const prev = contentRef.current;
           const next = response.data;
           if (prev && prev.title === next.title && prev.wordCount === next.wordCount
-              && prev.content.length === next.content.length && prev.thumbnailUrl === next.thumbnailUrl) {
+              && prev.content.length === next.content.length && prev.thumbnailUrl === next.thumbnailUrl
+              && prev.maturityRating === next.maturityRating && prev.author === next.author
+              && prev.duration === next.duration) {
             return;
           }
         }
@@ -866,7 +874,7 @@ export function App() {
         setContent(response.data);
         if (!sameUrl) {
           setExtractEpoch((n) => n + 1);
-          setSummary(null);
+          setSummary(null); setEarlyGenre(null);
           setNotionUrl(null);
           setChatMessages([]);
           setInputValue('');
@@ -883,10 +891,14 @@ export function App() {
     }
   }, []);
 
-  // Refresh: cancel in-flight summarization, clear cached state, then re-extract
+  // Refresh: cancel in-flight summarization + chat + web searches, clear cached state, then re-extract
   const handleRefresh = useCallback(() => {
+    autoSearchAbortRef.current?.abort();
+    autoSearchAbortRef.current = null;
+    setActiveSectionActions(new Map());
     const tabId = activeTabIdRef.current;
     if (tabId != null) {
+      sendMessage({ type: 'CANCEL_CHAT', tabId } as any).catch(() => {});
       if (loadingRef.current) {
         sendMessage({ type: 'CANCEL_SUMMARIZE', tabId } as import('@/lib/messaging/types').CancelSummarizeMessage).catch(() => {});
         setLoading(false);
@@ -894,7 +906,7 @@ export function App() {
       tabStatesRef.current.delete(tabId);
       deletePersistedTabState(tabId).catch(() => {});
     }
-    setSummary(null);
+    setSummary(null); setEarlyGenre(null);
     setChatMessages([]);
     setRawResponses([]);
     setActualSystemPrompt('');
@@ -970,6 +982,15 @@ export function App() {
       || url.startsWith('https://chromewebstore.google.com') || url.startsWith('https://chrome.google.com/webstore');
 
     const switchToTab = async (tabId: number) => {
+      // Abort any running auto web searches and cancel in-flight chat from the previous tab
+      autoSearchAbortRef.current?.abort();
+      autoSearchAbortRef.current = null;
+      setActiveSectionActions(new Map());
+      setChatLoading(false);
+      setChatStreamingText('');
+      if (activeTabIdRef.current != null) {
+        sendMessage({ type: 'CANCEL_CHAT', tabId: activeTabIdRef.current } as any).catch(() => {});
+      }
       const prevTabId = activeTabIdRef.current;
       saveTabState(prevTabId);
       setActiveTabId(tabId);
@@ -998,10 +1019,16 @@ export function App() {
       if (tabId === activeTabIdRef.current) {
         if (isUnreachable(changeInfo.url ?? tab.url)) {
           if (changeInfo.url) {
-            // Navigated to a restricted page — clear stale content
+            // Navigated to a restricted page — clear stale content + abort web searches + cancel chat
+            autoSearchAbortRef.current?.abort();
+            autoSearchAbortRef.current = null;
+            setActiveSectionActions(new Map());
+            setChatLoading(false);
+            setChatStreamingText('');
+            sendMessage({ type: 'CANCEL_CHAT', tabId } as any).catch(() => {});
             setRestricted(true);
             setContent(null);
-            setSummary(null);
+            setSummary(null); setEarlyGenre(null);
             setChatMessages([]);
             setNotionUrl(null);
             setInputValue('');
@@ -1009,14 +1036,25 @@ export function App() {
           return;
         }
         if (changeInfo.url) setRestricted(false);
-        // Cancel in-flight summarization on URL change or page reload
-        if ((changeInfo.url || changeInfo.status === 'loading') && loadingRef.current) {
-          sendMessage({ type: 'CANCEL_SUMMARIZE', tabId } as import('@/lib/messaging/types').CancelSummarizeMessage).catch(() => {});
-          setLoading(false);
-          setSummary(null);
-          setChatMessages([]);
-          setNotionUrl(null);
-          setInputValue('');
+        // Cancel in-flight summarization, chat, and web searches on URL change or page reload
+        if (changeInfo.url || changeInfo.status === 'loading') {
+          // Abort any running auto web searches
+          autoSearchAbortRef.current?.abort();
+          autoSearchAbortRef.current = null;
+          setActiveSectionActions(new Map());
+          setChatLoading(false);
+          setChatStreamingText('');
+          // Cancel in-flight chat/web-search in background
+          sendMessage({ type: 'CANCEL_CHAT', tabId } as any).catch(() => {});
+
+          if (loadingRef.current) {
+            sendMessage({ type: 'CANCEL_SUMMARIZE', tabId } as import('@/lib/messaging/types').CancelSummarizeMessage).catch(() => {});
+            setLoading(false);
+            setSummary(null); setEarlyGenre(null);
+            setChatMessages([]);
+            setNotionUrl(null);
+            setInputValue('');
+          }
         }
         if (changeInfo.status === 'complete') extractContent();
         if (changeInfo.url) {
@@ -1046,6 +1084,11 @@ export function App() {
         setChatStreamingText(msg.chunk || '');
         return;
       }
+      if (msg?.type === 'GENRE_CLASSIFIED') {
+        if (msg.tabId != null && msg.tabId !== activeTabIdRef.current) return;
+        setEarlyGenre((msg as { genre?: string }).genre || null);
+        return;
+      }
       // Navigation-level changes (Gmail/Facebook) — always re-extract
       if (msg?.type === 'CONTENT_CHANGED') {
         if (sender.tab?.id != null && sender.tab.id !== activeTabIdRef.current) return;
@@ -1068,7 +1111,7 @@ export function App() {
       if (tabId === activeTabIdRef.current) {
         setActiveTabId(null);
         setContent(null);
-        setSummary(null);
+        setSummary(null); setEarlyGenre(null);
         setChatMessages([]);
         setNotionUrl(null);
         setLoading(false);
@@ -1182,8 +1225,14 @@ export function App() {
 
   // Memoized streaming preview computations (avoid re-parsing on every render)
   const streamingSummary = useMemo(
-    () => (streamingText && !mermaidFixStatus) ? tryParseStreamingSummary(streamingText) : null,
-    [streamingText, mermaidFixStatus],
+    () => {
+      if (!streamingText || mermaidFixStatus) return null;
+      const parsed = tryParseStreamingSummary(streamingText);
+      // Attach early genre so streaming preview gets spoiler/fiction treatment
+      if (parsed && earlyGenre && !parsed.genre) parsed.genre = earlyGenre;
+      return parsed;
+    },
+    [streamingText, mermaidFixStatus, earlyGenre],
   );
   const chatDisplayText = useMemo(
     () => chatStreamingText ? tryExtractStreamingChatText(chatStreamingText) : null,
@@ -1212,6 +1261,7 @@ export function App() {
     let autoSearchFactCheck = false;
     let completedSummary: SummaryDocument | null = null;
     setLoading(true);
+    setEarlyGenre(null);
     setStreamingText('');
     setStreamingProgress(null);
     setNotionUrl(null);
@@ -1322,7 +1372,8 @@ export function App() {
 
       // Check if auto-search should fire (evaluated before finally clears loading)
       if (settings.autoSearchFactCheck) {
-        const hasSearchableContent = finalSummary.factCheck || finalSummary.extraSections?.['Reception'];
+        const isFictionSummary = finalSummary.genre === 'narrative-fiction' || finalSummary.genre === 'comedy';
+        const hasSearchableContent = finalSummary.factCheck || (isFictionSummary && (finalSummary.keyTakeaways.length > 0 || finalSummary.extraSections?.['Reception']));
         if (hasSearchableContent) {
           const cfg = getActiveProviderConfig(settings);
           const me = getCatalogEntry(settings.activeProviderId, cfg.model);
@@ -1357,28 +1408,53 @@ export function App() {
     }
 
     // Fire auto-search AFTER main spinner is cleared — uses section-level action state
+    // Create abort controller so URL changes / tab switches can cancel pending searches
     if (autoSearchFactCheck && completedSummary) {
+      const controller = new AbortController();
+      autoSearchAbortRef.current = controller;
+      const { signal } = controller;
       const today = new Date().toISOString().slice(0, 10);
 
       // Auto-search Fact Check
-      if (completedSummary.factCheck) {
+      if (!signal.aborted && completedSummary.factCheck) {
         setActiveSectionActions(prev => new Map(prev).set('Fact Check', 'search'));
         const ok = await handleChatSend(buildFactCheckSearchPrompt(today), { internal: true, webSearch: true, summaryOverride: completedSummary });
+        if (signal.aborted) { setActiveSectionActions(new Map()); return; }
         if (ok) setSearchedSections(prev => new Set(prev).add('Fact Check'));
         setActiveSectionActions(prev => { const next = new Map(prev); next.delete('Fact Check'); return next; });
         persistToSession(originTabId);
       }
 
-      // Auto-search Reception section for Netflix content
-      if (content?.type === 'netflix' && completedSummary.extraSections?.['Reception']) {
-        setActiveSectionActions(prev => new Map(prev).set('Reception', 'search'));
+      // Auto-search Work Info for fiction genres — add real review scores
+      const isFiction = completedSummary.genre === 'narrative-fiction' || completedSummary.genre === 'comedy';
+      if (!signal.aborted && isFiction && completedSummary.keyTakeaways.length > 0) {
+        setActiveSectionActions(prev => new Map(prev).set('Work Info', 'search'));
         const ok = await handleChatSend(
-          `Today is ${today}. Search the web for the latest ratings, reviews, and reception of this Netflix title. Update the "Reception" section with: content/age rating (TV-MA, PG-13, R, etc.), current IMDb score, Rotten Tomatoes critic/audience scores, Metacritic score, notable critic reviews, awards/nominations, and any recent news about the show. Cite sources with dates.`,
+          `Today is ${today}. Search the web for current review scores and ratings for this title. Add a "**Review Scores** — ..." entry to keyTakeaways with: IMDb score, Rotten Tomatoes critic % and audience %, Metacritic score. Use exact current numbers. IMPORTANT: Return the COMPLETE updated keyTakeaways array with ALL existing entries preserved — only ADD the review scores entry. Use "**Label** — value" format.`,
           { internal: true, webSearch: true, summaryOverride: completedSummary },
         );
+        if (signal.aborted) { setActiveSectionActions(new Map()); return; }
+        if (ok) setSearchedSections(prev => new Set(prev).add('Work Info'));
+        setActiveSectionActions(prev => { const next = new Map(prev); next.delete('Work Info'); return next; });
+        persistToSession(originTabId);
+      }
+
+      // Auto-search Reception section for fiction genres
+      if (!signal.aborted && isFiction && completedSummary.extraSections?.['Reception']) {
+        setActiveSectionActions(prev => new Map(prev).set('Reception', 'search'));
+        const ok = await handleChatSend(
+          `Today is ${today}. Search the web for the latest ratings, reviews, and reception of this title. Update the "Reception" section with: current IMDb score, Rotten Tomatoes critic/audience scores, Metacritic score, notable critic reviews, awards/nominations, and any recent news. Cite sources with dates.`,
+          { internal: true, webSearch: true, summaryOverride: completedSummary },
+        );
+        if (signal.aborted) { setActiveSectionActions(new Map()); return; }
         if (ok) setSearchedSections(prev => new Set(prev).add('Reception'));
         setActiveSectionActions(prev => { const next = new Map(prev); next.delete('Reception'); return next; });
         persistToSession(originTabId);
+      }
+
+      // Clean up controller
+      if (autoSearchAbortRef.current === controller) {
+        autoSearchAbortRef.current = null;
       }
     }
   }, [content, resolvedTheme, persistToSession]);
@@ -1667,6 +1743,8 @@ export function App() {
         if (effectiveSummary) {
           updatedSummary.llmProvider = effectiveSummary.llmProvider;
           updatedSummary.llmModel = effectiveSummary.llmModel;
+          updatedSummary.genre = effectiveSummary.genre;
+          updatedSummary.subGenre = effectiveSummary.subGenre;
         }
       }
 
@@ -1712,6 +1790,11 @@ export function App() {
         });
       }
 
+      // Discard results if auto-search was aborted (URL changed during search)
+      if (isInternal && autoSearchAbortRef.current?.signal.aborted) {
+        return false;
+      }
+
       if (activeTabIdRef.current === originTabId) {
         if (fixedJson) {
           setSummary(fixedJson);
@@ -1733,7 +1816,10 @@ export function App() {
       }
       return true;
     } catch (err) {
-      const errMsg = `Error: ${err instanceof Error ? err.message : String(err)}`;
+      const msg = err instanceof Error ? err.message : String(err);
+      // Silently swallow cancellation — user navigated away, no error to show
+      if (msg === 'Chat cancelled' || msg === 'Chat failed') return false;
+      const errMsg = `Error: ${msg}`;
       if (activeTabIdRef.current === originTabId) {
         if (isInternal) setToast({ message: errMsg, type: 'error' });
         setChatMessages((prev) => [...prev, { role: 'assistant', content: errMsg, internal: isInternal }]);
@@ -1783,7 +1869,7 @@ export function App() {
         setToast({ message: 'No transcript available — summarizing from comments only', type: 'info' });
       }
       if (pendingResummarize) {
-        setSummary(null);
+        setSummary(null); setEarlyGenre(null);
         setChatMessages([]);
         setNotionUrl(null);
       }
@@ -1800,7 +1886,7 @@ export function App() {
         setToast({ message: 'No transcript available — summarizing from comments only', type: 'info' });
       }
       if (pendingResummarize) {
-        setSummary(null);
+        setSummary(null); setEarlyGenre(null);
         setChatMessages([]);
         setNotionUrl(null);
       }
@@ -1961,6 +2047,7 @@ export function App() {
             <MetadataHeader
               content={content}
               summary={summary || undefined}
+              earlyGenre={earlyGenre}
               providerName={(() => {
                 const cfg = getActiveProviderConfig(settings);
                 if (!cfg.apiKey && cfg.providerId !== 'self-hosted') return undefined;
@@ -2124,6 +2211,8 @@ export function App() {
                     prompt = buildFactCheckSearchPrompt(today);
                   } else if (sectionTitle === 'Notable Quotes') {
                     prompt = `Today is ${today}. Search the web to verify the quotes in the "${sectionTitle}" section. Check attribution accuracy and add context about any recent developments related to the quoted statements. Cite sources with dates.`;
+                  } else if (sectionTitle === 'Work Info') {
+                    prompt = `Today is ${today}. Search the web for the latest information about this work (as of ${today}). Update the "Work Info" metadata: verify/correct review scores (IMDb, Rotten Tomatoes), add awards, update season/episode counts, etc. IMPORTANT: Return the COMPLETE updated keyTakeaways array with ALL existing entries preserved — add or update entries but do NOT drop any. Use "**Label** — value" format for each entry.`;
                   } else {
                     prompt = `Today is ${today}. Search the web for the latest developments (as of ${today}) related to the "${sectionTitle}" section. Update with any new information, correct anything outdated, and add recent context. Cite sources with dates.`;
                   }
@@ -2381,7 +2470,7 @@ function sanitizePartialUpdate(raw: Record<string, unknown>): Partial<SummaryDoc
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (value === null) continue; // skip null (unchanged field from schema enforcement)
-    if (key === 'llmProvider' || key === 'llmModel') continue;
+    if (key === 'llmProvider' || key === 'llmModel' || key === 'genre' || key === 'subGenre') continue;
     if (value === DELETE_SENTINEL) {
       result[key] = undefined; // marks for removal during merge
       continue;
@@ -2479,7 +2568,7 @@ function restoreDataUriImages(original: string, updated: string): string {
 function mergeSummaryUpdates(existing: SummaryDocument, updates: Partial<SummaryDocument>): SummaryDocument {
   const merged = { ...existing };
   for (const [key, value] of Object.entries(updates)) {
-    if (key === 'llmProvider' || key === 'llmModel') continue;
+    if (key === 'llmProvider' || key === 'llmModel' || key === 'genre' || key === 'subGenre') continue;
     if (value === undefined) {
       delete (merged as Record<string, unknown>)[key];
     } else if (key === 'extraSections' && value && typeof value === 'object' && !Array.isArray(value)) {
