@@ -726,7 +726,7 @@ const lifestyle: GenreTemplate = {
     };
   },
   additionalGuidelines(detail) {
-    if (detail === 'detailed') return ['If the content makes health or safety claims, include factCheck.'];
+    if (detail !== 'brief') return ['If the content makes health or safety claims, include factCheck.'];
     return [];
   },
 };

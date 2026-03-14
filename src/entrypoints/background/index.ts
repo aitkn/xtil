@@ -200,7 +200,7 @@ async function handleMessage(message: Message): Promise<Message> {
         chatCtrl.abort();
         activeChats.delete(tabIdToCancel);
       }
-      return { type: 'CANCEL_CHAT', success: true } as unknown as Message;
+      return { success: true } as Message;
     }
     case 'CHAT_MESSAGE':
       return handleChatMessage(message.messages, message.summary, message.content, message.tabId, message.webSearch);

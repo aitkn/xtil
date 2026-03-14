@@ -223,16 +223,6 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
     if (nfEndIndex !== -1) {
       try {
         const result = await fetchNetflixTranscript(langPrefs, summaryLang);
-        console.log('[xTil] Netflix metadata:', JSON.stringify({
-          title: result.title, year: result.year, rating: result.rating,
-          seasonCount: result.seasonCount, episodeTitle: result.episodeTitle,
-          seasonNumber: result.seasonNumber, episodeNumber: result.episodeNumber,
-          creators: result.creators, cast: result.cast?.slice(0, 3),
-          thumbnailUrl: result.thumbnailUrl?.substring(0, 60),
-        }));
-        // Debug: log Netflix API metadata structure
-        const debugDump = (result as Record<string, unknown>)._debugDump;
-        if (debugDump) console.log('[xTil] Netflix video metadata dump:', debugDump);
         // Update title & metadata from bridge info
         if (result.title && result.title !== content.title) {
           content.title = result.title;
@@ -918,7 +908,6 @@ async function fetchNetflixTranscript(
     creators?: string[];
     cast?: string[];
     cachedLanguages?: string[];
-    _debugDump?: string;
   }>('tracks', {});
 
   if (!info?.tracks?.length) {

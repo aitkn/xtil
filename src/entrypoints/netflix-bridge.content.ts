@@ -160,14 +160,6 @@ export default defineContentScript({
         const artworkSources = [video?.artwork, video?.boxart, video?.storyart, video?.BGImages].filter(Array.isArray);
         const allArt = artworkSources.flat();
 
-        // Log artwork structure for debugging
-        if (allArt.length > 0) {
-          console.log('[xTil Netflix] artwork sample:', JSON.stringify(allArt.map((a: any) => ({
-            url: a?.url?.substring(0, 60), w: a?.w, h: a?.h, width: a?.width, height: a?.height, size: a?.size,
-            keys: a ? Object.keys(a).join(',') : 'null',
-          }))));
-        }
-
         if (allArt.length > 0) {
           // Sort by width descending — try w, width, or infer from URL
           const withSize = allArt.map((a: any) => {
@@ -195,41 +187,8 @@ export default defineContentScript({
       let episodeNumber: number | undefined;
       let creators: string[] | undefined;
       let cast: string[] | undefined;
-      let _debugDump: string | undefined;
       try {
-        // Log directly to Netflix page console (no serialization issues here)
-        if (video) {
-          const dump: Record<string, string> = {};
-          for (const key of Object.keys(video)) {
-            try {
-              const val = video[key];
-              if (val === null || val === undefined) continue;
-              if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
-                dump[key] = String(val);
-              } else if (Array.isArray(val)) {
-                dump[key] = `Array(${val.length})`;
-              } else if (typeof val === 'object') {
-                dump[key] = `{${Object.keys(val).slice(0, 10).join(', ')}}`;
-              }
-            } catch { dump[key] = '(error)'; }
-          }
-          console.log('[xTil Netflix] video fields:', JSON.stringify(dump, null, 2));
-          if (video.currentEpisode) {
-            const epDump: Record<string, string> = {};
-            for (const key of Object.keys(video.currentEpisode)) {
-              try {
-                const val = video.currentEpisode[key];
-                if (val === null || val === undefined) continue;
-                epDump[key] = typeof val === 'object' ? `{${Object.keys(val).slice(0, 8).join(', ')}}` : String(val);
-              } catch { epDump[key] = '(error)'; }
-            }
-            console.log('[xTil Netflix] episode fields:', JSON.stringify(epDump, null, 2));
-          }
-        }
-        // Pass as string for CustomEvent (avoids structured clone issues)
-        _debugDump = video ? Object.keys(video).join(', ') : 'no video object';
-
-        // Now try to extract fields from discovered structure
+        // Extract fields from Netflix's internal metadata structure
         year = video?.year || video?.releaseYear;
         rating = video?.maturity?.rating?.value || video?.maturityRating || video?.rating || video?.certification;
         if (video?.currentEpisode) {
@@ -280,7 +239,6 @@ export default defineContentScript({
         episodeNumber,
         creators,
         cast,
-        _debugDump,
         tracks: tracks
           .filter((t: any) => !t.isNoneTrack && !t.isForcedNarrative)
           .map((t: any) => ({
