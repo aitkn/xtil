@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-14T07:22:23.436Z",
+  "_generated": "2026-03-14T20:46:52.546Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -76,7 +76,7 @@
           "inputPrice": 5,
           "outputPrice": 25,
           "vision": true,
-          "reasoning": false,
+          "reasoning": true,
           "webSearch": true
         },
         "claude-sonnet-4-20250514": {
@@ -102,7 +102,7 @@
           "inputPrice": 3,
           "outputPrice": 15,
           "vision": true,
-          "reasoning": false,
+          "reasoning": true,
           "webSearch": true
         }
       }
@@ -364,8 +364,8 @@
       "models": {
         "babbage-002": {
           "name": "Babbage-002",
-          "inputPrice": 0.8,
-          "outputPrice": 0.9
+          "inputPrice": 1.6,
+          "outputPrice": 1.6
         },
         "chatgpt-4o-latest": {
           "name": "ChatGPT-4o Latest",
@@ -379,15 +379,26 @@
         "chatgpt-image-latest": {
           "name": "chatgpt-image-latest"
         },
+        "dall-e-2": {
+          "name": "DALL·E 2"
+        },
+        "dall-e-3": {
+          "name": "DALL·E 3"
+        },
         "davinci-002": {
           "name": "Davinci-002",
-          "inputPrice": 6,
-          "outputPrice": 6
+          "inputPrice": 12,
+          "outputPrice": 12
+        },
+        "gpt-3.5-0301": {
+          "name": "GPT-3.5 0301",
+          "inputPrice": 1.5,
+          "outputPrice": 2
         },
         "gpt-3.5-turbo": {
           "name": "GPT-3.5 Turbo",
-          "inputPrice": 1.5,
-          "outputPrice": 3
+          "inputPrice": 3,
+          "outputPrice": 6
         },
         "gpt-3.5-turbo-0125": {
           "name": "GPT-3.5 Turbo 0125",
@@ -408,10 +419,10 @@
           "name": "gpt-3.5-turbo-16k"
         },
         "gpt-3.5-turbo-16k-0613": {
-          "name": "GPT-3.5 Turbo 16K",
+          "name": "GPT-3.5 Turbo 16K 0613",
+          "contextWindow": 16384,
           "inputPrice": 3,
-          "outputPrice": 4,
-          "contextWindow": 16384
+          "outputPrice": 4
         },
         "gpt-3.5-turbo-instruct": {
           "name": "GPT-3.5 Turbo Instruct",
@@ -427,8 +438,7 @@
         "gpt-4-0125-preview": {
           "name": "GPT-4 0125 Preview",
           "inputPrice": 10,
-          "outputPrice": 30,
-          "vision": true
+          "outputPrice": 30
         },
         "gpt-4-0314": {
           "name": "GPT-4 0314",
@@ -443,8 +453,7 @@
         "gpt-4-1106-preview": {
           "name": "GPT-4 1106 Preview",
           "inputPrice": 10,
-          "outputPrice": 30,
-          "vision": true
+          "outputPrice": 30
         },
         "gpt-4-1106-vision-preview": {
           "name": "GPT-4 1106 Vision Preview",
@@ -454,9 +463,9 @@
         },
         "gpt-4-32k": {
           "name": "GPT-4 32K",
+          "contextWindow": 32768,
           "inputPrice": 60,
-          "outputPrice": 120,
-          "contextWindow": 32768
+          "outputPrice": 120
         },
         "gpt-4-turbo": {
           "name": "GPT-4 Turbo",
@@ -467,7 +476,7 @@
           "vision": true
         },
         "gpt-4-turbo-2024-04-09": {
-          "name": "GPT-4 Turbo",
+          "name": "GPT-4 Turbo 2024-04-09",
           "inputPrice": 10,
           "outputPrice": 30,
           "vision": true
@@ -485,9 +494,9 @@
           "webSearch": true
         },
         "gpt-4.1-2025-04-14": {
-          "name": "GPT-4.1",
-          "inputPrice": 1.5,
-          "outputPrice": 6
+          "name": "GPT-4.1 2025-04-14",
+          "inputPrice": 3,
+          "outputPrice": 12
         },
         "gpt-4.1-mini": {
           "name": "GPT-4.1 mini",
@@ -499,9 +508,9 @@
           "webSearch": true
         },
         "gpt-4.1-mini-2025-04-14": {
-          "name": "GPT-4.1 Mini",
-          "inputPrice": 0.4,
-          "outputPrice": 1.6
+          "name": "GPT-4.1 Mini 2025-04-14",
+          "inputPrice": 0.8,
+          "outputPrice": 3.2
         },
         "gpt-4.1-nano": {
           "name": "GPT-4.1 nano",
@@ -513,9 +522,9 @@
           "webSearch": true
         },
         "gpt-4.1-nano-2025-04-14": {
-          "name": "GPT-4.1 Nano",
-          "inputPrice": 0.1,
-          "outputPrice": 0.4
+          "name": "GPT-4.1 Nano 2025-04-14",
+          "inputPrice": 0.2,
+          "outputPrice": 0.8
         },
         "gpt-4o": {
           "name": "GPT-4o",
@@ -530,9 +539,9 @@
           "name": "gpt-4o-2024-05-13"
         },
         "gpt-4o-2024-08-06": {
-          "name": "GPT-4o",
-          "inputPrice": 2.225,
-          "outputPrice": 12.5,
+          "name": "GPT-4o 2024-08-06",
+          "inputPrice": 3.75,
+          "outputPrice": 15,
           "vision": true
         },
         "gpt-4o-2024-11-20": {
@@ -557,9 +566,9 @@
           "webSearch": true
         },
         "gpt-4o-mini-2024-07-18": {
-          "name": "GPT-4o Mini",
-          "inputPrice": 0.15,
-          "outputPrice": 0.6,
+          "name": "GPT-4o Mini 2024-07-18",
+          "inputPrice": 0.3,
+          "outputPrice": 1.2,
           "vision": true
         },
         "gpt-4o-mini-audio-preview": {
@@ -756,10 +765,11 @@
         },
         "gpt-5.4": {
           "name": "GPT-5.4",
+          "contextWindow": 1050000,
           "inputPrice": 2.5,
           "outputPrice": 15,
           "vision": true,
-          "reasoning": true,
+          "reasoning": false,
           "webSearch": true
         },
         "gpt-5.4-2026-03-05": {
@@ -767,9 +777,12 @@
         },
         "gpt-5.4-pro": {
           "name": "GPT-5.4 Pro",
+          "contextWindow": 1050000,
           "inputPrice": 30,
           "outputPrice": 180,
-          "vision": true
+          "vision": true,
+          "reasoning": false,
+          "webSearch": true
         },
         "gpt-5.4-pro-2026-03-05": {
           "name": "gpt-5.4-pro-2026-03-05"
@@ -795,7 +808,8 @@
           "name": "gpt-audio-mini-2025-12-15"
         },
         "gpt-image-1": {
-          "name": "gpt-image-1"
+          "name": "GPT Image 1",
+          "vision": true
         },
         "gpt-image-1-mini": {
           "name": "GPT Image 1 Mini",
@@ -809,13 +823,18 @@
           "outputPrice": 32,
           "vision": true
         },
+        "gpt-image-latest": {
+          "name": "GPT Image Latest",
+          "vision": true
+        },
         "gpt-realtime": {
           "name": "gpt-realtime"
         },
         "gpt-realtime-1.5": {
           "name": "GPT Realtime 1.5",
           "inputPrice": 32,
-          "outputPrice": 64
+          "outputPrice": 64,
+          "vision": true
         },
         "gpt-realtime-2025-08-28": {
           "name": "gpt-realtime-2025-08-28"
@@ -823,7 +842,8 @@
         "gpt-realtime-mini": {
           "name": "GPT Realtime Mini",
           "inputPrice": 10,
-          "outputPrice": 20
+          "outputPrice": 20,
+          "vision": true
         },
         "gpt-realtime-mini-2025-10-06": {
           "name": "gpt-realtime-mini-2025-10-06"
@@ -921,9 +941,9 @@
           "webSearch": true
         },
         "o4-mini-2025-04-16": {
-          "name": "o4 Mini",
-          "inputPrice": 2,
-          "outputPrice": 8,
+          "name": "O4 Mini 2025-04-16",
+          "inputPrice": 4,
+          "outputPrice": 16,
           "reasoning": true
         },
         "o4-mini-deep-research": {
@@ -949,6 +969,15 @@
         "text-embedding-ada-002": {
           "name": "Text Embedding Ada 002",
           "inputPrice": 0.1
+        },
+        "tts": {
+          "name": "TTS"
+        },
+        "tts-hd": {
+          "name": "TTS HD"
+        },
+        "whisper": {
+          "name": "Whisper"
         }
       }
     },
@@ -1024,6 +1053,13 @@
           "reasoning": true,
           "webSearch": true
         },
+        "grok-4-20-beta": {
+          "name": "Grok 4.20 Beta",
+          "contextWindow": 2000000,
+          "reasoning": true,
+          "vision": true,
+          "webSearch": true
+        },
         "grok-4-fast-non-reasoning": {
           "name": "Grok 4 Fast (Non-Reasoning)",
           "contextWindow": 2097152,
@@ -1041,13 +1077,6 @@
           "vision": true,
           "textGeneration": true,
           "reasoning": true,
-          "webSearch": true
-        },
-        "grok-4.20-beta": {
-          "name": "Grok 4.20 Beta",
-          "contextWindow": 2000000,
-          "reasoning": true,
-          "vision": true,
           "webSearch": true
         },
         "grok-4.20-beta-0309-non-reasoning": {

@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-14T12:00:00.000Z",
+  "_generated": "2026-03-14T20:47:00.000Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -20,7 +20,7 @@
           "inputPrice": 3,
           "outputPrice": 15,
           "vision": true,
-          "reasoning": false,
+          "reasoning": true,
           "webSearch": true
         },
         "claude-3-haiku-20240307": {
@@ -38,7 +38,7 @@
           "inputPrice": 5,
           "outputPrice": 25,
           "vision": true,
-          "reasoning": false,
+          "reasoning": true,
           "webSearch": true
         }
       },
@@ -156,11 +156,12 @@
       "models": {
         "gpt-5.4": {
           "name": "GPT-5.4",
+          "contextWindow": 1050000,
           "maxOutput": 128000,
           "inputPrice": 2.5,
           "outputPrice": 15,
           "vision": true,
-          "reasoning": true,
+          "reasoning": false,
           "webSearch": true
         },
         "gpt-5.1": {
@@ -235,7 +236,10 @@
       "excluded": [
         "babbage-002",
         "chatgpt-4o-latest",
+        "dall-e-2",
+        "dall-e-3",
         "davinci-002",
+        "gpt-3.5-0301",
         "gpt-3.5-turbo",
         "gpt-3.5-turbo-16k",
         "gpt-4",
@@ -271,7 +275,8 @@
         "o3-pro",
         "o4-mini-deep-research",
         "sora-2",
-        "sora-2-pro"
+        "sora-2-pro",
+        "whisper"
       ]
     },
     "xai": {
@@ -313,7 +318,7 @@
         "grok-4-0709",
         "grok-4-fast-non-reasoning",
         "grok-4-fast-reasoning",
-        "grok-4.20-beta",
+        "grok-4-20-beta",
         "grok-4.20-beta-0309-non-reasoning",
         "grok-4.20-beta-0309-reasoning",
         "grok-4.20-multi-agent-beta-0309",

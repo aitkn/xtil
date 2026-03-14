@@ -4,6 +4,22 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.0
+
+**Smart genre detection**
+
+- xTil now automatically detects what type of content you're reading — news, tutorial, fiction, academic paper, review, comedy special, and 12 more genres
+- Each genre gets a tailored summary with relevant sections (e.g. tutorials get step-by-step breakdowns, news gets fact-checking, fiction gets cast & plot)
+- Genre badge shown in the header so you know how xTil interpreted the content
+- Movies, TV shows, and plays get a dedicated "Work Info" section with structured metadata and spoiler-protected plot summaries — works from any source, not just Netflix
+- Scientific papers now reproduce equations in LaTeX notation
+- Review scores (IMDb, Rotten Tomatoes, Metacritic) are fetched via web search instead of guessed, with color-coded badges
+- Netflix metadata (thumbnail, maturity rating, season/episode info) extracted from the player and shown before summarizing
+- Diagrams and data charts are now genre-aware — encouraged for tutorials and academic content, skipped for fiction and comedy
+- Web searches cancel immediately when you navigate away — no more stale results appearing on the wrong page
+- Grok recommended as default provider in the setup wizard
+- Claude Opus/Sonnet 4.6 now support reasoning mode
+
 ## 1.1.12
 
 **Netflix support**
