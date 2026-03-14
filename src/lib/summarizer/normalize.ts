@@ -19,6 +19,7 @@ export const KNOWN_FIELDS = new Set([
   'extraSections', 'relatedTopics', 'tags',
   'sourceLanguage', 'summaryLanguage', 'translatedTitle',
   'inferredTitle', 'inferredAuthor', 'inferredPublishDate',
+  'genre', 'subGenre',
   'llmProvider', 'llmModel',
   // Envelope/signal keys (not summary fields)
   'text', 'noContent', 'noSummary', 'requestedImages', 'message', 'reason', 'updates',

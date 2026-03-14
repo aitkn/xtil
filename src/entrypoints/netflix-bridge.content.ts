@@ -152,14 +152,135 @@ export default defineContentScript({
       const meta = vmeta?.[movieId];
       const video = meta?._metadataObject?.video;
 
+      // Extract thumbnail from Netflix metadata — try multiple paths
+      let thumbnailUrl: string | undefined;
+      try {
+        // Netflix artwork arrays contain objects with url and size info
+        // Try all artwork types, pick the largest image (>100px to skip icons)
+        const artworkSources = [video?.artwork, video?.boxart, video?.storyart, video?.BGImages].filter(Array.isArray);
+        const allArt = artworkSources.flat();
+
+        // Log artwork structure for debugging
+        if (allArt.length > 0) {
+          console.log('[xTil Netflix] artwork sample:', JSON.stringify(allArt.map((a: any) => ({
+            url: a?.url?.substring(0, 60), w: a?.w, h: a?.h, width: a?.width, height: a?.height, size: a?.size,
+            keys: a ? Object.keys(a).join(',') : 'null',
+          }))));
+        }
+
+        if (allArt.length > 0) {
+          // Sort by width descending — try w, width, or infer from URL
+          const withSize = allArt.map((a: any) => {
+            const w = a?.w || a?.width || 0;
+            return { url: a?.url, w };
+          }).filter((a: any) => a.url);
+
+          // Pick largest that's > 100px (skip tiny icons), or just the largest
+          const sorted = withSize.sort((a: any, b: any) => b.w - a.w);
+          const large = sorted.find((a: any) => a.w > 100) || sorted[0];
+          if (large?.url) thumbnailUrl = large.url;
+        }
+        // Fallback: try image object with url property
+        if (!thumbnailUrl && video?.image?.url) {
+          thumbnailUrl = video.image.url;
+        }
+      } catch { /* ignore thumbnail extraction errors */ }
+
+      // Extract rich metadata — dump structure safely for discovery
+      let year: number | undefined;
+      let rating: string | undefined;
+      let seasonCount: number | undefined;
+      let episodeTitle: string | undefined;
+      let seasonNumber: number | undefined;
+      let episodeNumber: number | undefined;
+      let creators: string[] | undefined;
+      let cast: string[] | undefined;
+      let _debugDump: string | undefined;
+      try {
+        // Log directly to Netflix page console (no serialization issues here)
+        if (video) {
+          const dump: Record<string, string> = {};
+          for (const key of Object.keys(video)) {
+            try {
+              const val = video[key];
+              if (val === null || val === undefined) continue;
+              if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+                dump[key] = String(val);
+              } else if (Array.isArray(val)) {
+                dump[key] = `Array(${val.length})`;
+              } else if (typeof val === 'object') {
+                dump[key] = `{${Object.keys(val).slice(0, 10).join(', ')}}`;
+              }
+            } catch { dump[key] = '(error)'; }
+          }
+          console.log('[xTil Netflix] video fields:', JSON.stringify(dump, null, 2));
+          if (video.currentEpisode) {
+            const epDump: Record<string, string> = {};
+            for (const key of Object.keys(video.currentEpisode)) {
+              try {
+                const val = video.currentEpisode[key];
+                if (val === null || val === undefined) continue;
+                epDump[key] = typeof val === 'object' ? `{${Object.keys(val).slice(0, 8).join(', ')}}` : String(val);
+              } catch { epDump[key] = '(error)'; }
+            }
+            console.log('[xTil Netflix] episode fields:', JSON.stringify(epDump, null, 2));
+          }
+        }
+        // Pass as string for CustomEvent (avoids structured clone issues)
+        _debugDump = video ? Object.keys(video).join(', ') : 'no video object';
+
+        // Now try to extract fields from discovered structure
+        year = video?.year || video?.releaseYear;
+        rating = video?.maturity?.rating?.value || video?.maturityRating || video?.rating || video?.certification;
+        if (video?.currentEpisode) {
+          const ep = video.currentEpisode;
+          episodeTitle = ep.title || ep.episodeTitle;
+          seasonNumber = ep.seq ?? ep.season ?? ep.seasonNumber ?? ep.seasonNum;
+          episodeNumber = ep.episode ?? ep.ep ?? ep.episodeNumber ?? ep.episodeNum;
+        }
+        seasonCount = video?.seasonCount ?? (Array.isArray(video?.seasons) ? video.seasons.length : undefined);
+        // Creators — try many possible field names
+        const creatorFields = ['creators', 'directors', 'director', 'creator'];
+        for (const f of creatorFields) {
+          const v = video?.[f];
+          if (Array.isArray(v) && v.length) {
+            creators = v.map((c: any) => typeof c === 'string' ? c : c?.name || c?.personName || String(c)).filter(Boolean);
+            break;
+          } else if (typeof v === 'string' && v) {
+            creators = [v];
+            break;
+          }
+        }
+        // Cast
+        const castFields = ['cast', 'actors'];
+        for (const f of castFields) {
+          const v = video?.[f];
+          if (Array.isArray(v) && v.length) {
+            cast = v.map((c: any) => typeof c === 'string' ? c : c?.name || c?.personName || String(c)).filter(Boolean);
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn('[xTil Netflix bridge] metadata extraction error:', err);
+      }
+
       return {
         movieId,
         title: video?.title,
         synopsis: video?.synopsis,
         type: video?.type,
-        currentEpisode: video?.currentEpisode,
         duration: player.getDuration(),
         audioLang,
+        thumbnailUrl,
+        year,
+        rating,
+        seasonCount,
+        episodeTitle,
+        seasonNumber,
+        episodeNumber,
+        creators,
+        cast,
+        _debugDump,
         tracks: tracks
           .filter((t: any) => !t.isNoneTrack && !t.isForcedNarrative)
           .map((t: any) => ({

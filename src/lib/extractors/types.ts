@@ -31,6 +31,15 @@ export interface ExtractedContent {
   issueState?: 'open' | 'closed';
   repoStars?: number;
 
+  // Netflix/video-specific metadata (from player API)
+  showType?: string; // e.g. "show", "movie", "Limited Series"
+  maturityRating?: string; // e.g. "TV-MA", "PG-13", "R"
+  seasonCount?: number;
+  episodeTitle?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  cast?: string[]; // actor names
+
   // Video transcript (non-YouTube: CF Stream, Vimeo, Dailymotion, HTML5)
   transcriptWordCount?: number;
 

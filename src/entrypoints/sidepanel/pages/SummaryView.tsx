@@ -35,7 +35,7 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
   const [copied, setCopied] = useState(false);
   useEffect(() => { setMdSaved(false); setCopied(false); }, [summary]);
 
-  const isNetflix = content?.type === 'netflix';
+  const isFictionGenre = summary.genre === 'narrative-fiction' || summary.genre === 'comedy';
 
   // Split TL;DR into body and status line for color-coded rendering
   const { body: tldrBody, statusLabel, statusText } = splitTldrStatus(summary.tldr);
@@ -81,15 +81,15 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
 
       {/* Key Takeaways */}
       {summary.keyTakeaways.length > 0 && (
-        <Section title={isNetflix ? 'Show Info' : 'Key Takeaways'} defaultOpen
+        <Section title={isFictionGenre ? 'Work Info' : 'Key Takeaways'} defaultOpen
           onDelete={onDeleteSection ? () => onDeleteSection('keyTakeaways') : undefined}
-          onMore={onAdjustSection ? () => onAdjustSection('Key Takeaways', 'more') : undefined}
-          onLess={onAdjustSection ? () => onAdjustSection('Key Takeaways', 'less') : undefined}
-          onWebSearch={onWebSearch ? () => onWebSearch('Key Takeaways') : undefined}
-          spinningAction={spinning('Key Takeaways')}
+          onMore={onAdjustSection ? () => onAdjustSection(isFictionGenre ? 'Work Info' : 'Key Takeaways', 'more') : undefined}
+          onLess={onAdjustSection ? () => onAdjustSection(isFictionGenre ? 'Work Info' : 'Key Takeaways', 'less') : undefined}
+          onWebSearch={onWebSearch ? () => onWebSearch(isFictionGenre ? 'Work Info' : 'Key Takeaways') : undefined}
+          spinningAction={spinning(isFictionGenre ? 'Work Info' : 'Key Takeaways')}
           webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
-          {isNetflix ? (
+          {isFictionGenre ? (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'auto 1fr',
@@ -113,7 +113,7 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
                       color: 'var(--md-sys-color-on-surface)',
                       padding: '3px 0',
                       borderBottom: '1px solid var(--md-sys-color-outline-variant)',
-                    }}><NetflixInfoValue text={value} label={label} /></span>
+                    }}><WorkInfoValue text={value} label={label} /></span>
                   </Fragment>
                 );
               })}
@@ -128,9 +128,9 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
         </Section>
       )}
 
-      {/* Summary — spoiler for Netflix (contains full plot) */}
+      {/* Summary — spoiler for fiction genres (contains full plot with spoilers) */}
       {summary.summary && (
-        <Section title={isNetflix ? 'Plot Summary' : 'Summary'} defaultOpen={!isNetflix} spoiler={isNetflix}
+        <Section title={isFictionGenre ? 'Plot Summary' : 'Summary'} defaultOpen={!isFictionGenre} spoiler={isFictionGenre}
           onDelete={onDeleteSection ? () => onDeleteSection('summary') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Summary', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Summary', 'less') : undefined}
@@ -432,9 +432,11 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
   );
 }
 
-export function MetadataHeader({ content, summary, providerName, modelName, onProviderClick }: {
+export function MetadataHeader({ content, summary, earlyGenre, providerName, modelName, onProviderClick }: {
   content: ExtractedContent;
   summary?: SummaryDocument;
+  /** Genre from classifier broadcast — shown before summary arrives. */
+  earlyGenre?: string | null;
   providerName?: string;
   modelName?: string;
   onProviderClick?: () => void;
@@ -507,6 +509,25 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
           </span>
         );
       })()}
+      {(() => {
+        const genre = summary?.genre || earlyGenre;
+        if (!genre || genre === 'generic' || genre === 'software') return null;
+        return (
+          <span
+            title={summary?.subGenre ? `${genre} / ${summary.subGenre}` : genre}
+            style={{
+              backgroundColor: 'var(--md-sys-color-surface-container-highest)',
+              color: 'var(--md-sys-color-on-surface-variant)',
+              padding: '2px 10px',
+              borderRadius: 'var(--md-sys-shape-corner-small)',
+              font: 'var(--md-sys-typescale-label-small)',
+              fontWeight: 600,
+            }}
+          >
+            {genre.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+          </span>
+        );
+      })()}
     </div>
   );
 
@@ -560,6 +581,30 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
         )}
         {content.duration && <span>{content.duration}</span>}
         {content.viewCount && <span>{content.viewCount} views</span>}
+        {content.showType && (
+          <span style={{ fontStyle: 'italic' }}>
+            {content.showType.charAt(0).toUpperCase() + content.showType.slice(1)}
+          </span>
+        )}
+        {content.maturityRating && (
+          <span style={{
+            backgroundColor: 'var(--md-sys-color-surface-container-highest)',
+            color: 'var(--md-sys-color-on-surface-variant)',
+            padding: '2px 8px', borderRadius: '12px',
+            font: 'var(--md-sys-typescale-label-small)', fontWeight: 600,
+          }}>
+            {content.maturityRating}
+          </span>
+        )}
+        {content.seasonNumber != null && content.episodeNumber != null && (
+          <span>S{content.seasonNumber} E{content.episodeNumber}</span>
+        )}
+        {content.episodeTitle && content.episodeTitle !== content.title && (
+          <span style={{ fontStyle: 'italic' }}>{content.episodeTitle}</span>
+        )}
+        {content.seasonCount != null && content.seasonCount > 0 && (
+          <span>{content.seasonCount} season{content.seasonCount > 1 ? 's' : ''}</span>
+        )}
         {content.type === 'github' && content.prState && (
           <span style={{
             backgroundColor: content.prState === 'merged' ? '#8250df' : content.prState === 'open' ? '#1a7f37' : '#cf222e',
@@ -672,7 +717,11 @@ const badgeStyle = (colors: { bg: string; fg: string }) => ({
 });
 
 /** Render text with color-coded badges for content ratings & review scores. */
-function NetflixInfoValue({ text, label }: { text: string; label?: string }) {
+function WorkInfoValue({ text, label }: { text: string; label?: string }) {
+  // Strip markdown bold/italic that LLMs wrap around scores — breaks badge regex matching
+  // e.g. "IMDb **7.5**/10" → "IMDb 7.5/10", "Rotten Tomatoes **60**%" → "Rotten Tomatoes 60%"
+  const cleanText = text.replace(/\*{1,2}(\S.*?\S|\S)\*{1,2}/g, '$1');
+
   // Split text into segments, replacing known patterns with badges
   const parts: preact.ComponentChildren[] = [];
   let key = 0;
@@ -685,20 +734,20 @@ function NetflixInfoValue({ text, label }: { text: string; label?: string }) {
     { re: /\b(TV-MA|TV-14|TV-PG|TV-G|TV-Y7|TV-Y|NC-17|PG-13|PG|NR|UR)\b/g, type: 'content' as const },
     // Standalone R/G only in rating-labeled rows to avoid false positives
     ...(isRatingLabel ? [{ re: /\b(R|G)\b/g, type: 'content' as const }] : []),
-    // IMDb ~x.x/10 or x/10 or just IMDb x.x (with optional ~, approx, etc.)
-    { re: /\bIMDb\s*[~≈]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*10)?\b/gi, type: 'imdb' as const },
-    // Rotten Tomatoes / RT xx%
-    { re: /\b(?:Rotten\s+Tomato(?:es)?|RT)\s*[~≈]?\s*(\d+)\s*%/gi, type: 'rt' as const },
-    // Metacritic / MC xx/100 or xx%
-    { re: /\b(?:Metacritic|MC)\s*[~≈]?\s*(\d+)\s*(?:\/\s*100|%)?/gi, type: 'meta' as const },
+    // IMDb ~x.x/10 or x/10 or just IMDb x.x (with optional :, ~, approx, etc.)
+    { re: /\bIMDb[:\s]*[~≈]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*10)?\b/gi, type: 'imdb' as const },
+    // Rotten Tomatoes / RT xx% (with optional colon, "Critics:", "Audience:")
+    { re: /\b(?:Rotten\s+Tomato(?:es)?|RT)\s*(?:Critics|Audience)?[:\s]*[~≈]?\s*(\d+)\s*%/gi, type: 'rt' as const },
+    // Metacritic / MC xx/100 or xx% (with optional colon)
+    { re: /\b(?:Metacritic|MC)[:\s]*[~≈]?\s*(\d+)\s*(?:\/\s*100|%)?/gi, type: 'meta' as const },
   ];
 
-  // Collect all badge matches with positions
+  // Collect all badge matches against cleaned text (positions align with cleanText)
   const badges: Array<{ start: number; end: number; node: preact.ComponentChildren }> = [];
   for (const { re, type } of badgePatterns) {
     re.lastIndex = 0;
     let m;
-    while ((m = re.exec(text)) !== null) {
+    while ((m = re.exec(cleanText)) !== null) {
       if (type === 'content') {
         const rating = m[1].toUpperCase();
         const colors = contentRatingColor(rating);
@@ -722,20 +771,20 @@ function NetflixInfoValue({ text, label }: { text: string; label?: string }) {
 
   if (badges.length === 0) return <InlineMarkdown text={text} />;
 
-  // Sort by position and build output
+  // Sort by position and build output (positions reference cleanText)
   badges.sort((a, b) => a.start - b.start);
   let pos = 0;
   for (const b of badges) {
     if (b.start < pos) continue; // skip overlapping matches
     if (b.start > pos) {
-      const seg = text.slice(pos, b.start);
-      parts.push(<InlineMarkdown key={key++} text={seg} />);
+      const seg = cleanText.slice(pos, b.start);
+      if (seg.trim()) parts.push(<InlineMarkdown key={key++} text={seg} />);
     }
     parts.push(b.node);
     pos = b.end;
   }
-  if (pos < text.length) {
-    parts.push(<InlineMarkdown key={key++} text={text.slice(pos)} />);
+  if (pos < cleanText.length) {
+    parts.push(<InlineMarkdown key={key++} text={cleanText.slice(pos)} />);
   }
 
   return <>{parts}</>;

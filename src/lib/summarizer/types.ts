@@ -55,6 +55,8 @@ export interface SummaryDocument {
   inferredTitle?: string; // title inferred from content when not in metadata (e.g. Facebook posts)
   inferredAuthor?: string; // author inferred from content when not in metadata
   inferredPublishDate?: string; // publish date inferred from content when not in metadata
+  genre?: string; // classified genre ID, e.g. 'news', 'tutorial'
+  subGenre?: string; // optional sub-genre, e.g. 'standup', 'breaking'
   llmProvider?: string; // display name of the LLM provider used, e.g. 'OpenAI'
   llmModel?: string; // model ID used for summarization, e.g. 'gpt-4o'
 }

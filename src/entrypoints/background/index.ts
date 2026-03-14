@@ -34,6 +34,8 @@ async function getCachedImages(): Promise<{ images: ImageContent[]; urls: { url:
 
 // Per-tab AbortController registry for in-flight summarizations
 const activeSummarizations = new Map<number, AbortController>();
+// Per-tab AbortController registry for in-flight chat/web-search
+const activeChats = new Map<number, AbortController>();
 
 /** Broadcast a fire-and-forget message to all extension views (sidepanel, popup). */
 function broadcastMessage(msg: Record<string, unknown>): void {
@@ -190,6 +192,15 @@ async function handleMessage(message: Message): Promise<Message> {
         activeSummarizations.delete((message as import('@/lib/messaging/types').CancelSummarizeMessage).tabId);
       }
       return { type: 'CANCEL_SUMMARIZE', success: true } as Message;
+    }
+    case 'CANCEL_CHAT': {
+      const tabIdToCancel = (message as { tabId: number }).tabId;
+      const chatCtrl = activeChats.get(tabIdToCancel);
+      if (chatCtrl) {
+        chatCtrl.abort();
+        activeChats.delete(tabIdToCancel);
+      }
+      return { type: 'CANCEL_CHAT', success: true } as unknown as Message;
     }
     case 'CHAT_MESSAGE':
       return handleChatMessage(message.messages, message.summary, message.content, message.tabId, message.webSearch);
@@ -674,6 +685,11 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
       currentTotalChunks = totalChunks;
     };
 
+    // Genre classification callback — broadcast to sidepanel for status display
+    const onGenreClassified = (result: { genre: string; subGenre?: string; confidence: number }) => {
+      broadcastMessage({ type: 'GENRE_CLASSIFIED', genre: result.genre, subGenre: result.subGenre, confidence: result.confidence, tabId });
+    };
+
     try {
       const result = await summarize(provider, content, {
         detailLevel: settings.summaryDetailLevel,
@@ -693,6 +709,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         onResponseBody,
         onStreamChunk,
         onChunkProgress,
+        onGenreClassified,
       });
       result.llmProvider = providerName;
       result.llmModel = llmConfig.model;
@@ -733,6 +750,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
           onResponseBody,
           onStreamChunk,
           onChunkProgress,
+          onGenreClassified,
         });
         result.llmProvider = providerName;
         result.llmModel = llmConfig.model;
@@ -764,6 +782,14 @@ async function handleChatMessage(
   tabId?: number,
   webSearch?: boolean,
 ): Promise<ChatResponseMessage> {
+  // Register abort controller for this tab's chat
+  const controller = new AbortController();
+  if (tabId != null) {
+    activeChats.get(tabId)?.abort();
+    activeChats.set(tabId, controller);
+  }
+  const { signal } = controller;
+
   try {
     const settings = await getSettings();
     const llmConfig = getActiveProviderConfig(settings);
@@ -848,6 +874,9 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
 
     // --- SYSTEM MSG 2: Document extract (cached across turns) ---
     let documentSystem = `Source metadata:\n${metaLines.join('\n')}`;
+    if (summary.genre) {
+      documentSystem += `\nClassified genre: ${summary.genre}${summary.subGenre ? ` (${summary.subGenre})` : ''}`;
+    }
     if (hasImages && cachedImageUrls.length > 0) {
       const urlLines = cachedImageUrls.map((img, i) =>
         `${i + 1}. ${img.url}${img.alt ? ` — "${img.alt}"` : ''}`,
@@ -901,8 +930,8 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
     let lastResponseBody = '';
 
     const chatOpts: ChatOptions = schemaEnforced
-      ? { jsonSchema: RESPONSE_SCHEMA, webSearch, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } }
-      : { jsonMode: true, webSearch, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } };
+      ? { maxTokens: 8192, jsonSchema: RESPONSE_SCHEMA, webSearch, signal, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } }
+      : { maxTokens: 8192, jsonMode: true, webSearch, signal, onRequestBody: (b) => { lastRequestBody = b; }, onResponseBody: (b) => { lastResponseBody = b; } };
 
     // Stream the chat response so the user sees typing in real-time
     let accumulated = '';
@@ -910,20 +939,29 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
     const CHAT_THROTTLE_MS = 150;
 
     const generator = provider.streamChat(chatMessages, chatOpts);
-    for await (const chunk of generator) {
-      // Anthropic web search: reset signal means model started a new text block
-      // after searching — discard pre-search text and show only the final response.
-      if (chunk === '\x00RESET\x00') {
-        accumulated = '';
-        broadcastMessage({ type: 'CHAT_CHUNK', chunk: '', tabId });
-        continue;
+    try {
+      for await (const chunk of generator) {
+        if (signal.aborted) {
+          generator.return();
+          throw new Error('Chat cancelled');
+        }
+        // Anthropic web search: reset signal means model started a new text block
+        // after searching — discard pre-search text and show only the final response.
+        if (chunk === '\x00RESET\x00') {
+          accumulated = '';
+          broadcastMessage({ type: 'CHAT_CHUNK', chunk: '', tabId });
+          continue;
+        }
+        accumulated += chunk;
+        const now = Date.now();
+        if (now - lastChatPush >= CHAT_THROTTLE_MS) {
+          lastChatPush = now;
+          broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });
+        }
       }
-      accumulated += chunk;
-      const now = Date.now();
-      if (now - lastChatPush >= CHAT_THROTTLE_MS) {
-        lastChatPush = now;
-        broadcastMessage({ type: 'CHAT_CHUNK', chunk: accumulated, tabId });
-      }
+    } catch (err) {
+      if (signal.aborted) throw new Error('Chat cancelled');
+      throw err;
     }
 
     // Final flush
@@ -943,6 +981,8 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
       success: false,
       error: err instanceof Error ? err.message : String(err),
     };
+  } finally {
+    if (tabId != null) activeChats.delete(tabId);
   }
 }
 

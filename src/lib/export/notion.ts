@@ -306,6 +306,12 @@ export class NotionAdapter implements ExportAdapter {
       };
     }
 
+    if (summary.genre) {
+      properties['Genre'] = {
+        rich_text: [{ text: { content: summary.genre + (summary.subGenre ? ` / ${summary.subGenre}` : '') } }],
+      };
+    }
+
     return properties;
   }
 

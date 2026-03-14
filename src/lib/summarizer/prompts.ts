@@ -1,5 +1,6 @@
 import type { ExtractedContent, ExtractedComment } from '../extractors/types';
 import { MERMAID_ESSENTIAL_RULES } from '../mermaid-rules';
+import { GENRE_TEMPLATES, type Genre, type DetailLevel, type SizeCategory, type FieldGuidelines, type ContentHints } from './genres';
 
 /** Max comments to include in the prompt, by detail level. */
 export const COMMENT_LIMITS: Record<string, number> = { brief: 50, standard: 200, detailed: 1000 };
@@ -37,7 +38,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
   pt: 'Portuguese', ru: 'Russian', zh: 'Chinese', ja: 'Japanese', ko: 'Korean',
 };
 
-export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', language: string, languageExcept: string[] = [], imageAnalysisEnabled = false, wordCount = 1500, contentType?: string, githubPageType?: string): string {
+export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', language: string, languageExcept: string[] = [], imageAnalysisEnabled = false, wordCount = 1500, contentType?: string, githubPageType?: string, genre?: Genre, isVideo = false): string {
   const targetLang = LANGUAGE_NAMES[language] || language;
   // Remove target language from exceptions — translating target→target is a no-op
   const exceptLangs = languageExcept
@@ -190,19 +191,34 @@ Every field value must be in the chosen output language. No mixing languages wit
     },
   })[size];
 
-  // Content-type-aware field exclusions
+  // Genre-aware field overrides
+  // Genre template provides field-level overrides; source type (GitHub/Netflix) provides platform-specific formatting
   const isGitHub = contentType === 'github';
   const isNetflix = contentType === 'netflix';
-  const skipQuotes = isGitHub;
-  const skipFactCheck = isGitHub || isNetflix;
+
+  // Load genre template — skip for software (uses GitHub overrides) and generic (uses base)
+  const genreTemplate = genre && genre !== 'software' && genre !== 'generic'
+    ? GENRE_TEMPLATES[genre] : undefined;
+  const contentHints: ContentHints = { isVideo };
+  const genreFieldOverrides = genreTemplate?.getOverrides(detailLevel as DetailLevel, size as SizeCategory, contentHints);
+
+  const skipQuotes = genreTemplate?.skipQuotes ?? isGitHub;
+  const skipFactCheck = genreTemplate?.skipFactCheck ?? (isGitHub || isNetflix);
+
+  // Initialize field guidelines from genre overrides or base `d`.
+  // Genre returning null for a field → 'Set to null.' (triggers skip logic below).
+  // Genre returning undefined (or absent key) → fall through to base `d` value.
+  function genreOrDefault(override: string | null | undefined, base: string): string {
+    if (override === undefined) return base;
+    return override ?? 'Set to null.';
+  }
+  let gProsCons = genreOrDefault(genreFieldOverrides?.prosCons, d.prosCons);
+  let gComments = genreOrDefault(genreFieldOverrides?.comments, d.comments);
+  let gExtraSections = genreOrDefault(genreFieldOverrides?.extraSections, d.extraSections);
+  let gConclusion: string | undefined = genreFieldOverrides?.conclusion;
 
   // Apply GitHub-specific field guidelines — replace generic instructions with page-type-specific ones
-  // (moves field overrides from user prompt into system prompt for clarity and token savings)
-  let gProsCons = d.prosCons;
-  let gComments = d.comments;
-  let gExtraSections = d.extraSections;
-  let gConclusion: string | null = null; // null = use default `d.conclusion`
-
+  // (GitHub always uses software genre which has no overrides, so these take precedence)
   if (isGitHub && githubPageType) {
     switch (githubPageType) {
       case 'pr':
@@ -276,47 +292,6 @@ Every field value must be in the chosen output language. No mixing languages wit
     }
   }
 
-  // Netflix-specific field overrides
-  let netflixOverrides: { tldr: string; takeaways: string; summary: string; quotes: string; conclusion: string; extraSections: string } | undefined;
-  if (isNetflix) {
-    gProsCons = 'Set to null.';
-    gComments = 'Set to null.';
-    const nf = detailLevel === 'brief' ? {
-      tldr: 'Spoiler-free overview: genre, tone, premise. 2-3 sentences. Include year, director/showrunner, and lead cast names inline. Do NOT reveal plot twists or endings.',
-      takeaways: '3-5 items. Each: "**Label** — explanation". Use for: show metadata (year, content rating like TV-MA/PG-13/R, genre), main themes, tone/mood, notable aspects. Keep spoiler-free.',
-      summary: 'Brief spoiler-free synopsis only — what the show/movie is about without revealing key plot points. 2-3 sentences.',
-      quotes: 'Set to null.',
-      conclusion: '1-2 sentences — overall impression, who would enjoy this.',
-      extraSections: 'Set to null.',
-    } : detailLevel === 'standard' ? {
-      tldr: 'Spoiler-free overview: genre, tone, premise, year, director/showrunner, lead cast. 2-3 sentences. Do NOT reveal plot twists or endings.',
-      takeaways: '5-7 items. Each: "**Label** — explanation". Include: year/seasons, director/showrunner, main cast (actor as Character), genre, content rating (TV-MA/PG-13/R etc.), review scores (IMDb/RT if known), key themes. Keep spoiler-free.',
-      summary: 'FULL PLOT SUMMARY with spoilers. Include all major plot points, twists, and resolution. Structure with ### subheadings for acts/major sequences. This section WILL be hidden behind a spoiler warning in the UI.',
-      quotes: '3-5 memorable lines of dialogue with timestamps.',
-      conclusion: '2-3 sentences — critical assessment, thematic significance, who would enjoy this.',
-      extraSections: `Include these sections IN THIS ORDER:
-  - "[SPOILER] Condensed Script" — Rewrite the transcript as a condensed play script. Include key dialogue (with character names in bold), brief stage directions in italics, and emotional beats. Omit repetitive/filler dialogue but preserve the dramatic flow. Target ~40% of original transcript length. Add "(more)" at the end to indicate a longer version is available in Detailed mode.
-  - "Cast & Characters" — List main characters as "**Actor Name** as **Character Name** — brief role description from what we see". Use your knowledge of the cast.
-  - "Themes" — Major themes explored, with brief analysis.
-  - "Similar Titles" — 4-5 similar shows/movies with brief explanations of why they're similar.`,
-    } : /* detailed */ {
-      tldr: 'Spoiler-free overview: genre, tone, premise, year, director/showrunner, lead cast, awards/acclaim. 3-4 sentences. Do NOT reveal plot twists.',
-      takeaways: '7-10 items covering: year/seasons, director/showrunner/writer, full main cast (actor as Character), genre/subgenre, content rating (TV-MA/PG-13/R etc.), review scores (IMDb/RT if known), awards, production notes, key themes. Spoiler-free.',
-      summary: 'COMPREHENSIVE PLOT SUMMARY with full spoilers. Cover every significant scene, character arc, twist, and the resolution. Use ### subheadings for acts/major sequences. Include emotional beats and character motivations. This section WILL be hidden behind a spoiler warning.',
-      quotes: '5-10 memorable or significant lines of dialogue with timestamps.',
-      conclusion: '3-5 sentences — critical assessment, thematic depth, cultural significance, comparison to similar works.',
-      extraSections: `Include these sections IN THIS ORDER:
-  - "[SPOILER] Condensed Script" — Rewrite the FULL transcript as a condensed play script. Format: character names in **bold**, stage directions and scene descriptions in *italics*, key dialogue preserved verbatim where impactful. Compress mundane exchanges but keep ALL dramatically significant scenes. Target ~60% of original transcript length. This should read as an enjoyable, aesthetically pleasant dramatic text.
-  - "Cast & Characters" — Detailed list: "**Actor Name** as **Character Name** — character description, arc, relationships". Use your knowledge of the cast and what we see in the transcript.
-  - "Themes & Analysis" — In-depth thematic analysis: major themes, symbolism, cultural references, narrative techniques.
-  - "Show Context" — Where this fits in the series (if TV): season arc, connections to other episodes, cliffhangers, character development across the season. For movies: place in director's filmography, genre context.
-  - "Reception" — Critical and audience reception, awards, notable reviews. Use your knowledge; note if information may be outdated.
-  - "Similar Titles" — 5-7 recommendations with explanations.`,
-    };
-    gExtraSections = nf.extraSections;
-    netflixOverrides = nf;
-  }
-
   // Skip fields from schema+guidelines when they're just "Set to null"
   const skipProsCons = gProsCons === 'Set to null.';
   const skipComments = gComments === 'Set to null.';
@@ -324,14 +299,17 @@ Every field value must be in the chosen output language. No mixing languages wit
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // Genre can override the factCheck level (e.g. news forces 'standard' even at brief)
+  const effectiveFactCheck = genreFieldOverrides?.factCheck !== undefined ? genreFieldOverrides.factCheck : d.factCheck;
+
   // factCheck rules — shared body for standard/detailed, null for brief, skipped for GitHub
-  const factCheckPreamble = d.factCheck === 'detailed'
+  const factCheckPreamble = effectiveFactCheck === 'detailed'
     ? 'Actively look for verifiable factual claims to analyze. Include when'
     : 'Include ONLY when';
 
   const factCheckGuideline = skipFactCheck
     ? ''
-    : d.factCheck === null
+    : effectiveFactCheck === null
       ? '- "factCheck": Set to null.'
       : `- "factCheck" — NEVER set to null for news, journalism, or reporting of any kind. For non-news content, ${factCheckPreamble.toLowerCase()} any of the conditions below apply.
   MANDATORY (never null):
@@ -372,11 +350,16 @@ Every field value must be in the chosen output language. No mixing languages wit
   - 🔍 Unverifiable: **"Crime dropped 77% in Memphis"** — no public dataset supports this specific figure
   - ⛔ Omitted: **industry funding** — The cited study was funded by the manufacturer; no independent replication exists. Article presents findings as neutral science`;
 
-  // Quotes extra instructions (translation + timestamps) — only when quotes are included
-  const quotesExtra = (skipQuotes || d.quotes === 'Set to null.') ? '' : ' When the summary language differs from the source language, append a translation in parentheses after each quote, e.g. "Original quote" (Translation). If you include a timestamp, always make it a clickable markdown link — never a bare number.';
+  // Effective quotes guideline — genre may override or null it out
+  const effectiveQuotes = genreFieldOverrides?.quotes !== undefined ? genreFieldOverrides.quotes : d.quotes;
+  const hasQuotes = !skipQuotes && !!effectiveQuotes && effectiveQuotes !== 'Set to null.';
 
-  // Mermaid section — skip for GitHub non-code types; syntax rules appended when diagrams are allowed
-  const mermaidGuideline = (isGitHub && githubPageType !== 'code')
+  // Quotes extra instructions (translation + timestamps) — only when quotes are included
+  const quotesExtra = hasQuotes ? ' When the summary language differs from the source language, append a translation in parentheses after each quote, e.g. "Original quote" (Translation). If you include a timestamp, always make it a clickable markdown link — never a bare number.' : '';
+
+  // Mermaid section — skip for GitHub non-code types and genres that don't benefit from process diagrams
+  const skipMermaid = genreTemplate?.skipMermaid ?? false;
+  const mermaidGuideline = ((isGitHub && githubPageType !== 'code') || skipMermaid)
     ? ''
     : detailLevel === 'brief'
     ? `- ${d.mermaid}`
@@ -402,26 +385,32 @@ Every field value must be in the chosen output language. No mixing languages wit
   }
   const schemaFields = schema.map(f => `    ${f}`).join(',\n');
 
-  // Build guidelines
-  const guidelines: string[] = netflixOverrides ? [
-    `- "tldr": ${netflixOverrides.tldr}`,
-    `- "keyTakeaways": ${netflixOverrides.takeaways}`,
-    `- "summary": ${netflixOverrides.summary}`,
+  // Build guidelines — genre overrides replace base `d` values for core fields
+  const gTldr = genreFieldOverrides?.tldr;
+  const gTakeaways = genreFieldOverrides?.takeaways;
+  const gTakeawayFormat = genreFieldOverrides?.takeawayFormat;
+  const gSummary = genreFieldOverrides?.summary;
+  const gRelatedTopics = genreFieldOverrides?.relatedTopics;
+  const gTags = genreFieldOverrides?.tags;
+
+  const guidelines: string[] = gTldr ? [
+    `- "tldr": ${gTldr}`,
+    `- "keyTakeaways": ${gTakeaways || `${d.takeaways} items. Each: ${gTakeawayFormat || d.takeawayFormat}.`}`,
+    `- "summary": ${gSummary || d.summary}`,
   ] : [
     `- "tldr": ${d.tldr}. Each sentence standalone — never one compound run-on. Bold the most critical terms.`,
     `- "keyTakeaways": ${d.takeaways} items. Each: ${d.takeawayFormat}.`,
     `- "summary": ${d.summary}. Bold key terms, names, and statistics throughout.`,
   ];
-  if (!skipQuotes) guidelines.push(`- "notableQuotes": ${netflixOverrides?.quotes || d.quotes}${quotesExtra}`);
-  guidelines.push(`- "conclusion": ${netflixOverrides?.conclusion || gConclusion || `${d.conclusion}.`}`);
+  if (hasQuotes) guidelines.push(`- "notableQuotes": ${effectiveQuotes}${quotesExtra}`);
+  guidelines.push(`- "conclusion": ${gConclusion || `${d.conclusion}.`}`);
   if (!skipProsCons) guidelines.push(`- "prosAndCons": ${gProsCons}`);
   if (factCheckGuideline) guidelines.push(factCheckGuideline);
   if (!skipComments) guidelines.push(`- "commentsHighlights": ${gComments}`);
-  if (!isNetflix) guidelines.push(`- "relatedTopics": ${d.relatedTopics} topics.`);
-  else guidelines.push(`- "relatedTopics": Similar shows/movies — ${d.relatedTopics} recommendations with brief reason why they're similar.`);
+  guidelines.push(`- "relatedTopics": ${gRelatedTopics || `${d.relatedTopics} topics.`}`);
   if (!skipExtraSections) guidelines.push(`- "extraSections": ${gExtraSections}`);
   guidelines.push(
-    `- "tags": ${d.tags} short, lowercase tags.` + (isNetflix ? ' Include genre, mood, and content warnings.' : ''),
+    `- "tags": ${gTags || `${d.tags} short, lowercase tags.`}`,
     `- "sourceLanguage" must be the ISO 639-1 code of the language the MAJORITY of the original content is written in (e.g. "en", "ru", "fr"). A few foreign words, proper names, or technical terms do not change the source language — only the dominant language of the body text counts.`,
     `- "summaryLanguage" must be the ISO 639-1 code of the language you actually wrote the summary in. It must match the output language you chose in the LANGUAGE RULE (Step 2) at the top.`,
   );
@@ -436,7 +425,10 @@ Every field value must be in the chosen output language. No mixing languages wit
   guidelines.push(`- All text fields support full markdown formatting (bold, italic, links, lists, etc.). Use it wherever it improves clarity.`);
   guidelines.push(`- MATH FORMULAS: When the content contains mathematical expressions, equations, or formulas, reproduce them using LaTeX notation: \`$...$\` for inline math and \`$$...$$\` for display (block) equations. Always prefer LaTeX over Unicode approximations for anything beyond simple arithmetic.`);
   if (mermaidGuideline) guidelines.push(mermaidGuideline);
-  if (!contentType || contentType === 'article' || contentType === 'pdf' || contentType === 'generic') {
+  // Data charts — enabled for data-heavy genres and generic content types
+  const enableDataCharts = genreTemplate?.enableDataCharts
+    ?? (!contentType || contentType === 'article' || contentType === 'pdf' || contentType === 'generic');
+  if (enableDataCharts) {
     const chartMax = detailLevel === 'brief' ? '1' : detailLevel === 'standard' ? '2-3' : '2-5';
     guidelines.push(`- DATA CHARTS: If the content contains significant numerical tables or datasets, identify the most important data and visualize it using mermaid charts (\`xychart-beta\` for trends/comparisons, \`pie\` for proportions). Create up to ${chartMax} chart(s). Place charts in the "summary" or "extraSections" near the relevant discussion. This applies even when process/architecture diagrams are otherwise omitted — data visualization is always valuable when the numbers warrant it.`);
   }
@@ -449,9 +441,14 @@ Every field value must be in the chosen output language. No mixing languages wit
     `- IMPORTANT: If the user's additional instructions explicitly ask you NOT to summarize, or say they only want to ask questions / chat about the content, RESPECT their request. Respond with: {"text": "Your conversational response here"}. Do NOT include "summary" in this case.`,
   );
 
-  const role = isGitHub ? 'an expert software engineer and content summarizer'
-    : isNetflix ? 'an expert film/TV critic and content summarizer with deep knowledge of cinema, television, actors, directors, and entertainment industry'
-    : 'an expert content summarizer';
+  // Genre-specific additional guidelines (e.g. "check for logical fallacies")
+  const additionalGuidelines = genreTemplate?.additionalGuidelines?.(detailLevel as DetailLevel) ?? [];
+  for (const g of additionalGuidelines) {
+    guidelines.push(`- ${g}`);
+  }
+
+  const role = genreTemplate?.role
+    ?? (isGitHub ? 'an expert software engineer and content summarizer' : 'an expert content summarizer');
 
   // Build a short, punchy language reminder for the very end of the prompt (recency bias)
   let langReminder: string;

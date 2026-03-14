@@ -276,15 +276,6 @@
     },
     "xai": {
       "models": {
-        "grok-4-1-fast-non-reasoning": {
-          "name": "Grok 4.1 Fast (Non-Reasoning)",
-          "contextWindow": 2097152,
-          "inputPrice": 0.2,
-          "outputPrice": 0.5,
-          "vision": true,
-          "textGeneration": true,
-          "webSearch": true
-        },
         "grok-4-1-fast-reasoning": {
           "name": "Grok 4.1 Fast (Reasoning)",
           "contextWindow": 2097152,
@@ -293,6 +284,15 @@
           "vision": true,
           "textGeneration": true,
           "reasoning": true,
+          "webSearch": true
+        },
+        "grok-4-1-fast-non-reasoning": {
+          "name": "Grok 4.1 Fast (Non-Reasoning)",
+          "contextWindow": 2097152,
+          "inputPrice": 0.2,
+          "outputPrice": 0.5,
+          "vision": true,
+          "textGeneration": true,
           "webSearch": true
         },
         "grok-4": {

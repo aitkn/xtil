@@ -40,6 +40,8 @@ export const RESPONSE_SCHEMA: JsonSchema = {
           inferredTitle: { type: 'string' },
           inferredAuthor: { type: 'string' },
           inferredPublishDate: { type: 'string' },
+          genre: { type: 'string' },
+          subGenre: { type: 'string' },
         },
         additionalProperties: false,
       },

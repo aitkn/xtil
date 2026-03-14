@@ -223,6 +223,16 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
     if (nfEndIndex !== -1) {
       try {
         const result = await fetchNetflixTranscript(langPrefs, summaryLang);
+        console.log('[xTil] Netflix metadata:', JSON.stringify({
+          title: result.title, year: result.year, rating: result.rating,
+          seasonCount: result.seasonCount, episodeTitle: result.episodeTitle,
+          seasonNumber: result.seasonNumber, episodeNumber: result.episodeNumber,
+          creators: result.creators, cast: result.cast?.slice(0, 3),
+          thumbnailUrl: result.thumbnailUrl?.substring(0, 60),
+        }));
+        // Debug: log Netflix API metadata structure
+        const debugDump = (result as Record<string, unknown>)._debugDump;
+        if (debugDump) console.log('[xTil] Netflix video metadata dump:', debugDump);
         // Update title & metadata from bridge info
         if (result.title && result.title !== content.title) {
           content.title = result.title;
@@ -237,6 +247,37 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
         }
         if (result.duration) {
           content.duration = formatDuration(result.duration);
+        }
+        if (result.thumbnailUrl) {
+          content.thumbnailUrl = result.thumbnailUrl;
+        }
+        // Rich metadata from Netflix API
+        if (result.showType) {
+          content.showType = result.showType;
+        }
+        if (result.year) {
+          content.publishDate = String(result.year);
+        }
+        if (result.creators?.length) {
+          content.author = result.creators.join(', ');
+        }
+        if (result.rating) {
+          content.maturityRating = result.rating;
+        }
+        if (result.seasonCount) {
+          content.seasonCount = result.seasonCount;
+        }
+        if (result.episodeTitle) {
+          content.episodeTitle = result.episodeTitle;
+        }
+        if (result.seasonNumber != null) {
+          content.seasonNumber = result.seasonNumber;
+        }
+        if (result.episodeNumber != null) {
+          content.episodeNumber = result.episodeNumber;
+        }
+        if (result.cast?.length) {
+          content.cast = result.cast;
         }
         content.content = content.content.replace(
           /\[Transcript available - fetching\.\.\.\]\n\n\[NETFLIX_TRANSCRIPT:[^\]]+\]/,
@@ -854,7 +895,11 @@ function netflixBridgeRequest<T>(
 async function fetchNetflixTranscript(
   langPrefs?: string[],
   summaryLang?: string,
-): Promise<{ transcript: string; title?: string; synopsis?: string; duration?: number }> {
+): Promise<{
+  transcript: string; title?: string; synopsis?: string; duration?: number; thumbnailUrl?: string;
+  showType?: string; year?: number; rating?: string; seasonCount?: number; episodeTitle?: string;
+  seasonNumber?: number; episodeNumber?: number; creators?: string[]; cast?: string[];
+}> {
   // Step 1: Get track list and metadata from bridge
   const info = await netflixBridgeRequest<{
     tracks: Array<{ trackId: string; bcp47: string; displayName: string; rawTrackType: string }>;
@@ -863,7 +908,17 @@ async function fetchNetflixTranscript(
     synopsis?: string;
     duration?: number;
     audioLang?: string;
+    thumbnailUrl?: string;
+    year?: number;
+    rating?: string;
+    seasonCount?: number;
+    episodeTitle?: string;
+    seasonNumber?: number;
+    episodeNumber?: number;
+    creators?: string[];
+    cast?: string[];
     cachedLanguages?: string[];
+    _debugDump?: string;
   }>('tracks', {});
 
   if (!info?.tracks?.length) {
@@ -903,11 +958,82 @@ async function fetchNetflixTranscript(
     throw new Error('Failed to parse Netflix TTML subtitles');
   }
 
+  // Thumbnail: bridge API → DOM fallback (skip tiny icons <100px)
+  let thumbnailUrl = info.thumbnailUrl;
+  if (!thumbnailUrl) {
+    // DOM fallback: find the largest image on the Netflix player page
+    const candidates = document.querySelectorAll('img[src]') as NodeListOf<HTMLImageElement>;
+    let bestImg: HTMLImageElement | null = null;
+    let bestWidth = 0;
+    for (const img of candidates) {
+      const w = img.naturalWidth || img.width;
+      if (w > bestWidth && w > 100) {
+        bestWidth = w;
+        bestImg = img;
+      }
+    }
+    if (bestImg?.src) thumbnailUrl = bestImg.src;
+  }
+  if (!thumbnailUrl) {
+    // og:image fallback (may be stale on SPA navigation but worth trying)
+    thumbnailUrl = document.querySelector('meta[property="og:image"]')?.getAttribute('content') || undefined;
+  }
+
+  // Show type from bridge API ("show"/"movie") or DOM ("Limited Series")
+  let showType = info.type as string | undefined; // "show", "movie", etc.
+  if (!showType || showType === 'show') {
+    // Try to get more specific type from DOM (e.g. "Limited Series", "Series")
+    const typeEl = document.querySelector('[data-uia="video-title"] + div, .previewModal--tags .previewModal--tags-label, .duration');
+    const typeText = typeEl?.textContent?.trim();
+    if (typeText && /series|season|episode|film|movie|special|documentary|miniseries/i.test(typeText)) {
+      showType = typeText;
+    }
+  }
+
+  // DOM-based metadata enrichment — scrape the paused/pre-play overlay
+  // Netflix shows episode info, show type, and synopsis on the player overlay
+  let episodeTitle = info.episodeTitle;
+  let episodeNumber = info.episodeNumber;
+  let seasonNumber = info.seasonNumber;
+  if (!episodeTitle) {
+    // Netflix overlay: "The Futures of You and Me: Ep. 1" or "S1:E3 Episode Title"
+    const epEl = document.querySelector('[data-uia="video-title"] span:last-child, .ellipsize-text .ellipsize-text, .watch-video--evidence-text');
+    const epText = epEl?.textContent?.trim();
+    if (epText) {
+      // Try "Episode Title: Ep. N" format
+      const epMatch = epText.match(/^(.+?):\s*Ep\.\s*(\d+)$/i);
+      if (epMatch) {
+        episodeTitle = epMatch[1].trim();
+        episodeNumber = parseInt(epMatch[2], 10);
+      } else {
+        // Try "S1:E3 Title" format
+        const seMatch = epText.match(/^S(\d+)\s*:\s*E(\d+)\s+(.+)$/i);
+        if (seMatch) {
+          seasonNumber = parseInt(seMatch[1], 10);
+          episodeNumber = parseInt(seMatch[2], 10);
+          episodeTitle = seMatch[3].trim();
+        } else {
+          episodeTitle = epText;
+        }
+      }
+    }
+  }
+
   return {
     transcript,
     title: info.title,
     synopsis: info.synopsis,
     duration: info.duration,
+    thumbnailUrl,
+    showType,
+    year: info.year,
+    rating: info.rating,
+    seasonCount: info.seasonCount,
+    episodeTitle,
+    seasonNumber,
+    episodeNumber,
+    creators: info.creators,
+    cast: info.cast,
   };
 }
 
