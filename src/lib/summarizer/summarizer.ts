@@ -443,8 +443,10 @@ export function buildPlaceholders(content: ExtractedContent, imageUrlList?: { ur
   if (imageUrlList?.length) {
     imageUrlList.forEach((img, i) => replacements.push([`{{IMG_${i + 1}}}`, img.url]));
   }
-  if (content.type === 'youtube') {
-    const cleanUrl = content.url.replace(/[&?]t=\d+s?/g, '');
+  if (content.type === 'youtube' || content.type === 'netflix') {
+    let cleanUrl = content.url.replace(/[&?]t=\d+s?/g, '');
+    // Ensure URL has a ? so &t=SECONDS appended by LLM is valid
+    if (!cleanUrl.includes('?')) cleanUrl += '?';
     replacements.push(['{{VIDEO_URL}}', cleanUrl]);
   }
   // GitHub file references

@@ -48,8 +48,8 @@ const STEP_HELPERS: Record<Exclude<OnboardingStep, null>, { title: string; subti
     subtitle: 'Image analysis lets xTil read images on the page and include them in summaries. Uncheck it to save tokens. If your model doesn\'t support vision, this setting is ignored. Press "Test Connection" to verify everything works.',
   },
   factCheck: {
-    title: 'Step 5: Auto-verify facts with web search',
-    subtitle: 'When enabled, xTil will automatically run a web search to verify key claims after summarizing. This adds a "Fact Check" section with source links. Only available for models that support web search.',
+    title: 'Step 5: Auto-enrich with web search',
+    subtitle: 'When enabled, xTil will automatically run a web search after summarizing to verify facts, update ratings, and enrich content with the latest information. Only available for models that support web search.',
   },
   notionKey: {
     title: 'Step 6: Save summaries to Notion (optional)',
@@ -995,7 +995,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             htmlFor="autoSearchFactCheck"
             style={{ font: 'var(--md-sys-typescale-label-medium)', color: modelSupportsWebSearch ? 'var(--md-sys-color-on-surface)' : 'var(--md-sys-color-on-surface-variant)', cursor: modelSupportsWebSearch ? 'pointer' : 'default' }}
           >
-            Auto-search fact checks
+            Auto-enrich with web search
           </label>
         </div>
         <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', marginTop: '2px', marginLeft: '26px' }}>

@@ -544,6 +544,7 @@ export function App() {
 
       // Check if this is a same-video YouTube timestamp link
       const cur = contentRef.current;
+      // YouTube timestamp links: seek the player
       if (cur?.type === 'youtube') {
         const linkVideoId = href.match(YT_VIDEO_RE)?.[1];
         const curVideoId = cur.url.match(YT_VIDEO_RE)?.[1];
@@ -557,6 +558,17 @@ export function App() {
               sendMessage({ type: 'SEEK_VIDEO', seconds } as SeekVideoMessage).catch(() => {});
               return;
             }
+          }
+        }
+      }
+      // Netflix timestamp links: seek the player
+      if (cur?.type === 'netflix' && href.includes('netflix.com')) {
+        const tMatch = href.match(/[?&]t=(\d+)/);
+        if (tMatch) {
+          const seconds = parseInt(tMatch[1], 10);
+          if (!isNaN(seconds)) {
+            sendMessage({ type: 'SEEK_VIDEO', seconds } as SeekVideoMessage).catch(() => {});
+            return;
           }
         }
       }
@@ -848,13 +860,18 @@ export function App() {
           } catch { /* ignore */ }
         }
 
+        // Same URL reload — preserve existing summary and chat
+        const prev = contentRef.current;
+        const sameUrl = prev && prev.url === response.data.url;
         setContent(response.data);
-        setExtractEpoch((n) => n + 1);
-        setSummary(null);
-        setNotionUrl(null);
-        setChatMessages([]);
-        setInputValue('');
-        setPendingResummarize(false);
+        if (!sameUrl) {
+          setExtractEpoch((n) => n + 1);
+          setSummary(null);
+          setNotionUrl(null);
+          setChatMessages([]);
+          setInputValue('');
+          setPendingResummarize(false);
+        }
       } else if (response.error === 'restricted') {
         setRestricted(true);
         setContent(null);
@@ -1152,9 +1169,9 @@ export function App() {
   const summarizeVariant: SummarizeVariant = (() => {
     if (!isLLMConfigured) return 'disabled';
     if (!content) return 'primary';
-    if (content.type !== 'youtube') return 'primary';
+    if (content.type !== 'youtube' && content.type !== 'netflix') return 'primary';
 
-    const hasTranscriptMarker = content.content.includes('[YOUTUBE_TRANSCRIPT:');
+    const hasTranscriptMarker = content.content.includes('[YOUTUBE_TRANSCRIPT:') || content.content.includes('[NETFLIX_TRANSCRIPT:');
     const hasTranscriptError = content.content.includes('*Transcript could not be loaded:');
     const transcriptLoaded = !hasTranscriptMarker && !hasTranscriptError;
 
@@ -1304,12 +1321,15 @@ export function App() {
       persistToSession(originTabId);
 
       // Check if auto-search should fire (evaluated before finally clears loading)
-      if (settings.autoSearchFactCheck && finalSummary.factCheck) {
-        const cfg = getActiveProviderConfig(settings);
-        const me = getCatalogEntry(settings.activeProviderId, cfg.model);
-        if (me?.webSearch) {
-          autoSearchFactCheck = true;
-          completedSummary = finalSummary;
+      if (settings.autoSearchFactCheck) {
+        const hasSearchableContent = finalSummary.factCheck || finalSummary.extraSections?.['Reception'];
+        if (hasSearchableContent) {
+          const cfg = getActiveProviderConfig(settings);
+          const me = getCatalogEntry(settings.activeProviderId, cfg.model);
+          if (me?.webSearch) {
+            autoSearchFactCheck = true;
+            completedSummary = finalSummary;
+          }
         }
       }
     } catch (err) {
@@ -1338,12 +1358,28 @@ export function App() {
 
     // Fire auto-search AFTER main spinner is cleared — uses section-level action state
     if (autoSearchFactCheck && completedSummary) {
-      setActiveSectionActions(prev => new Map(prev).set('Fact Check', 'search'));
       const today = new Date().toISOString().slice(0, 10);
-      const ok = await handleChatSend(buildFactCheckSearchPrompt(today), { internal: true, webSearch: true, summaryOverride: completedSummary });
-      if (ok) setSearchedSections(prev => new Set(prev).add('Fact Check'));
-      setActiveSectionActions(prev => { const next = new Map(prev); next.delete('Fact Check'); return next; });
-      persistToSession(originTabId);
+
+      // Auto-search Fact Check
+      if (completedSummary.factCheck) {
+        setActiveSectionActions(prev => new Map(prev).set('Fact Check', 'search'));
+        const ok = await handleChatSend(buildFactCheckSearchPrompt(today), { internal: true, webSearch: true, summaryOverride: completedSummary });
+        if (ok) setSearchedSections(prev => new Set(prev).add('Fact Check'));
+        setActiveSectionActions(prev => { const next = new Map(prev); next.delete('Fact Check'); return next; });
+        persistToSession(originTabId);
+      }
+
+      // Auto-search Reception section for Netflix content
+      if (content?.type === 'netflix' && completedSummary.extraSections?.['Reception']) {
+        setActiveSectionActions(prev => new Map(prev).set('Reception', 'search'));
+        const ok = await handleChatSend(
+          `Today is ${today}. Search the web for the latest ratings, reviews, and reception of this Netflix title. Update the "Reception" section with: content/age rating (TV-MA, PG-13, R, etc.), current IMDb score, Rotten Tomatoes critic/audience scores, Metacritic score, notable critic reviews, awards/nominations, and any recent news about the show. Cite sources with dates.`,
+          { internal: true, webSearch: true, summaryOverride: completedSummary },
+        );
+        if (ok) setSearchedSections(prev => new Set(prev).add('Reception'));
+        setActiveSectionActions(prev => { const next = new Map(prev); next.delete('Reception'); return next; });
+        persistToSession(originTabId);
+      }
     }
   }, [content, resolvedTheme, persistToSession]);
 
@@ -1432,6 +1468,18 @@ export function App() {
       }
     }
 
+    // Netflix timestamp links: seek the player
+    if (cur?.type === 'netflix' && url.includes('netflix.com')) {
+      const tMatch = url.match(/[?&]t=(\d+)/);
+      if (tMatch) {
+        const seconds = parseInt(tMatch[1], 10);
+        if (!isNaN(seconds)) {
+          sendMessage({ type: 'SEEK_VIDEO', seconds } as SeekVideoMessage).catch(() => {});
+          return;
+        }
+      }
+    }
+
     // Parse link and current page to detect same-page hash navigation
     try {
       const link = new URL(url);
@@ -1514,6 +1562,14 @@ export function App() {
         return;
       }
     } catch { /* fall through */ }
+
+    // For video content (Netflix, YouTube), open external links in a new tab
+    // to avoid navigating away from the video
+    if (cur && (cur.type === 'netflix' || cur.type === 'youtube')) {
+      // Open in new tab — YouTube timestamp links are already handled above
+      chromeObj.tabs.create({ url });
+      return;
+    }
 
     chromeObj.tabs.update(tabId, { url });
   }, []);
@@ -2051,6 +2107,12 @@ export function App() {
                 await handleChatSend(prompt, { internal: true });
                 setActiveSectionActions(prev => { const next = new Map(prev); next.delete(sectionTitle); return next; });
               }}
+              onContinueSection={async (sectionTitle) => {
+                setActiveSectionActions(prev => new Map(prev).set(sectionTitle, 'more'));
+                const prompt = `The "${sectionTitle}" section was truncated. Continue it from where it left off — do NOT rewrite what's already there. Preserve everything already written and append the continuation. Keep the same style and formatting. Continue until the end of the content.`;
+                await handleChatSend(prompt, { internal: true });
+                setActiveSectionActions(prev => { const next = new Map(prev); next.delete(sectionTitle); return next; });
+              }}
               onWebSearch={(() => {
                 const cfg = getActiveProviderConfig(settings);
                 const modelEntry = getCatalogEntry(settings.activeProviderId, cfg.model);
@@ -2561,15 +2623,15 @@ function extractJsonAndText(raw: string): { updates: Partial<SummaryDocument> | 
 }
 
 function ContentIndicators({ content, settings }: { content: ExtractedContent; settings: Settings }) {
-  const isYouTube = content.type === 'youtube';
+  const isVideoContent = content.type === 'youtube' || content.type === 'netflix';
   const commentCount = content.comments?.length ?? 0;
 
   // Transcript is resolved during extraction now.
-  const hasTranscriptMarker = content.content.includes('[YOUTUBE_TRANSCRIPT:');
+  const hasTranscriptMarker = content.content.includes('[YOUTUBE_TRANSCRIPT:') || content.content.includes('[NETFLIX_TRANSCRIPT:');
   const hasTranscriptError = content.content.includes('*Transcript could not be loaded:');
-  const transcriptLoaded = isYouTube && !hasTranscriptMarker && !hasTranscriptError;
+  const transcriptLoaded = isVideoContent && !hasTranscriptMarker && !hasTranscriptError;
 
-  const hasVideoTranscript = !isYouTube && (content.transcriptWordCount ?? 0) > 0;
+  const hasVideoTranscript = !isVideoContent && (content.transcriptWordCount ?? 0) > 0;
   const articleOnlyWords = hasVideoTranscript ? content.wordCount - content.transcriptWordCount! : content.wordCount;
 
   const commentWords = content.comments
@@ -2592,7 +2654,7 @@ function ContentIndicators({ content, settings }: { content: ExtractedContent; s
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-      {isYouTube ? (
+      {isVideoContent ? (
         <IndicatorChip
           icon={transcriptLoaded ? '\u2713' : '\u2717'}
           label={transcriptLoaded ? `Transcript \u00B7 ${content.wordCount.toLocaleString()} words`

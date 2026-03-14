@@ -1,3 +1,4 @@
+import { Fragment } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type { SummaryDocument } from '@/lib/summarizer/types';
 import type { ExtractedContent } from '@/lib/extractors/types';
@@ -17,6 +18,8 @@ interface SummaryContentProps {
   onNavigate?: (url: string) => void;
   onDeleteSection?: (sectionKey: string) => void;
   onAdjustSection?: (sectionTitle: string, direction: 'more' | 'less') => void;
+  /** Continue a truncated section — appends to existing content instead of rewriting. */
+  onContinueSection?: (sectionTitle: string) => void;
   onWebSearch?: (sectionTitle: string) => void;
   /** When set, search button is shown disabled with this tooltip instead of hidden. */
   webSearchDisabledReason?: string;
@@ -26,11 +29,13 @@ interface SummaryContentProps {
   activeSectionActions?: ReadonlyMap<string, 'search' | 'more' | 'less'>;
 }
 
-export function SummaryContent({ summary, content, onExport, notionUrl, exporting, onNavigate, onDeleteSection, onAdjustSection, onWebSearch, webSearchDisabledReason, searchedSections, activeSectionActions }: SummaryContentProps) {
+export function SummaryContent({ summary, content, onExport, notionUrl, exporting, onNavigate, onDeleteSection, onAdjustSection, onContinueSection, onWebSearch, webSearchDisabledReason, searchedSections, activeSectionActions }: SummaryContentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mdSaved, setMdSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   useEffect(() => { setMdSaved(false); setCopied(false); }, [summary]);
+
+  const isNetflix = content?.type === 'netflix';
 
   // Split TL;DR into body and status line for color-coded rendering
   const { body: tldrBody, statusLabel, statusText } = splitTldrStatus(summary.tldr);
@@ -76,7 +81,7 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
 
       {/* Key Takeaways */}
       {summary.keyTakeaways.length > 0 && (
-        <Section title="Key Takeaways" defaultOpen
+        <Section title={isNetflix ? 'Show Info' : 'Key Takeaways'} defaultOpen
           onDelete={onDeleteSection ? () => onDeleteSection('keyTakeaways') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Key Takeaways', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Key Takeaways', 'less') : undefined}
@@ -84,17 +89,48 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
           spinningAction={spinning('Key Takeaways')}
           webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
         >
-          <ol style={{ paddingLeft: '24px', font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.6, color: 'var(--md-sys-color-on-surface)' }}>
-            {summary.keyTakeaways.map((point, i) => (
-              <li key={i} style={{ marginBottom: '4px', paddingLeft: '4px' }}><InlineMarkdown text={point} /></li>
-            ))}
-          </ol>
+          {isNetflix ? (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'auto 1fr',
+              gap: '2px 10px',
+              font: 'var(--md-sys-typescale-body-small)',
+              lineHeight: 1.5,
+            }}>
+              {summary.keyTakeaways.map((point, i) => {
+                const match = point.match(/^\*\*(.+?)\*\*\s*[—–\-:]\s*(.+)$/);
+                const label = match ? match[1] : '';
+                const value = match ? match[2] : point;
+                return (
+                  <Fragment key={i}>
+                    <span style={{
+                      fontWeight: 700,
+                      color: 'var(--md-sys-color-primary)',
+                      whiteSpace: 'nowrap',
+                      padding: '3px 0',
+                    }}>{label || '\u00B7'}</span>
+                    <span style={{
+                      color: 'var(--md-sys-color-on-surface)',
+                      padding: '3px 0',
+                      borderBottom: '1px solid var(--md-sys-color-outline-variant)',
+                    }}><NetflixInfoValue text={value} label={label} /></span>
+                  </Fragment>
+                );
+              })}
+            </div>
+          ) : (
+            <ol style={{ paddingLeft: '24px', font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.6, color: 'var(--md-sys-color-on-surface)' }}>
+              {summary.keyTakeaways.map((point, i) => (
+                <li key={i} style={{ marginBottom: '4px', paddingLeft: '4px' }}><InlineMarkdown text={point} /></li>
+              ))}
+            </ol>
+          )}
         </Section>
       )}
 
-      {/* Summary */}
+      {/* Summary — spoiler for Netflix (contains full plot) */}
       {summary.summary && (
-        <Section title="Summary" defaultOpen
+        <Section title={isNetflix ? 'Plot Summary' : 'Summary'} defaultOpen={!isNetflix} spoiler={isNetflix}
           onDelete={onDeleteSection ? () => onDeleteSection('summary') : undefined}
           onMore={onAdjustSection ? () => onAdjustSection('Summary', 'more') : undefined}
           onLess={onAdjustSection ? () => onAdjustSection('Summary', 'less') : undefined}
@@ -212,21 +248,48 @@ export function SummaryContent({ summary, content, onExport, notionUrl, exportin
         </Section>
       )}
 
-      {/* Extra sections (added via chat refinement) */}
-      {summary.extraSections && Object.entries(summary.extraSections).map(([title, content]) => (
-        <Section key={`extra-${title}`} title={title}
-          onDelete={onDeleteSection ? () => onDeleteSection(`extra:${title}`) : undefined}
-          onMore={onAdjustSection ? () => onAdjustSection(title, 'more') : undefined}
-          onLess={onAdjustSection ? () => onAdjustSection(title, 'less') : undefined}
-          onWebSearch={onWebSearch ? () => onWebSearch(title) : undefined}
-          spinningAction={spinning(title)}
-          webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
-        >
-          <div style={{ font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.6 }}>
-            <MarkdownRenderer content={content} />
-          </div>
-        </Section>
-      ))}
+      {/* Extra sections (added via chat refinement or content-type-specific) */}
+      {summary.extraSections && Object.entries(summary.extraSections).map(([rawTitle, sectionContent]) => {
+        const isSpoilerSection = rawTitle.startsWith('[SPOILER] ');
+        const displayTitle = isSpoilerSection ? rawTitle.slice(10) : rawTitle;
+        return (
+          <Section key={`extra-${rawTitle}`} title={displayTitle} spoiler={isSpoilerSection}
+            onDelete={onDeleteSection ? () => onDeleteSection(`extra:${rawTitle}`) : undefined}
+            onMore={onAdjustSection ? () => onAdjustSection(rawTitle, 'more') : undefined}
+            onLess={onAdjustSection ? () => onAdjustSection(rawTitle, 'less') : undefined}
+            onWebSearch={onWebSearch ? () => onWebSearch(rawTitle) : undefined}
+            spinningAction={spinning(rawTitle)}
+            webSearchDisabledReason={!onWebSearch ? webSearchDisabledReason : undefined}
+          >
+            <div style={{ font: 'var(--md-sys-typescale-body-medium)', lineHeight: 1.6 }}>
+              {/* Strip trailing continuation hints from LLM: (more), (more...), (load entire...), etc. */}
+              <MarkdownRenderer content={sectionContent.replace(/\s*\(?(?:more|load\s+entire|continue|full\s+version|see\s+full)[^)]*\)?\s*\.{0,3}\s*$/i, '')} />
+              {/(?:more|load\s+entire|continue|full\s+version|see\s+full)[^)]*\)?\s*\.{0,3}\s*$/i.test(sectionContent) && onContinueSection && (
+                <button
+                  onClick={() => onContinueSection(rawTitle)}
+                  disabled={spinning(rawTitle) === 'more'}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    marginTop: '8px',
+                    padding: '4px 12px',
+                    borderRadius: 'var(--md-sys-shape-corner-medium)',
+                    border: '1px solid var(--md-sys-color-outline-variant)',
+                    background: 'var(--md-sys-color-surface-container)',
+                    color: 'var(--md-sys-color-primary)',
+                    font: 'var(--md-sys-typescale-label-medium)',
+                    cursor: spinning(rawTitle) === 'more' ? 'wait' : 'pointer',
+                    opacity: spinning(rawTitle) === 'more' ? 0.6 : 1,
+                  }}
+                >
+                  {spinning(rawTitle) === 'more' ? 'Expanding\u2026' : 'Show full version \u2192'}
+                </button>
+              )}
+            </div>
+          </Section>
+        );
+      })}
 
       {/* Related Topics */}
       {summary.relatedTopics.length > 0 && (
@@ -403,7 +466,7 @@ export function MetadataHeader({ content, summary, providerName, modelName, onPr
         fontWeight: 600,
         textTransform: 'uppercase',
       }}>
-        {content.type === 'youtube' ? 'YouTube' : content.type === 'pdf' ? 'PDF' : content.type === 'facebook' ? 'Facebook' : content.type === 'reddit' ? 'Reddit' : content.type === 'twitter' ? 'X' : content.type === 'github' ? 'GitHub' : content.type === 'linkedin' ? 'LinkedIn' : content.type}
+        {content.type === 'youtube' ? 'YouTube' : content.type === 'netflix' ? 'Netflix' : content.type === 'pdf' ? 'PDF' : content.type === 'facebook' ? 'Facebook' : content.type === 'reddit' ? 'Reddit' : content.type === 'twitter' ? 'X' : content.type === 'github' ? 'GitHub' : content.type === 'linkedin' ? 'LinkedIn' : content.type}
       </span>
       {content.type !== 'github' && content.estimatedReadingTime > 0 && (
         <span style={{ color: 'var(--md-sys-color-on-surface-variant)', font: 'var(--md-sys-typescale-label-small)' }}>
@@ -576,17 +639,121 @@ function ThumbnailCollage({ urls, title, fallbackUrl }: { urls: string[]; title:
   );
 }
 
+// --- Netflix info value with color-coded rating badges ---
+
+/** Content/age rating color: red for mature, orange for teens, green for general. */
+function contentRatingColor(rating: string): { bg: string; fg: string } {
+  const r = rating.toUpperCase();
+  if (['TV-MA', 'R', 'NC-17', '18+', 'X'].includes(r)) return { bg: '#b71c1c', fg: '#fff' };
+  if (['TV-14', 'PG-13', 'TV-PG', '13+', '16+'].includes(r)) return { bg: '#e65100', fg: '#fff' };
+  if (['TV-Y7', 'PG', 'TV-G', 'TV-Y', 'G', '7+'].includes(r)) return { bg: '#2e7d32', fg: '#fff' };
+  return { bg: '#546e7a', fg: '#fff' };
+}
+
+/** Review score color: green >=70, yellow >=50, red <50. Works for x/10, x%, etc. */
+function scoreColor(value: number, max: number): { bg: string; fg: string } {
+  const pct = (value / max) * 100;
+  if (pct >= 70) return { bg: '#2e7d32', fg: '#fff' };
+  if (pct >= 50) return { bg: '#f57f17', fg: '#fff' };
+  return { bg: '#c62828', fg: '#fff' };
+}
+
+const badgeStyle = (colors: { bg: string; fg: string }) => ({
+  display: 'inline-block',
+  padding: '1px 7px',
+  borderRadius: '4px',
+  fontWeight: 700 as const,
+  fontSize: '11px',
+  lineHeight: '18px',
+  backgroundColor: colors.bg,
+  color: colors.fg,
+  verticalAlign: 'middle',
+  marginRight: '3px',
+});
+
+/** Render text with color-coded badges for content ratings & review scores. */
+function NetflixInfoValue({ text, label }: { text: string; label?: string }) {
+  // Split text into segments, replacing known patterns with badges
+  const parts: preact.ComponentChildren[] = [];
+  let key = 0;
+
+  // Only match standalone R/G when the label indicates a rating context
+  const isRatingLabel = /rating|rated/i.test(label || '');
+
+  const badgePatterns = [
+    // Content ratings — hyphenated ones are always unambiguous
+    { re: /\b(TV-MA|TV-14|TV-PG|TV-G|TV-Y7|TV-Y|NC-17|PG-13|PG|NR|UR)\b/g, type: 'content' as const },
+    // Standalone R/G only in rating-labeled rows to avoid false positives
+    ...(isRatingLabel ? [{ re: /\b(R|G)\b/g, type: 'content' as const }] : []),
+    // IMDb ~x.x/10 or x/10 or just IMDb x.x (with optional ~, approx, etc.)
+    { re: /\bIMDb\s*[~≈]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*10)?\b/gi, type: 'imdb' as const },
+    // Rotten Tomatoes / RT xx%
+    { re: /\b(?:Rotten\s+Tomato(?:es)?|RT)\s*[~≈]?\s*(\d+)\s*%/gi, type: 'rt' as const },
+    // Metacritic / MC xx/100 or xx%
+    { re: /\b(?:Metacritic|MC)\s*[~≈]?\s*(\d+)\s*(?:\/\s*100|%)?/gi, type: 'meta' as const },
+  ];
+
+  // Collect all badge matches with positions
+  const badges: Array<{ start: number; end: number; node: preact.ComponentChildren }> = [];
+  for (const { re, type } of badgePatterns) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      if (type === 'content') {
+        const rating = m[1].toUpperCase();
+        const colors = contentRatingColor(rating);
+        badges.push({ start: m.index, end: m.index + m[0].length, node: <span key={key++} style={badgeStyle(colors)}>{rating}</span> });
+      } else if (type === 'imdb') {
+        const val = parseFloat(m[1]);
+        const colors = scoreColor(val, 10);
+        badges.push({ start: m.index, end: m.index + m[0].length, node: <span key={key++} style={badgeStyle(colors)}>IMDb {m[1]}/10</span> });
+      } else if (type === 'rt') {
+        const val = parseInt(m[1], 10);
+        // RT uses "fresh" (>=60%) = red tomato, "rotten" (<60%) = grey-green
+        const rtColors = { bg: val >= 60 ? '#d32f2f' : '#546e7a', fg: '#fff' };
+        badges.push({ start: m.index, end: m.index + m[0].length, node: <span key={key++} style={badgeStyle(rtColors)}>🍅 {m[1]}%</span> });
+      } else if (type === 'meta') {
+        const val = parseInt(m[1], 10);
+        const colors = scoreColor(val, 100);
+        badges.push({ start: m.index, end: m.index + m[0].length, node: <span key={key++} style={badgeStyle(colors)}>MC {m[1]}/100</span> });
+      }
+    }
+  }
+
+  if (badges.length === 0) return <InlineMarkdown text={text} />;
+
+  // Sort by position and build output
+  badges.sort((a, b) => a.start - b.start);
+  let pos = 0;
+  for (const b of badges) {
+    if (b.start < pos) continue; // skip overlapping matches
+    if (b.start > pos) {
+      const seg = text.slice(pos, b.start);
+      parts.push(<InlineMarkdown key={key++} text={seg} />);
+    }
+    parts.push(b.node);
+    pos = b.end;
+  }
+  if (pos < text.length) {
+    parts.push(<InlineMarkdown key={key++} text={text.slice(pos)} />);
+  }
+
+  return <>{parts}</>;
+}
+
 // Track user-toggled section state by title so it survives re-renders / remounts
 const sectionUserState = new Map<string, boolean>();
 
 /** Reset user section overrides (call when generating a fresh summary for a new page). */
 export function resetSectionState() { sectionUserState.clear(); }
 
-function Section({ title, subtitle, titleColor, defaultOpen = false, onDelete, onMore, onLess, onWebSearch, webSearchDisabledReason, spinningAction, children }: {
+function Section({ title, subtitle, titleColor, defaultOpen = false, spoiler = false, onDelete, onMore, onLess, onWebSearch, webSearchDisabledReason, spinningAction, children }: {
   title: string;
   subtitle?: string;
   titleColor?: string;
   defaultOpen?: boolean;
+  /** When true, section always starts closed with a spoiler badge, ignoring saved state. */
+  spoiler?: boolean;
   onDelete?: () => void;
   onMore?: () => void;
   onLess?: () => void;
@@ -597,11 +764,12 @@ function Section({ title, subtitle, titleColor, defaultOpen = false, onDelete, o
   spinningAction?: 'search' | 'more' | 'less' | null;
   children: preact.ComponentChildren;
 }) {
-  const [open, setOpen] = useState(sectionUserState.get(title) ?? defaultOpen);
+  // Spoiler sections always start closed — ignore saved state
+  const [open, setOpen] = useState(spoiler ? false : (sectionUserState.get(title) ?? defaultOpen));
 
   const toggle = () => {
     const next = !open;
-    sectionUserState.set(title, next);
+    if (!spoiler) sectionUserState.set(title, next); // don't persist spoiler toggle
     setOpen(next);
   };
 
@@ -638,6 +806,19 @@ function Section({ title, subtitle, titleColor, defaultOpen = false, onDelete, o
           color: 'var(--md-sys-color-on-surface-variant)',
         }}>&#9654;</span>
         <span style={titleColor ? { color: titleColor } : undefined}>{title}</span>
+        {spoiler && (
+          <span style={{
+            fontSize: '10px',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            padding: '1px 6px',
+            borderRadius: 'var(--md-sys-shape-corner-small)',
+            backgroundColor: 'var(--md-sys-color-error-container)',
+            color: 'var(--md-sys-color-on-error-container)',
+            marginLeft: '6px',
+          }}>Spoiler</span>
+        )}
         {subtitle && <span style={{ font: 'var(--md-sys-typescale-label-small)', color: titleColor || 'var(--md-sys-color-on-surface-variant)', opacity: 0.7, marginLeft: '4px' }}>{subtitle}</span>}
       </button>
       {hasToolbar && (
@@ -726,7 +907,8 @@ function summaryToMarkdown(summary: SummaryDocument, content: ExtractedContent |
   }
 
   if (summary.extraSections) {
-    for (const [title, content] of Object.entries(summary.extraSections)) {
+    for (const [rawTitle, content] of Object.entries(summary.extraSections)) {
+      const title = rawTitle.startsWith('[SPOILER] ') ? rawTitle.slice(10) : rawTitle;
       lines.push(`## ${title}`, '', content, '');
     }
   }

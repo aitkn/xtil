@@ -8,6 +8,7 @@ import { detectCloudflareStreamVideo, fetchCloudflareStreamTranscript } from '@/
 import { detectVimeoVideo, fetchVimeoTranscript } from '@/lib/vimeo';
 import { detectDailymotionVideo, fetchDailymotionTranscript } from '@/lib/dailymotion';
 import { detectHTML5VideoWithTracks, fetchHTML5VideoTranscript } from '@/lib/html5-video';
+import { parseTTML } from '@/lib/netflix';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -107,6 +108,7 @@ export default defineContentScript({
             transcriptCache.clear();
             transcriptFailCache.clear();
             bridgeAvailable = true;
+            netflixBridgeAvailable = true;
           }
           extractAndResolve(msg.langPrefs, msg.summaryLang, msg.readonly)
             .then((content) => {
@@ -132,15 +134,23 @@ export default defineContentScript({
         }
 
         if (msg.type === 'SEEK_VIDEO') {
+          const seconds = (msg as { seconds: number }).seconds;
+          // Netflix: use player API via bridge (direct video.currentTime crashes DRM)
+          if (window.location.hostname.includes('netflix.com')) {
+            netflixBridgeRequest('seek', { seconds })
+              .then(() => sendResponse({ success: true }))
+              .catch(() => sendResponse({ success: false, error: 'Netflix seek failed' }));
+            return true;
+          }
           const video = document.querySelector('video');
           if (video) {
-            video.currentTime = (msg as { seconds: number }).seconds;
+            video.currentTime = seconds;
             video.play().catch(() => {});
             sendResponse({ success: true });
           } else {
             sendResponse({ success: false, error: 'No video element found' });
           }
-          return;
+          return true;
         }
 
         if (msg.type === 'FETCH_TRANSCRIPT') {
@@ -205,8 +215,46 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
     }
   }
 
-  // Resolve video transcript from embedded players (non-YouTube)
-  if (content.type !== 'youtube') {
+  // Resolve Netflix transcript inline
+  const nfMarker = '[NETFLIX_TRANSCRIPT:';
+  const nfMarkerIndex = content.content.indexOf(nfMarker);
+  if (nfMarkerIndex !== -1) {
+    const nfEndIndex = content.content.indexOf(']', nfMarkerIndex + nfMarker.length);
+    if (nfEndIndex !== -1) {
+      try {
+        const result = await fetchNetflixTranscript(langPrefs, summaryLang);
+        // Update title & metadata from bridge info
+        if (result.title && result.title !== content.title) {
+          content.title = result.title;
+          content.content = content.content.replace(/^# .+\n/, `# ${result.title}\n`);
+        }
+        if (result.synopsis) {
+          content.description = result.synopsis;
+          content.content = content.content.replace(
+            /## Transcript/,
+            `## Description\n\n${result.synopsis}\n\n## Transcript`,
+          );
+        }
+        if (result.duration) {
+          content.duration = formatDuration(result.duration);
+        }
+        content.content = content.content.replace(
+          /\[Transcript available - fetching\.\.\.\]\n\n\[NETFLIX_TRANSCRIPT:[^\]]+\]/,
+          result.transcript,
+        );
+        content.wordCount = content.content.split(/\s+/).filter(Boolean).length;
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        content.content = content.content.replace(
+          /\[Transcript available - fetching\.\.\.\]\n\n\[NETFLIX_TRANSCRIPT:[^\]]+\]/,
+          `*Transcript could not be loaded: ${errMsg}*`,
+        );
+      }
+    }
+  }
+
+  // Resolve video transcript from embedded players (non-YouTube, non-Netflix)
+  if (content.type !== 'youtube' && content.type !== 'netflix') {
     const transcript = await fetchEmbeddedVideoTranscript(document, window.location.href, langPrefs, summaryLang);
     if (transcript) {
       content.transcriptWordCount = transcript.split(/\s+/).filter(Boolean).length;
@@ -762,4 +810,112 @@ function decodeXmlEntities(text: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/\n/g, ' ');
+}
+
+// --- Netflix transcript ---
+
+let netflixBridgeAvailable = true;
+
+/**
+ * Send a request to the Netflix MAIN-world bridge via CustomEvent on document.
+ * Both isolated and MAIN world share the same document object.
+ */
+function netflixBridgeRequest<T>(
+  reqType: string,
+  payload: Record<string, unknown>,
+): Promise<T | null> {
+  if (!netflixBridgeAvailable) return Promise.resolve(null);
+  return new Promise<T | null>((resolve) => {
+    const requestId = `xtil_nf_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const timeout = setTimeout(() => {
+      document.removeEventListener('xtil-netflix-response', handler);
+      netflixBridgeAvailable = false;
+      resolve(null);
+    }, 10000);
+
+    function handler(event: Event) {
+      const detail = (event as CustomEvent).detail;
+      if (detail?.requestId !== requestId) return;
+
+      document.removeEventListener('xtil-netflix-response', handler);
+      clearTimeout(timeout);
+
+      if (detail.error) resolve(null);
+      else resolve(detail as T);
+    }
+
+    document.addEventListener('xtil-netflix-response', handler);
+    document.dispatchEvent(new CustomEvent('xtil-netflix-request', {
+      detail: { type: reqType, requestId, ...payload },
+    }));
+  });
+}
+
+async function fetchNetflixTranscript(
+  langPrefs?: string[],
+  summaryLang?: string,
+): Promise<{ transcript: string; title?: string; synopsis?: string; duration?: number }> {
+  // Step 1: Get track list and metadata from bridge
+  const info = await netflixBridgeRequest<{
+    tracks: Array<{ trackId: string; bcp47: string; displayName: string; rawTrackType: string }>;
+    currentTrack?: { trackId: string; bcp47: string; displayName: string };
+    title?: string;
+    synopsis?: string;
+    duration?: number;
+    audioLang?: string;
+    cachedLanguages?: string[];
+  }>('tracks', {});
+
+  if (!info?.tracks?.length) {
+    throw new Error('Netflix player not available or no subtitle tracks');
+  }
+
+  // Step 2: Pick language — respect user's Netflix subtitle selection first
+  // If user has actively chosen a subtitle language in Netflix, use that.
+  // Otherwise fall back to pickBestTrack logic with langPrefs.
+  let targetLang: string;
+  if (info.currentTrack?.bcp47) {
+    // User has a subtitle track selected in Netflix — respect it
+    targetLang = info.currentTrack.bcp47;
+  } else {
+    const captionTracks: CaptionTrack[] = info.tracks.map(t => ({
+      baseUrl: t.trackId,
+      languageCode: t.bcp47,
+      name: { simpleText: t.displayName },
+      kind: t.rawTrackType === 'CLOSEDCAPTIONS' ? 'cc' : undefined,
+    }));
+    const best = pickBestTrack(captionTracks, langPrefs, summaryLang, info.audioLang);
+    targetLang = best.languageCode;
+  }
+
+  // Step 3: Request TTML from bridge (may trigger track switch)
+  const ttmlResp = await netflixBridgeRequest<{ ttml: string }>(
+    'ttml', { langCode: targetLang },
+  );
+
+  if (!ttmlResp?.ttml) {
+    throw new Error('Could not fetch Netflix subtitles');
+  }
+
+  // Step 4: Parse TTML
+  const transcript = parseTTML(ttmlResp.ttml);
+  if (!transcript) {
+    throw new Error('Failed to parse Netflix TTML subtitles');
+  }
+
+  return {
+    transcript,
+    title: info.title,
+    synopsis: info.synopsis,
+    duration: info.duration,
+  };
+}
+
+function formatDuration(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }

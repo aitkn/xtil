@@ -1,6 +1,7 @@
 import type { ContentExtractor } from './types';
 import { pdfExtractor } from './pdf';
 import { youtubeExtractor } from './youtube';
+import { netflixExtractor } from './netflix';
 import { gdocsExtractor } from './gdocs';
 import { gmailExtractor } from './gmail';
 import { facebookExtractor } from './facebook';
@@ -14,6 +15,7 @@ import { genericExtractor } from './generic';
 const extractors: ContentExtractor[] = [
   pdfExtractor, // first — PDFs have no DOM for other extractors
   youtubeExtractor,
+  netflixExtractor,
   gdocsExtractor,
   gmailExtractor,
   facebookExtractor,
