@@ -4,7 +4,7 @@
 xTil — AI Page Insights
 
 ## Short Description (max 132 chars)
-Extract the signal, distill the insight. AI summaries of articles, PDFs, videos & PRs with diagrams, chat and Notion export.
+Extract the signal, distill the insight. Genre-aware AI summaries with fact-checks, diagrams, chat refinement and export.
 
 ## Detailed Description
 
@@ -18,6 +18,11 @@ xTil turns any web page, PDF, video, or PR into a multi-section analysis — key
 
 ────────────────────────────────────────
 
+SMART GENRE DETECTION
+xTil automatically identifies what you're reading — news article, tutorial, academic paper, movie, comedy special, business report, legal document, and more — then tailors the summary with genre-specific sections. News gets fact-checking and timelines. Tutorials get step-by-step breakdowns. Fiction gets cast info, spoiler-protected plot summaries, and review scores fetched via web search. Each genre brings a different expert perspective.
+
+────────────────────────────────────────
+
 WHAT YOU GET
 Every page produces a structured breakdown: concise overview, key takeaways with bold labels, notable quotes with original language preserved, a fact-check grading claims as verified/contested/unverifiable, pros & cons, and a conclusion. LaTeX math renders beautifully — perfect for academic papers. Choose between brief, standard, or detailed analysis — xTil automatically scales the depth to match the content.
 
@@ -25,17 +30,16 @@ Every page produces a structured breakdown: concise overview, key takeaways with
 
 WORKS EVERYWHERE YOU READ
 xTil adapts to the page you're on:
-• PDFs — Academic papers, reports, and documents with figure extraction
-• YouTube — Transcript-based summary with clickable timestamp links
-• GitHub — PRs, issues, code files, repos, commits, and releases
+• Articles & PDFs — Papers, reports, and documents with figure extraction
+• Video platforms — Transcript-based summaries with clickable timestamps, show metadata, and maturity ratings
+• Code hosting — PRs, issues, code files, repos, commits, and releases
 • Social media — Posts, threads, nested comments, and engagement metrics
-• Gmail — Email conversations and threaded discussions
-…and many more. Full list of supported platforms: github.com/aitkn/xtil
+…and many more. Full list of supported platforms at github.com/aitkn/xtil
 
 ────────────────────────────────────────
 
 AUTO-GENERATED DIAGRAMS & IMAGE ANALYSIS
-xTil generates Mermaid diagrams that visualize the content's structure — flowcharts, timelines, and more, with automatic light/dark theme support. Pages with images get vision-powered analysis: charts, screenshots, and infographics are read and woven into the summary.
+xTil generates diagrams that visualize the content's structure — flowcharts, timelines, data charts, and more, with automatic light/dark theme support. Pages with images get vision-powered analysis: charts, screenshots, and infographics are read and woven into the summary.
 
 ────────────────────────────────────────
 
