@@ -5,7 +5,7 @@ export default defineConfig({
   srcDir: 'src',
   manifest: {
     name: 'xTil',
-    description: 'Extract the signal, distill the insight. AI summaries of articles, PDFs, videos & PRs with diagrams, chat and Notion export.',
+    description: 'Extract the signal, distill the insight. Genre-aware AI summaries with fact-checks, diagrams, chat refinement and export.',
     icons: {
       16: 'icons/icon-action.png',
       32: 'icons/icon-action.png',
