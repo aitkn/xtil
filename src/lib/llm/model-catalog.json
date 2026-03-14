@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-13T12:00:00.000Z",
+  "_generated": "2026-03-14T12:00:00.000Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -156,7 +156,6 @@
       "models": {
         "gpt-5.4": {
           "name": "GPT-5.4",
-          "contextWindow": 1050000,
           "maxOutput": 128000,
           "inputPrice": 2.5,
           "outputPrice": 15,
@@ -234,11 +233,9 @@
         }
       },
       "excluded": [
-        "Whisper",
         "babbage-002",
         "chatgpt-4o-latest",
         "davinci-002",
-        "gpt-3.5-0301",
         "gpt-3.5-turbo",
         "gpt-3.5-turbo-16k",
         "gpt-4",
@@ -300,7 +297,7 @@
         },
         "grok-4": {
           "name": "Grok 4",
-          "contextWindow": 262144,
+          "contextWindow": 2000000,
           "inputPrice": 3,
           "outputPrice": 15,
           "vision": true,
@@ -314,9 +311,9 @@
         "grok-3",
         "grok-3-mini",
         "grok-4-0709",
-        "grok-4-20-beta",
         "grok-4-fast-non-reasoning",
         "grok-4-fast-reasoning",
+        "grok-4.20-beta",
         "grok-4.20-beta-0309-non-reasoning",
         "grok-4.20-beta-0309-reasoning",
         "grok-4.20-multi-agent-beta-0309",

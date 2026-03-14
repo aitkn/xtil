@@ -4,6 +4,20 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.1.12
+
+**Netflix support**
+
+- Extract subtitles from Netflix — works with any show or movie that has closed captions
+- Movie/TV-specific summary with spoiler-free overview, show info, cast & characters, plot summary, and condensed script
+- Spoiler protection — plot details hidden by default behind a collapsible spoiler tag
+- Color-coded rating badges for content ratings (TV-MA, PG-13, R) and review scores (IMDb, Rotten Tomatoes, Metacritic)
+- Clickable timestamps that seek the Netflix player to the exact moment
+- Cast names and similar titles link to Netflix search
+- Auto-enriched reception section with latest ratings via web search
+- "Show full version" button to expand truncated condensed scripts
+- Page reload no longer clears your existing summary
+
 ## 1.1.11
 
 **Video transcript extraction beyond YouTube**
