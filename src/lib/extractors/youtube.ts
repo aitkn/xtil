@@ -20,11 +20,8 @@ export const youtubeExtractor: ContentExtractor = {
       || doc.querySelector('#title h1 yt-formatted-string')?.textContent?.trim()
       || doc.querySelector('h1.title')?.textContent?.trim();
 
-    const title =
-      h1Title ||
-      docTitle ||
-      doc.querySelector('meta[name="title"]')?.getAttribute('content') ||
-      'Untitled Video';
+    // Only use live DOM elements — <meta> tags are stale after SPA navigation
+    const title = h1Title || docTitle || 'Untitled Video';
 
     const channelName =
       // Desktop YouTube — scope to watch area to avoid picking up sidebar recommendations
@@ -36,9 +33,7 @@ export const youtubeExtractor: ContentExtractor = {
       // Mobile YouTube (ytm-* custom elements)
       doc.querySelector('ytm-slim-owner-renderer a')?.textContent?.trim() ||
       doc.querySelector('.slim-owner-icon-and-title a')?.textContent?.trim() ||
-      // Meta tags (work on both desktop and mobile)
-      doc.querySelector('link[itemprop="name"]')?.getAttribute('content') ||
-      doc.querySelector('meta[name="author"]')?.getAttribute('content') ||
+      // Note: <link itemprop="name"> and <meta name="author"> are stale after SPA nav — don't use
       undefined;
 
     // Read description without manipulating the DOM. Try #content first (visible
@@ -51,25 +46,18 @@ export const youtubeExtractor: ContentExtractor = {
       expander?.querySelector('#content yt-formatted-string') ||
       expander?.querySelector('#snippet yt-attributed-string') ||
       expander?.querySelector('#snippet yt-formatted-string');
-    const description =
-      fullDescEl?.textContent?.trim() ||
-      doc.querySelector('meta[name="description"]')?.getAttribute('content') ||
-      doc.querySelector('meta[property="og:description"]')?.getAttribute('content') ||
-      undefined;
+    // Only use live DOM elements for description — <meta> tags are stale after SPA navigation
+    const description = fullDescEl?.textContent?.trim() || undefined;
 
+    // Prefer live DOM elements — <meta> itemprop tags are stale after SPA navigation
     const liveDateText = doc.querySelector('#info-strings yt-formatted-string')?.textContent?.trim();
-    const publishDate =
-      doc.querySelector('meta[itemprop="datePublished"]')?.getAttribute('content') ||
-      doc.querySelector('meta[itemprop="uploadDate"]')?.getAttribute('content') ||
-      liveDateText ||
-      undefined;
+    const publishDate = liveDateText || undefined;
 
-    const liveDuration = doc.querySelector('.ytp-time-duration')?.textContent?.trim();
-    const duration = liveDuration ||
-      formatDuration(doc.querySelector('meta[itemprop="duration"]')?.getAttribute('content') || undefined);
+    // Only use live DOM — <meta> itemprop tags are stale after SPA navigation
+    const duration = doc.querySelector('.ytp-time-duration')?.textContent?.trim() || undefined;
 
-    const liveViewCount = doc.querySelector('ytd-video-view-count-renderer span')?.textContent?.trim();
-    const viewCount = liveViewCount || extractViewCount(doc);
+    // Only use live DOM — <meta> itemprop tags are stale after SPA navigation
+    const viewCount = doc.querySelector('ytd-video-view-count-renderer span')?.textContent?.trim() || undefined;
 
     const thumbnailUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
@@ -99,15 +87,6 @@ export const youtubeExtractor: ContentExtractor = {
   },
 };
 
-function extractViewCount(doc: Document): string | undefined {
-  const meta = doc.querySelector('meta[itemprop="interactionCount"]');
-  if (meta) {
-    const count = parseInt(meta.getAttribute('content') || '', 10);
-    if (!isNaN(count)) return count.toLocaleString();
-  }
-  return undefined;
-}
-
 function buildContent(title: string, description: string | undefined, transcript: string): string {
   let content = `# ${title}\n\n`;
 
@@ -121,18 +100,3 @@ function buildContent(title: string, description: string | undefined, transcript
   return content;
 }
 
-function formatDuration(isoDuration: string | undefined): string | undefined {
-  if (!isoDuration) return undefined;
-
-  const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!match) return isoDuration;
-
-  const hours = parseInt(match[1] || '0', 10);
-  const minutes = parseInt(match[2] || '0', 10);
-  const seconds = parseInt(match[3] || '0', 10);
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
-}
