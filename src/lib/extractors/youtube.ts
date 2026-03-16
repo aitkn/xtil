@@ -37,9 +37,8 @@ export const youtubeExtractor: ContentExtractor = {
       undefined;
 
     // Read description without manipulating the DOM. Try #content first (visible
-    // when already expanded), then #snippet (always present, may be truncated),
-    // then meta tags (~155 chars). Never click expand/collapse — it interferes
-    // with the user's UI state and causes the description to close unexpectedly.
+    // when already expanded), then #snippet (always present, may be truncated).
+    // Never click expand/collapse — it interferes with the user's UI state.
     const expander = doc.querySelector('ytd-text-inline-expander');
     const fullDescEl =
       expander?.querySelector('#content yt-attributed-string') ||

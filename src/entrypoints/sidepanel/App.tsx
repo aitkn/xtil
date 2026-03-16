@@ -1106,7 +1106,7 @@ export function App() {
       if (msg?.type === 'CONTENT_CHANGED') {
         if (sender.tab?.id != null && sender.tab.id !== activeTabIdRef.current) return;
         if (spaTimer) clearTimeout(spaTimer);
-        spaTimer = setTimeout(() => extractContent(), 800);
+        spaTimer = setTimeout(() => { spaTimer = null; extractContent(); }, 800);
         return;
       }
       // User interaction (scroll/click) — only refresh metadata when no summary yet
@@ -1114,7 +1114,7 @@ export function App() {
         if (sender.tab?.id != null && sender.tab.id !== activeTabIdRef.current) return;
         if (summaryRef.current || loadingRef.current) return;
         if (spaTimer) clearTimeout(spaTimer);
-        spaTimer = setTimeout(() => extractContent(true), 300);
+        spaTimer = setTimeout(() => { spaTimer = null; extractContent(true); }, 300);
         return;
       }
     };
