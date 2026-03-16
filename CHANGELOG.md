@@ -4,6 +4,12 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.3
+
+**YouTube navigation fix**
+
+- Fixed stale content appearing after clicking between YouTube videos — descriptions, transcripts, and summaries now correctly update when navigating within YouTube
+
 ## 1.2.0
 
 **Smart genre detection**
