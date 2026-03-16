@@ -1056,11 +1056,24 @@ export function App() {
             setInputValue('');
           }
         }
-        if (changeInfo.status === 'complete') extractContent();
         if (changeInfo.url) {
+          // Clear all stale state so debug panel / handleSummarize won't use old page's data
+          setContent(null);
+          setSummary(null); setEarlyGenre(null);
+          setChatMessages([]);
+          setNotionUrl(null);
+          setInputValue('');
+          setPendingResummarize(false);
+          setConversationLog([]);
+          setRollingSummary('');
+          setLastRequestBody('');
+          setLastResponseBody('');
           if (spaTimer) clearTimeout(spaTimer);
-          spaTimer = setTimeout(() => extractContent(), 1500);
+          spaTimer = setTimeout(() => { spaTimer = null; extractContent(); }, 1500);
         }
+        // Extract on page load complete, but skip if SPA timer is pending —
+        // SPA navigation (e.g. YouTube) needs time for the DOM to update.
+        if (changeInfo.status === 'complete' && !spaTimer) extractContent();
       } else if (tabStatesRef.current.has(tabId)) {
         // Background tab navigated — invalidate cache; re-extract on next switch
         tabStatesRef.current.delete(tabId);
@@ -1093,7 +1106,7 @@ export function App() {
       if (msg?.type === 'CONTENT_CHANGED') {
         if (sender.tab?.id != null && sender.tab.id !== activeTabIdRef.current) return;
         if (spaTimer) clearTimeout(spaTimer);
-        spaTimer = setTimeout(() => extractContent(), 800);
+        spaTimer = setTimeout(() => { spaTimer = null; extractContent(); }, 800);
         return;
       }
       // User interaction (scroll/click) — only refresh metadata when no summary yet
@@ -1101,7 +1114,7 @@ export function App() {
         if (sender.tab?.id != null && sender.tab.id !== activeTabIdRef.current) return;
         if (summaryRef.current || loadingRef.current) return;
         if (spaTimer) clearTimeout(spaTimer);
-        spaTimer = setTimeout(() => extractContent(true), 300);
+        spaTimer = setTimeout(() => { spaTimer = null; extractContent(true); }, 300);
         return;
       }
     };

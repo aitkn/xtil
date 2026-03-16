@@ -103,6 +103,15 @@ export default defineContentScript({
         }
         const msg = message as { type: string; videoId?: string; hintLang?: string; langPrefs?: string[]; summaryLang?: string; readonly?: boolean; refresh?: boolean };
         if (msg.type === 'EXTRACT_CONTENT') {
+          // Auto-clear transcript caches on SPA navigation (e.g. clicking a new YouTube video)
+          const currentUrl = window.location.href;
+          spaNavExtraction = lastExtractUrl !== '' && lastExtractUrl !== currentUrl;
+          if (spaNavExtraction) {
+            transcriptCache.clear();
+            transcriptFailCache.clear();
+          }
+          lastExtractUrl = currentUrl;
+
           if (msg.refresh) {
             // User clicked Refresh — clear all caches for a fresh extraction
             transcriptCache.clear();
@@ -506,6 +515,12 @@ const transcriptFailCache = new Map<string, { error: string; time: number }>();
 const transcriptInFlight = new Map<string, Promise<string>>(); // dedup parallel calls
 const FAIL_CACHE_TTL = 60_000; // don't retry failed transcripts for 60s
 
+// Track last extraction URL to auto-clear transcript caches on SPA navigation
+let lastExtractUrl = '';
+// True when current extraction was triggered by SPA navigation (URL changed without page reload).
+// DOM-based transcript scraping is unreliable in this case — old panel may still be visible.
+let spaNavExtraction = false;
+
 async function fetchYouTubeTranscript(
   videoId: string,
   hintLang?: string,
@@ -541,16 +556,20 @@ async function fetchYouTubeTranscriptImpl(
   langPrefs?: string[],
   summaryLang?: string,
 ): Promise<string> {
-  // Step 1: Try fast local extraction first (no network, no errors in console)
-  const embedded = extractTranscriptFromPageData();
-  if (embedded) {
-    transcriptCache.set(videoId, embedded);
-    return embedded;
-  }
-  const domTranscript = scrapeTranscriptFromDOM();
-  if (domTranscript) {
-    transcriptCache.set(videoId, domTranscript);
-    return domTranscript;
+  // Step 1: Try fast local extraction first (no network, no errors in console).
+  // Skip DOM-based methods after SPA navigation — <script> tags and transcript
+  // panel may still contain the previous video's data.
+  if (!spaNavExtraction) {
+    const embedded = extractTranscriptFromPageData(videoId);
+    if (embedded) {
+      transcriptCache.set(videoId, embedded);
+      return embedded;
+    }
+    const domTranscript = scrapeTranscriptFromDOM();
+    if (domTranscript) {
+      transcriptCache.set(videoId, domTranscript);
+      return domTranscript;
+    }
   }
 
   // Step 2: Get player data to find available caption tracks & pick best language
@@ -617,7 +636,7 @@ async function fetchYouTubeTranscriptImpl(
  * YouTube embeds transcript segments in engagement panels even when
  * captions are is_servable=false (timedtext returns empty, get_transcript 400s).
  */
-function extractTranscriptFromPageData(): string | null {
+function extractTranscriptFromPageData(expectedVideoId?: string): string | null {
   for (const script of document.querySelectorAll('script')) {
     const text = script.textContent || '';
     const match = text.match(/ytInitialData\s*=\s*(\{.+?\});\s*(?:var\s|let\s|const\s|window\[|<\/script>|$)/s);
@@ -625,6 +644,14 @@ function extractTranscriptFromPageData(): string | null {
 
     let data: any;
     try { data = JSON.parse(match[1]); } catch { continue; }
+
+    // Validate that this ytInitialData belongs to the expected video.
+    // On SPA navigation, <script> tags are stale and contain old video data.
+    if (expectedVideoId) {
+      const dataVideoId = data?.currentVideoEndpoint?.watchEndpoint?.videoId;
+      // Skip if videoId doesn't match OR if we can't verify (no videoId in data = likely stale)
+      if (!dataVideoId || dataVideoId !== expectedVideoId) continue;
+    }
 
     const panels = data?.engagementPanels;
     if (!panels) continue;
