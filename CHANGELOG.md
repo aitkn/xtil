@@ -4,6 +4,14 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.4
+
+**JW Player support**
+
+- Videos using JW Player (Skilljar, Udemy, and other learning platforms) now have their captions detected and extracted for summarization
+- Updated model catalog — added GPT-5.4 Mini and GPT-5.4 Nano
+
+
 ## 1.2.3
 
 **YouTube navigation fix**

@@ -8,6 +8,7 @@ import { detectCloudflareStreamVideo, fetchCloudflareStreamTranscript } from '@/
 import { detectVimeoVideo, fetchVimeoTranscript } from '@/lib/vimeo';
 import { detectDailymotionVideo, fetchDailymotionTranscript } from '@/lib/dailymotion';
 import { detectHTML5VideoWithTracks, fetchHTML5VideoTranscript } from '@/lib/html5-video';
+import { detectJwPlayer, fetchJwPlayerTranscript } from '@/lib/jwplayer';
 import { parseTTML } from '@/lib/netflix';
 
 export default defineContentScript({
@@ -370,6 +371,15 @@ async function fetchEmbeddedVideoTranscript(
   if (dmVideoId) {
     try {
       const t = await fetchDailymotionTranscript(dmVideoId, langPrefs, summaryLang);
+      if (t) return t;
+    } catch { /* fall through */ }
+  }
+
+  // JW Player (uses its own caption system, not standard <track> elements)
+  const jwMediaId = detectJwPlayer(doc);
+  if (jwMediaId) {
+    try {
+      const t = await fetchJwPlayerTranscript(jwMediaId, langPrefs, summaryLang);
       if (t) return t;
     } catch { /* fall through */ }
   }
