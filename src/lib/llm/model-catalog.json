@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-28T18:00:00.000Z",
+  "_generated": "2026-04-24T20:00:00.000Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -31,8 +31,8 @@
           "outputPrice": 1.25,
           "vision": true
         },
-        "claude-opus-4-6": {
-          "name": "Claude Opus 4.6",
+        "claude-opus-4-7": {
+          "name": "Claude Opus 4.7",
           "contextWindow": 1000000,
           "maxOutput": 128000,
           "inputPrice": 5,
@@ -49,32 +49,36 @@
         "claude-opus-4-1-20250805",
         "claude-opus-4-20250514",
         "claude-opus-4-5-20251101",
+        "claude-opus-4-6",
         "claude-sonnet-4-20250514",
         "claude-sonnet-4-5-20250929"
       ]
     },
     "deepseek": {
       "models": {
-        "deepseek-chat": {
-          "name": "DeepSeek-V3.2",
-          "contextWindow": 128000,
-          "maxOutput": 8000,
-          "inputPrice": 0.28,
-          "outputPrice": 0.42,
+        "deepseek-v4-flash": {
+          "name": "DeepSeek-V4 Flash",
+          "contextWindow": 1000000,
+          "maxOutput": 384000,
+          "inputPrice": 0.14,
+          "outputPrice": 0.28,
           "vision": false,
           "reasoning": false
         },
-        "deepseek-reasoner": {
-          "name": "DeepSeek-V3.2 Reasoning",
-          "contextWindow": 128000,
-          "maxOutput": 64000,
-          "inputPrice": 0.28,
-          "outputPrice": 0.42,
+        "deepseek-v4-pro": {
+          "name": "DeepSeek-V4 Pro",
+          "contextWindow": 1000000,
+          "maxOutput": 384000,
+          "inputPrice": 1.74,
+          "outputPrice": 3.48,
           "vision": false,
           "reasoning": true
         }
       },
-      "excluded": []
+      "excluded": [
+        "deepseek-chat",
+        "deepseek-reasoner"
+      ]
     },
     "google": {
       "models": {
@@ -127,6 +131,8 @@
         }
       },
       "excluded": [
+        "deep-research-max-preview-04-2026",
+        "deep-research-preview-04-2026",
         "deep-research-pro-preview-12-2025",
         "gemini-2.0-flash",
         "gemini-2.0-flash-001",
@@ -143,17 +149,30 @@
         "gemini-2.5-flash-preview-05-20",
         "gemini-2.5-pro-preview-05-06",
         "gemini-robotics-er-1.5-preview",
+        "gemini-robotics-er-1.6-preview",
         "gemma-3-12b-it",
         "gemma-3-1b-it",
         "gemma-3-27b-it",
         "gemma-3-4b-it",
         "gemma-3n-e2b-it",
         "gemma-3n-e4b-it",
+        "gemma-4-26b-a4b-it",
+        "gemma-4-31b-it",
         "nano-banana-pro-preview"
       ]
     },
     "openai": {
       "models": {
+        "gpt-5.5": {
+          "name": "GPT-5.5",
+          "contextWindow": 1000000,
+          "maxOutput": 128000,
+          "inputPrice": 5,
+          "outputPrice": 30,
+          "vision": true,
+          "reasoning": true,
+          "webSearch": true
+        },
         "gpt-5.4": {
           "name": "GPT-5.4",
           "maxOutput": 128000,
@@ -258,6 +277,7 @@
         "gpt-5.2-chat-latest",
         "gpt-5.2-pro",
         "gpt-5.4-pro",
+        "gpt-5.5-pro",
         "o1",
         "o1-2024-12-17",
         "o1-mini",
@@ -271,6 +291,16 @@
     },
     "xai": {
       "models": {
+        "grok-4.20-0309-reasoning": {
+          "name": "Grok 4.20 (Reasoning)",
+          "contextWindow": 2000000,
+          "inputPrice": 2,
+          "outputPrice": 6,
+          "vision": true,
+          "textGeneration": true,
+          "reasoning": true,
+          "webSearch": true
+        },
         "grok-4-1-fast-reasoning": {
           "name": "Grok 4.1 Fast (Reasoning)",
           "contextWindow": 2097152,
@@ -289,27 +319,17 @@
           "vision": true,
           "textGeneration": true,
           "webSearch": true
-        },
-        "grok-4": {
-          "name": "Grok 4",
-          "contextWindow": 262144,
-          "inputPrice": 3,
-          "outputPrice": 15,
-          "vision": true,
-          "textGeneration": true,
-          "reasoning": true,
-          "webSearch": true
         }
       },
       "excluded": [
         "grok-2-vision-1212",
         "grok-3",
         "grok-3-mini",
+        "grok-4",
         "grok-4-0709",
         "grok-4-fast-non-reasoning",
         "grok-4-fast-reasoning",
         "grok-4.20-0309-non-reasoning",
-        "grok-4.20-0309-reasoning",
         "grok-4.20-multi-agent-0309",
         "grok-code-fast-1"
       ]

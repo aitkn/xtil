@@ -53,8 +53,8 @@ const SLIDES = [
     name: 'auto-diagrams',
     panelIndex: 3,
     icon: '&#128200;',
-    iconBg: 'rgba(109,95,245,0.12)',
-    iconColor: '#8b7cf6',
+    iconBg: 'rgba(227,146,128,0.14)',
+    iconColor: '#e39280',
     title: 'Diagrams,<br>Automatically',
     desc: 'Flowcharts, class diagrams, timelines, ER diagrams — over 20 types. Syntax errors get auto-fixed. If a diagram has issues, xTil retries up to 5 times.',
   },
@@ -79,7 +79,7 @@ const SLIDES = [
 function createBaseOverlay() {
   return `
     position: fixed; top: 0; left: 0; width: 1280px; height: 800px;
-    background: linear-gradient(135deg, #08070f 0%, #0e0d1a 30%, #110f20 60%, #0a0918 100%);
+    background: linear-gradient(135deg, #14110d 0%, #181410 30%, #1a1612 60%, #14110d 100%);
     z-index: 99999; overflow: hidden;
   `;
 }
@@ -116,7 +116,7 @@ async function main() {
       overlay.id = 'screenshot-overlay';
       overlay.style.cssText = `
         position: fixed; top: 0; left: 0; width: 1280px; height: 800px;
-        background: linear-gradient(135deg, #08070f 0%, #0e0d1a 30%, #110f20 60%, #0a0918 100%);
+        background: linear-gradient(135deg, #14110d 0%, #181410 30%, #1a1612 60%, #14110d 100%);
         z-index: 99999; display: flex; align-items: center; padding: 0 60px; gap: 40px;
         overflow: hidden;
       `;
@@ -125,7 +125,7 @@ async function main() {
       const glow1 = document.createElement('div');
       glow1.style.cssText = `
         position: absolute; top: 30%; right: 15%; width: 800px; height: 800px;
-        background: radial-gradient(circle, rgba(109,95,245,0.15) 0%, transparent 60%);
+        background: radial-gradient(circle, rgba(227,146,128,0.10) 0%, transparent 60%);
         transform: translate(30%, -40%); pointer-events: none;
       `;
       overlay.appendChild(glow1);
@@ -133,7 +133,7 @@ async function main() {
       const glow2 = document.createElement('div');
       glow2.style.cssText = `
         position: absolute; bottom: -15%; left: 5%; width: 600px; height: 600px;
-        background: radial-gradient(circle, rgba(79,70,229,0.1) 0%, transparent 60%);
+        background: radial-gradient(circle, rgba(227,146,128,0.08) 0%, transparent 60%);
         pointer-events: none;
       `;
       overlay.appendChild(glow2);
@@ -141,7 +141,7 @@ async function main() {
       const glow3 = document.createElement('div');
       glow3.style.cssText = `
         position: absolute; top: -20%; left: 40%; width: 500px; height: 500px;
-        background: radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 55%);
+        background: radial-gradient(circle, rgba(227,146,128,0.06) 0%, transparent 55%);
         pointer-events: none;
       `;
       overlay.appendChild(glow3);
@@ -154,7 +154,7 @@ async function main() {
       `;
       brand.innerHTML = `
         <img src="/website/public/icon.svg" style="width:48px;height:48px;">
-        <span style="font-family:'DM Sans',sans-serif;font-size:1.8rem;font-weight:700;color:#fff;">xTil</span>
+        <span style="font-family:'Gambarino','Iowan Old Style',Georgia,serif;font-size:1.8rem;font-weight:700;color:#fff;">xTil</span>
       `;
       overlay.appendChild(brand);
 
@@ -162,7 +162,7 @@ async function main() {
       const url = document.createElement('div');
       url.style.cssText = `
         position: absolute; bottom: 32px; left: 60px;
-        font-family: 'Outfit', sans-serif; font-size: 1.4rem;
+        font-family: 'Supreme', system-ui, sans-serif; font-size: 1.4rem;
         color: rgba(255,255,255,0.3); letter-spacing: 0.03em;
       `;
       url.textContent = 'xtil.ai';
@@ -175,7 +175,7 @@ async function main() {
       let badgesHTML = '';
       if (s.badges) {
         badgesHTML = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:28px;">
-          ${s.badges.map(key => `<div style="display:flex;align-items:center;gap:7px;padding:6px 14px;border-radius:10px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);font-family:'Outfit',sans-serif;font-size:0.95rem;font-weight:500;">${icons[key]}<span>${key === 'x' ? 'X / Twitter' : key === 'gdocs' ? 'Google Docs' : key.charAt(0).toUpperCase() + key.slice(1)}</span></div>`).join('')}
+          ${s.badges.map(key => `<div style="display:flex;align-items:center;gap:7px;padding:6px 14px;border-radius:10px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);font-family:'Supreme',system-ui,sans-serif;font-size:0.95rem;font-weight:500;">${icons[key]}<span>${key === 'x' ? 'X / Twitter' : key === 'gdocs' ? 'Google Docs' : key.charAt(0).toUpperCase() + key.slice(1)}</span></div>`).join('')}
         </div>`;
       }
 
@@ -183,9 +183,9 @@ async function main() {
         <div style="width:72px;height:72px;border-radius:18px;background:${s.iconBg};color:${s.iconColor};
           display:flex;align-items:center;justify-content:center;font-size:2.2rem;margin-bottom:36px;">${s.icon}</div>
         <div style="font-size:3.8rem;font-weight:700;color:#fff;line-height:1.08;margin-bottom:28px;
-          font-family:'DM Sans',sans-serif;letter-spacing:-0.02em;">${s.title}</div>
+          font-family:'Gambarino','Iowan Old Style',Georgia,serif;letter-spacing:-0.02em;">${s.title}</div>
         <div style="font-size:1.7rem;color:rgba(255,255,255,0.5);line-height:1.65;
-          font-family:'Outfit',sans-serif;font-weight:400;">${s.desc}</div>
+          font-family:'Supreme',system-ui,sans-serif;font-weight:400;">${s.desc}</div>
         ${badgesHTML}
       `;
       overlay.appendChild(textDiv);
@@ -211,7 +211,7 @@ async function main() {
           const fade = document.createElement('div');
           fade.style.cssText = `
             position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
-            background: linear-gradient(transparent, #08070f);
+            background: linear-gradient(transparent, #14110d);
             pointer-events: none;
           `;
           panelWrapper.appendChild(fade);
@@ -240,8 +240,8 @@ async function main() {
               ${icons[exp.icon]}
             </div>
             <div>
-              <div style="font-family:'DM Sans',sans-serif;font-size:1.35rem;font-weight:600;color:#fff;margin-bottom:4px;">${exp.label}</div>
-              <div style="font-family:'Outfit',sans-serif;font-size:1rem;color:rgba(255,255,255,0.4);">${exp.sub}</div>
+              <div style="font-family:'Gambarino','Iowan Old Style',Georgia,serif;font-size:1.35rem;font-weight:600;color:#fff;margin-bottom:4px;">${exp.label}</div>
+              <div style="font-family:'Supreme',system-ui,sans-serif;font-size:1rem;color:rgba(255,255,255,0.4);">${exp.sub}</div>
             </div>
           `;
           exportDiv.appendChild(card);

@@ -7,16 +7,16 @@ import 'katex/dist/katex.min.css';
 
 /** Master color palette — 12 colors per theme. Used for pie, cScale, xyChart, and auto-legends. */
 export const PALETTE = {
-  light: ['#1a56db','#16a34a','#d97706','#dc2626','#7c3aed','#0891b2','#be185d','#4f46e5',
+  light: ['#b04a34','#16a34a','#d97706','#dc2626','#7c3aed','#0891b2','#be185d','#4f46e5',
           '#059669','#ea580c','#4338ca','#b91c1c'],
-  dark:  ['#b4c5ff','#4ade80','#fbbf24','#f87171','#a78bfa','#22d3ee','#f472b6','#818cf8',
+  dark:  ['#e39280','#4ade80','#fbbf24','#f87171','#a78bfa','#22d3ee','#f472b6','#818cf8',
           '#34d399','#fb923c','#a5b4fc','#fca5a5'],
 } as const;
 
 /** Derive pie1-12, cScale0-11 (+ label/peer), git0-7, fillType0-7 from PALETTE */
 function paletteVars(theme: 'light' | 'dark') {
   const colors = PALETTE[theme];
-  const labelColor = theme === 'dark' ? '#1a1c1e' : '#ffffff';
+  const labelColor = theme === 'dark' ? '#1e1b17' : '#ffffff';
   const vars: Record<string, string> = {};
   for (let i = 0; i < colors.length; i++) {
     vars[`pie${i + 1}`] = colors[i];
@@ -30,8 +30,8 @@ function paletteVars(theme: 'light' | 'dark') {
   }
   // fillType for journey/state (0..7)
   const fills = theme === 'light'
-    ? ['#dbe4ff', '#e8eaf6', '#dcfce7', '#fef3c7', '#fce7f3', '#e0e7ff', '#d1fae5', '#fff7ed']
-    : ['#1a3a8a', '#3a3d52', '#052e16', '#78350f', '#831843', '#312e81', '#064e3b', '#7c2d12'];
+    ? ['#fbe4dc', '#f1ece2', '#dcfce7', '#fef3c7', '#fce7f3', '#e0e7ff', '#d1fae5', '#fff7ed']
+    : ['#7a2d1e', '#3a352d', '#052e16', '#78350f', '#831843', '#312e81', '#064e3b', '#7c2d12'];
   for (let i = 0; i < fills.length; i++) {
     vars[`fillType${i}`] = fills[i];
   }
@@ -40,127 +40,127 @@ function paletteVars(theme: 'light' | 'dark') {
 
 const MERMAID_THEME_VARS = {
   light: {
-    primaryColor: '#dbe4ff',
-    primaryTextColor: '#0a2463',
-    primaryBorderColor: '#1a56db',
-    secondaryColor: '#e8eaf6',
-    secondaryTextColor: '#1a1c2e',
-    secondaryBorderColor: '#74777f',
+    primaryColor: '#fbe4dc',
+    primaryTextColor: '#4a1a10',
+    primaryBorderColor: '#b04a34',
+    secondaryColor: '#f1ece2',
+    secondaryTextColor: '#2a2520',
+    secondaryBorderColor: '#8a857c',
     tertiaryColor: '#dcfce7',
     tertiaryTextColor: '#052e16',
     tertiaryBorderColor: '#16a34a',
-    lineColor: '#74777f',
-    textColor: '#1a1c1e',
-    mainBkg: '#dbe4ff',
-    nodeBorder: '#1a56db',
-    clusterBkg: '#f3f4f6',
-    clusterBorder: '#c4c6d0',
-    titleColor: '#0a2463',
+    lineColor: '#8a857c',
+    textColor: '#1e1b17',
+    mainBkg: '#fbe4dc',
+    nodeBorder: '#b04a34',
+    clusterBkg: '#f3eee4',
+    clusterBorder: '#d3cdc1',
+    titleColor: '#4a1a10',
     edgeLabelBackground: '#ffffff',
-    nodeTextColor: '#0a2463',
+    nodeTextColor: '#4a1a10',
     // Sequence diagram
-    actorTextColor: '#0a2463',
-    actorBkg: '#dbe4ff',
-    actorBorder: '#1a56db',
-    actorLineColor: '#74777f',
-    signalColor: '#1a1c1e',
-    signalTextColor: '#1a1c1e',
-    labelBoxBkgColor: '#dbe4ff',
-    labelBoxBorderColor: '#1a56db',
-    labelTextColor: '#0a2463',
-    loopTextColor: '#0a2463',
-    noteBkgColor: '#e8eaf6',
-    noteTextColor: '#1a1c2e',
-    noteBorderColor: '#74777f',
-    activationBkgColor: '#dbe4ff',
-    activationBorderColor: '#1a56db',
+    actorTextColor: '#4a1a10',
+    actorBkg: '#fbe4dc',
+    actorBorder: '#b04a34',
+    actorLineColor: '#8a857c',
+    signalColor: '#1e1b17',
+    signalTextColor: '#1e1b17',
+    labelBoxBkgColor: '#fbe4dc',
+    labelBoxBorderColor: '#b04a34',
+    labelTextColor: '#4a1a10',
+    loopTextColor: '#4a1a10',
+    noteBkgColor: '#f1ece2',
+    noteTextColor: '#2a2520',
+    noteBorderColor: '#8a857c',
+    activationBkgColor: '#fbe4dc',
+    activationBorderColor: '#b04a34',
     // Pie / timeline / cScale — generated from PALETTE
     ...paletteVars('light'),
-    pieTitleTextColor: '#0a2463',
+    pieTitleTextColor: '#4a1a10',
     pieSectionTextColor: '#ffffff',
-    pieLegendTextColor: '#1a1c1e',
+    pieLegendTextColor: '#1e1b17',
     pieStrokeColor: '#ffffff',
     // State / class
-    labelColor: '#1a1c1e',
-    altBackground: '#f3f4f6',
+    labelColor: '#1e1b17',
+    altBackground: '#f3eee4',
     // Flowchart
-    defaultLinkColor: '#74777f',
+    defaultLinkColor: '#8a857c',
     // Mindmap
-    mindmapRootColor: '#dbe4ff',
-    mindmapTextColor: '#0a2463',
-    mindmapMainColor: '#1a56db',
-    mindmapSecondaryColor: '#e8eaf6',
-    mindmapLineColor: '#74777f',
+    mindmapRootColor: '#fbe4dc',
+    mindmapTextColor: '#4a1a10',
+    mindmapMainColor: '#b04a34',
+    mindmapSecondaryColor: '#f1ece2',
+    mindmapLineColor: '#8a857c',
     // Gantt
-    sectionBkgColor: '#dbe4ff',
-    sectionBkgColor2: '#e8eaf6',
-    altSectionBkgColor: '#f3f4f6',
-    taskBkgColor: '#dbe4ff',
-    taskBorderColor: '#1a56db',
-    taskTextColor: '#0a2463',
+    sectionBkgColor: '#fbe4dc',
+    sectionBkgColor2: '#f1ece2',
+    altSectionBkgColor: '#f3eee4',
+    taskBkgColor: '#fbe4dc',
+    taskBorderColor: '#b04a34',
+    taskTextColor: '#4a1a10',
     doneTaskBkgColor: '#dcfce7',
     critBkgColor: '#fef3c7',
     todayLineColor: '#dc2626',
   },
   dark: {
-    primaryColor: '#1a3a8a',
-    primaryTextColor: '#dbe4ff',
-    primaryBorderColor: '#b4c5ff',
-    secondaryColor: '#3a3d52',
-    secondaryTextColor: '#e0e1f5',
-    secondaryBorderColor: '#8e9099',
+    primaryColor: '#7a2d1e',
+    primaryTextColor: '#fbe4dc',
+    primaryBorderColor: '#e39280',
+    secondaryColor: '#3a352d',
+    secondaryTextColor: '#ece6d8',
+    secondaryBorderColor: '#8a857c',
     tertiaryColor: '#052e16',
     tertiaryTextColor: '#dcfce7',
     tertiaryBorderColor: '#4ade80',
-    lineColor: '#8e9099',
-    textColor: '#e3e2e6',
-    mainBkg: '#1a3a8a',
-    nodeBorder: '#b4c5ff',
-    clusterBkg: '#212326',
-    clusterBorder: '#44474e',
-    titleColor: '#dbe4ff',
-    edgeLabelBackground: '#2b2d31',
-    nodeTextColor: '#dbe4ff',
+    lineColor: '#8a857c',
+    textColor: '#f2ecde',
+    mainBkg: '#7a2d1e',
+    nodeBorder: '#e39280',
+    clusterBkg: '#1c1915',
+    clusterBorder: '#3a352d',
+    titleColor: '#fbe4dc',
+    edgeLabelBackground: '#221e18',
+    nodeTextColor: '#fbe4dc',
     // Sequence diagram
-    actorTextColor: '#dbe4ff',
-    actorBkg: '#1a3a8a',
-    actorBorder: '#b4c5ff',
-    actorLineColor: '#8e9099',
-    signalColor: '#e3e2e6',
-    signalTextColor: '#e3e2e6',
-    labelBoxBkgColor: '#1a3a8a',
-    labelBoxBorderColor: '#b4c5ff',
-    labelTextColor: '#dbe4ff',
-    loopTextColor: '#dbe4ff',
-    noteBkgColor: '#3a3d52',
-    noteTextColor: '#e0e1f5',
-    noteBorderColor: '#8e9099',
-    activationBkgColor: '#1a3a8a',
-    activationBorderColor: '#b4c5ff',
+    actorTextColor: '#fbe4dc',
+    actorBkg: '#7a2d1e',
+    actorBorder: '#e39280',
+    actorLineColor: '#8a857c',
+    signalColor: '#f2ecde',
+    signalTextColor: '#f2ecde',
+    labelBoxBkgColor: '#7a2d1e',
+    labelBoxBorderColor: '#e39280',
+    labelTextColor: '#fbe4dc',
+    loopTextColor: '#fbe4dc',
+    noteBkgColor: '#3a352d',
+    noteTextColor: '#ece6d8',
+    noteBorderColor: '#8a857c',
+    activationBkgColor: '#7a2d1e',
+    activationBorderColor: '#e39280',
     // Pie / timeline / cScale — generated from PALETTE
     ...paletteVars('dark'),
-    pieTitleTextColor: '#dbe4ff',
-    pieSectionTextColor: '#1a1c1e',
-    pieLegendTextColor: '#e3e2e6',
-    pieStrokeColor: '#212326',
+    pieTitleTextColor: '#fbe4dc',
+    pieSectionTextColor: '#1e1b17',
+    pieLegendTextColor: '#f2ecde',
+    pieStrokeColor: '#1c1915',
     // State / class
-    labelColor: '#e3e2e6',
-    altBackground: '#2b2d31',
+    labelColor: '#f2ecde',
+    altBackground: '#221e18',
     // Flowchart
-    defaultLinkColor: '#8e9099',
+    defaultLinkColor: '#8a857c',
     // Mindmap
-    mindmapRootColor: '#1a3a8a',
-    mindmapTextColor: '#dbe4ff',
-    mindmapMainColor: '#b4c5ff',
-    mindmapSecondaryColor: '#3a3d52',
-    mindmapLineColor: '#8e9099',
+    mindmapRootColor: '#7a2d1e',
+    mindmapTextColor: '#fbe4dc',
+    mindmapMainColor: '#e39280',
+    mindmapSecondaryColor: '#3a352d',
+    mindmapLineColor: '#8a857c',
     // Gantt
-    sectionBkgColor: '#1a3a8a',
-    sectionBkgColor2: '#3a3d52',
-    altSectionBkgColor: '#212326',
-    taskBkgColor: '#1a3a8a',
-    taskBorderColor: '#b4c5ff',
-    taskTextColor: '#dbe4ff',
+    sectionBkgColor: '#7a2d1e',
+    sectionBkgColor2: '#3a352d',
+    altSectionBkgColor: '#1c1915',
+    taskBkgColor: '#7a2d1e',
+    taskBorderColor: '#e39280',
+    taskTextColor: '#fbe4dc',
     doneTaskBkgColor: '#052e16',
     critBkgColor: '#78350f',
     todayLineColor: '#f87171',
@@ -175,8 +175,8 @@ const CSCALE_AS_BG_RE = /^\s*(mindmap|timeline|kanban)/m;
 function bgCScaleVars(theme: 'light' | 'dark'): Record<string, string> {
   const fills = NODE_FILLS[theme];
   const strokes = PALETTE[theme];
-  const label = theme === 'dark' ? '#e3e2e6' : '#1a1c1e';
-  const inv = theme === 'dark' ? '#2b2d31' : '#ffffff';
+  const label = theme === 'dark' ? '#f2ecde' : '#1e1b17';
+  const inv = theme === 'dark' ? '#221e18' : '#ffffff';
   const vars: Record<string, string> = {};
   for (let i = 0; i < 12; i++) {
     vars[`cScale${i}`] = fills[i % fills.length];
@@ -196,7 +196,7 @@ function getMermaidConfig(theme: 'light' | 'dark', bgPalette = false) {
       ...MERMAID_THEME_VARS[theme],
       ...(bgPalette ? bgCScaleVars(theme) : {}),
       xyChart: {
-        backgroundColor: theme === 'dark' ? '#212326' : '#f3f4f6',
+        backgroundColor: theme === 'dark' ? '#1c1915' : '#f3eee4',
         plotColorPalette: PALETTE[theme].join(', '),
       },
     },
@@ -383,8 +383,8 @@ function parseXyChartSeries(source: string): { type: 'line' | 'bar'; name: strin
 
 /** Node background fills — muted for dark mode, pastel for light mode. */
 const NODE_FILLS = {
-  light: ['#dbe4ff', '#dcfce7', '#fef3c7', '#fee2e2', '#f3e8ff', '#cffafe', '#fce7f3', '#e0e7ff'],
-  dark:  ['#1a3a8a', '#052e16', '#78350f', '#7f1d1d', '#581c87', '#164e63', '#831843', '#312e81'],
+  light: ['#fbe4dc', '#dcfce7', '#fef3c7', '#fee2e2', '#f3e8ff', '#cffafe', '#fce7f3', '#e0e7ff'],
+  dark:  ['#7a2d1e', '#052e16', '#78350f', '#7f1d1d', '#581c87', '#164e63', '#831843', '#312e81'],
 } as const;
 
 /** Replace fill/stroke/color in `style` and `classDef` with theme-appropriate colors.
@@ -392,7 +392,7 @@ const NODE_FILLS = {
 function themeInlineColors(source: string, theme: 'light' | 'dark'): string {
   const fills = NODE_FILLS[theme];
   const strokes = PALETTE[theme];
-  const text = theme === 'dark' ? '#dbe4ff' : '#0a2463';
+  const text = theme === 'dark' ? '#fbe4dc' : '#4a1a10';
   let idx = 0;
   return source.replace(
     /^(\s*(?:style|classDef)\s+\S+\s+)(.*)$/gm,

@@ -4,55 +4,77 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Changelog — xTil</title>
-  <meta name="description" content="What's new in xTil — release notes and user-facing improvements.">
+  <meta name="description" content="What's new in xTil — release notes and user-facing improvements to the Chrome extension.">
+  <meta name="theme-color" content="#faf6ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#15120f" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Changelog — xTil">
   <meta property="og:description" content="What's new in xTil — release notes and user-facing improvements.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://xtil.ai/changelog">
+  <meta property="og:url" content="https://xtil.ai/changelog.html">
+  <meta property="og:image" content="https://xtil.ai/store/promo-marquee-1400x560.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://xtil.ai/store/promo-marquee-1400x560.png">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+  <link href="https://api.fontshare.com/v2/css?f[]=gambarino@1&f[]=supreme@300,400,500,700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg-deep: #06050e;
-      --bg: #0b0918;
-      --surface: #13102a;
-      --surface-light: #1a1538;
-      --border: #221d40;
-      --primary: #6d5ff5;
-      --primary-bright: #8577ff;
-      --accent: #a78bfa;
-      --glow: #7c3aed;
-      --text: #e8e5f5;
-      --text-muted: #827ca0;
-      --emerald: #34d399;
+      color-scheme: light dark;
+
+      --bg-deep:       oklch(97.5% 0.01 75);
+      --bg:            oklch(96% 0.012 72);
+      --surface:       oklch(98.5% 0.008 75);
+      --surface-light: oklch(99.2% 0.005 75);
+      --border:        oklch(88% 0.012 70);
+      --primary:       oklch(52% 0.14 32);
+      --primary-bright:oklch(58% 0.15 32);
+      --accent:        var(--primary);
+      --glow:          var(--primary);
+      --text:          oklch(18% 0.012 55);
+      --text-secondary:oklch(38% 0.014 58);
+      --text-muted:    oklch(52% 0.016 62);
+      --emerald:       oklch(52% 0.11 155);
+
+      --font-display: 'Gambarino', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+      --font-body: 'Supreme', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+
+      --fs-body: 1.0625rem;
+      --lh-body: 1.62;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-deep:       oklch(13% 0.008 55);
+        --bg:            oklch(15% 0.008 55);
+        --surface:       oklch(17% 0.01 55);
+        --surface-light: oklch(20% 0.01 55);
+        --border:        oklch(28% 0.012 58);
+        --primary:       oklch(64% 0.13 32);
+        --primary-bright:oklch(70% 0.14 32);
+        --accent:        var(--primary);
+        --glow:          var(--primary);
+        --text:          oklch(94% 0.01 80);
+        --text-secondary:oklch(78% 0.012 72);
+        --text-muted:    oklch(62% 0.014 68);
+        --emerald:       oklch(70% 0.12 155);
+      }
     }
 
     html { scroll-behavior: smooth; }
 
     body {
-      font-family: 'Outfit', sans-serif;
+      font-family: var(--font-body);
+      font-size: var(--fs-body);
+      font-feature-settings: 'ss01', 'ss02', 'cv01', 'cv11';
       color: var(--text);
       background: var(--bg-deep);
-      line-height: 1.6;
+      line-height: var(--lh-body);
       -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
       overflow-x: hidden;
-    }
-
-    /* Noise grain overlay */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 9999;
-      opacity: 0.03;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      background-repeat: repeat;
-      background-size: 256px 256px;
     }
 
     a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
@@ -68,7 +90,7 @@
       right: 0;
       z-index: 100;
       padding: 0 28px;
-      background: rgba(6, 5, 14, 0.82);
+      background: color-mix(in oklch, var(--bg-deep) 82%, transparent);
       backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
     }
@@ -84,9 +106,10 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      font-family: 'DM Sans', sans-serif;
-      font-weight: 700;
-      font-size: 1.7rem;
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-size: 1.75rem;
+      letter-spacing: -0.01em;
       color: var(--text);
     }
     .nav-brand img { width: 48px; height: 48px; }
@@ -110,7 +133,6 @@
     }
     .nav-cta:hover {
       background: var(--primary-bright) !important;
-      box-shadow: 0 0 24px rgba(109, 95, 245, 0.4);
     }
 
     /* ─── Changelog content ─── */
@@ -121,14 +143,18 @@
       margin-bottom: 48px;
     }
     .changelog-header h1 {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 2.4rem;
-      font-weight: 700;
-      margin-bottom: 8px;
+      font-family: var(--font-display);
+      font-size: clamp(2.25rem, 1.5rem + 3vw, 3.5rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 12px;
     }
     .changelog-header p {
-      color: var(--text-muted);
-      font-size: 1.05rem;
+      font-family: var(--font-body);
+      color: var(--text-secondary);
+      font-size: 1.125rem;
+      line-height: 1.55;
     }
     .changelog-header p a {
       color: var(--text-muted);
@@ -139,12 +165,14 @@
 
     /* Rendered markdown */
     .changelog-body h2 {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-top: 48px;
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      font-weight: 400;
+      letter-spacing: -0.015em;
+      line-height: 1.2;
+      margin-top: 56px;
       margin-bottom: 4px;
-      padding-bottom: 12px;
+      padding-bottom: 14px;
       border-bottom: 1px solid var(--border);
       color: var(--primary-bright);
     }
@@ -168,7 +196,7 @@
       font-size: 0.95rem;
       line-height: 1.55;
       color: var(--text);
-      border-bottom: 1px solid rgba(34, 29, 64, 0.5);
+      border-bottom: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
     }
     .changelog-body li:last-child {
       border-bottom: none;

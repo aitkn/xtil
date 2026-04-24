@@ -4,6 +4,16 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.5
+
+**Warm rebrand + fresh model lineup**
+
+- Refreshed visual identity — new iron-oxide-on-warm-paper theme replaces the cool blue across the side panel, diagrams, and website; new icons across all sizes
+- Added Claude Opus 4.7 (replaces 4.6 as Anthropic flagship, same price)
+- Added GPT-5.5 alongside GPT-5.4 for users who want OpenAI's newest tier
+- Added Grok 4.20 (2M context, replaces Grok 4 as xAI flagship)
+- Added DeepSeek V4 Flash and V4 Pro (replace V3.2 — cheaper flash tier, stronger reasoning tier, 1M context on both)
+
 ## 1.2.4
 
 **JW Player support**

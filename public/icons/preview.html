@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><title>xTil icon preview</title><style>
+  body { background: #2a2724; color: #faf6ee; font-family: sans-serif; padding: 32px; margin: 0; }
+  .grid { display: flex; gap: 28px; align-items: flex-end; flex-wrap: wrap; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 11px; color: #a39d92; }
+  .cell img { background: repeating-conic-gradient(#3a3631 0 90deg, #2a2724 0 180deg) 0 0/12px 12px; padding: 0; }
+  h2 { font-size: 12px; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; color: #a39d92; margin: 28px 0 16px; }
+</style></head><body>
+  <h2>Native size</h2>
+  <div class="grid">
+    <div class="cell"><img src="icon-16.svg" width="16" height="16"><div>16px</div></div>
+    <div class="cell"><img src="icon-24.svg" width="24" height="24"><div>24px</div></div>
+    <div class="cell"><img src="icon-32.svg" width="32" height="32"><div>32px</div></div>
+    <div class="cell"><img src="icon-48.svg" width="48" height="48"><div>48px</div></div>
+    <div class="cell"><img src="icon-128.svg" width="128" height="128"><div>128px</div></div>
+  </div>
+  <h2>Scaled to 128</h2>
+  <div class="grid">
+    <div class="cell"><img src="icon-16.svg" width="128" height="128"><div>16 → 128</div></div>
+    <div class="cell"><img src="icon-24.svg" width="128" height="128"><div>24 → 128</div></div>
+    <div class="cell"><img src="icon-32.svg" width="128" height="128"><div>32 → 128</div></div>
+    <div class="cell"><img src="icon-48.svg" width="128" height="128"><div>48 → 128</div></div>
+    <div class="cell"><img src="icon-128.svg" width="128" height="128"><div>128</div></div>
+  </div>
+</body></html>

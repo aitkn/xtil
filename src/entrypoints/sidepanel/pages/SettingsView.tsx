@@ -1564,10 +1564,9 @@ function StepHint({ step, currentStep, title, subtitle, details }: { step: Exclu
     <div style={{
       animation: 'fadeIn 0.4s ease',
       marginTop: '10px',
-      padding: '10px 12px',
+      padding: '12px 14px',
       borderRadius: 'var(--md-sys-shape-corner-medium)',
       backgroundColor: 'var(--md-sys-color-primary-container)',
-      borderLeft: '3px solid var(--md-sys-color-primary)',
     }}>
       <div style={{
         font: 'var(--md-sys-typescale-label-medium)',

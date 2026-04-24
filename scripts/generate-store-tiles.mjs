@@ -31,7 +31,7 @@ function badgesHTML(size = 'small') {
     { svg: BADGES.gdocs, text: isSmall ? '' : 'Docs' },
   ];
   return `<div style="display:flex;align-items:center;gap:${gap};flex-wrap:nowrap;">
-    ${labels.map(b => `<div style="display:flex;align-items:center;gap:${iconGap};padding:${pad};border-radius:${borderRadius};background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.45);font-family:'Outfit',sans-serif;font-size:${fontSize};font-weight:500;white-space:nowrap;">${b.svg}${b.text ? `<span>${b.text}</span>` : ''}</div>`).join('')}
+    ${labels.map(b => `<div style="display:flex;align-items:center;gap:${iconGap};padding:${pad};border-radius:${borderRadius};background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.45);font-family:'Supreme',system-ui,sans-serif;font-size:${fontSize};font-weight:500;white-space:nowrap;">${b.svg}${b.text ? `<span>${b.text}</span>` : ''}</div>`).join('')}
   </div>`;
 }
 
@@ -65,7 +65,7 @@ async function main() {
     overlay.id = 'tile-overlay';
     overlay.style.cssText = `
       position: fixed; top: 0; left: 0; width: 440px; height: 280px;
-      background: #06050e; z-index: 99999;
+      background: #16130f; z-index: 99999;
       overflow: hidden;
     `;
 
@@ -73,14 +73,14 @@ async function main() {
     const g1 = document.createElement('div');
     g1.style.cssText = `
       position: absolute; top: -40%; right: 5%; width: 350px; height: 350px;
-      background: radial-gradient(circle, rgba(109,95,245,0.14) 0%, transparent 60%);
+      background: radial-gradient(circle, rgba(227,146,128,0.10) 0%, transparent 60%);
       pointer-events: none;
     `;
     overlay.appendChild(g1);
     const g2 = document.createElement('div');
     g2.style.cssText = `
       position: absolute; bottom: -30%; left: 20%; width: 300px; height: 300px;
-      background: radial-gradient(circle, rgba(79,70,229,0.08) 0%, transparent 60%);
+      background: radial-gradient(circle, rgba(227,146,128,0.07) 0%, transparent 60%);
       pointer-events: none;
     `;
     overlay.appendChild(g2);
@@ -93,13 +93,13 @@ async function main() {
     textDiv.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
         <img src="/website/public/icon.svg" style="width:36px;height:36px;">
-        <span style="font-family:'DM Sans',sans-serif;font-size:1.6rem;font-weight:700;color:#fff;letter-spacing:-0.02em;">xTil</span>
+        <span style="font-family:'Gambarino','Iowan Old Style',Georgia,serif;font-size:1.6rem;font-weight:700;color:#fff;letter-spacing:-0.02em;">xTil</span>
       </div>
-      <div style="font-family:'DM Sans',sans-serif;font-size:1.15rem;font-weight:600;color:#fff;line-height:1.3;margin-bottom:8px;">
-        <span style="background:linear-gradient(135deg,#4f46e5,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Extract</span> content,<br>
-        <span style="background:linear-gradient(135deg,#4f46e5,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">distill</span> knowledge
+      <div style="font-family:'Gambarino','Iowan Old Style',Georgia,serif;font-size:1.15rem;font-weight:600;color:#fff;line-height:1.3;margin-bottom:8px;">
+        <em style="color:#e39280;font-style:italic;">Extract</em> content,<br>
+        <em style="color:#e39280;font-style:italic;">distill</em> knowledge
       </div>
-      <div style="font-family:'Outfit',sans-serif;font-size:0.72rem;color:rgba(255,255,255,0.4);line-height:1.5;">
+      <div style="font-family:'Supreme',system-ui,sans-serif;font-size:0.72rem;color:rgba(255,255,255,0.4);line-height:1.5;">
         AI-powered Chrome extension that turns any web page into structured insights.
       </div>
     `;
@@ -129,7 +129,7 @@ async function main() {
       const dFade = document.createElement('div');
       dFade.style.cssText = `
         position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
-        background: linear-gradient(transparent, #06050e); pointer-events: none; z-index: 2;
+        background: linear-gradient(transparent, #16130f); pointer-events: none; z-index: 2;
       `;
       const diaWrap = document.createElement('div');
       diaWrap.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
@@ -145,13 +145,13 @@ async function main() {
         width: 215px; max-height: none; overflow: hidden;
         transform: rotate(2deg) scale(0.82); transform-origin: top center;
         border-radius: 10px;
-        box-shadow: 0 12px 40px rgba(109,95,245,0.25), 0 0 0 1px rgba(255,255,255,0.08);
+        box-shadow: 0 12px 40px rgba(227,146,128,0.18), 0 0 0 1px rgba(255,255,255,0.08);
       `;
       // Very short fade at bottom edge
       const yFade = document.createElement('div');
       yFade.style.cssText = `
         position: absolute; bottom: 0; left: 0; right: 0; height: 20px;
-        background: linear-gradient(transparent, #06050e); pointer-events: none; z-index: 2;
+        background: linear-gradient(transparent, #16130f); pointer-events: none; z-index: 2;
       `;
       const ytWrap = document.createElement('div');
       ytWrap.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
@@ -202,7 +202,7 @@ async function main() {
     overlay.id = 'tile-overlay';
     overlay.style.cssText = `
       position: fixed; top: 0; left: 0; width: 1400px; height: 560px;
-      background: #06050e; z-index: 99999;
+      background: #16130f; z-index: 99999;
       display: flex; align-items: center; padding: 0 80px;
       overflow: hidden;
     `;
@@ -211,7 +211,7 @@ async function main() {
     const g1 = document.createElement('div');
     g1.style.cssText = `
       position: absolute; top: 20%; left: 30%; width: 800px; height: 800px;
-      background: radial-gradient(circle, rgba(79,70,229,0.1) 0%, transparent 55%);
+      background: radial-gradient(circle, rgba(227,146,128,0.08) 0%, transparent 55%);
       pointer-events: none;
     `;
     overlay.appendChild(g1);
@@ -219,7 +219,7 @@ async function main() {
     const g2 = document.createElement('div');
     g2.style.cssText = `
       position: absolute; bottom: -20%; right: 10%; width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 55%);
+      background: radial-gradient(circle, rgba(227,146,128,0.06) 0%, transparent 55%);
       pointer-events: none;
     `;
     overlay.appendChild(g2);
@@ -230,13 +230,13 @@ async function main() {
     textDiv.innerHTML = `
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;">
         <img src="/website/public/icon.svg" style="width:64px;height:64px;">
-        <span style="font-family:'DM Sans',sans-serif;font-size:2.8rem;font-weight:700;color:#fff;letter-spacing:-0.02em;">xTil</span>
+        <span style="font-family:'Gambarino','Iowan Old Style',Georgia,serif;font-size:2.8rem;font-weight:700;color:#fff;letter-spacing:-0.02em;">xTil</span>
       </div>
-      <div style="font-family:'DM Sans',sans-serif;font-size:1.8rem;font-weight:600;color:#fff;line-height:1.3;margin-bottom:16px;letter-spacing:-0.01em;">
-        <span style="background:linear-gradient(135deg,#4f46e5,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Extract</span> content,<br>
-        <span style="background:linear-gradient(135deg,#4f46e5,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">distill</span> knowledge
+      <div style="font-family:'Gambarino','Iowan Old Style',Georgia,serif;font-size:1.8rem;font-weight:600;color:#fff;line-height:1.3;margin-bottom:16px;letter-spacing:-0.01em;">
+        <em style="color:#e39280;font-style:italic;">Extract</em> content,<br>
+        <em style="color:#e39280;font-style:italic;">distill</em> knowledge
       </div>
-      <div style="font-family:'Outfit',sans-serif;font-size:1.05rem;color:rgba(255,255,255,0.45);line-height:1.7;margin-bottom:24px;">
+      <div style="font-family:'Supreme',system-ui,sans-serif;font-size:1.05rem;color:rgba(255,255,255,0.45);line-height:1.7;margin-bottom:24px;">
         AI-powered Chrome extension that turns any web page into structured insights — summaries, diagrams, fact-checks, and more.
       </div>
       ${badges}
@@ -253,7 +253,7 @@ async function main() {
     function addFade(panel) {
       panel.style.position = 'relative';
       const fade = document.createElement('div');
-      fade.style.cssText = 'position:absolute;bottom:0;left:0;right:0;height:50px;background:linear-gradient(transparent,#06050e);pointer-events:none;z-index:3;';
+      fade.style.cssText = 'position:absolute;bottom:0;left:0;right:0;height:50px;background:linear-gradient(transparent,#16130f);pointer-events:none;z-index:3;';
       panel.appendChild(fade);
     }
 

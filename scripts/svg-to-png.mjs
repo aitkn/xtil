@@ -1,23 +1,22 @@
 import { chromium } from 'playwright';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const iconsDir = resolve(import.meta.dirname, '../public/icons');
 
-// Map each output size to the SVG source to render from.
-// Sizes <= 48 use their own simplified SVG; larger sizes use the detailed 128px SVG.
-// icon-action.png: simplified design (from 48px SVG) rendered at 128px — used by
-// all sub-128 manifest entries so Chrome downscales a crisp high-res source.
+// Render every PNG from the detailed 128-px SVG so Chrome has a single high-res
+// source to downscale. icon-action.png is rendered at 256 so Chrome has headroom
+// even on 2x HiDPI toolbar displays (128 / 96 / 64 / 48 / 32 / 16 all pull from here).
 const sizeToSvg = {
-  16: 16,
-  24: 24,
-  32: 32,
-  48: 48,
-  64: 128,
-  96: 128,
-  128: 128,
-  256: 128,
-  'action': { svg: 48, px: 128 },
+  16: { svg: 128, px: 16 },
+  24: { svg: 128, px: 24 },
+  32: { svg: 128, px: 32 },
+  48: { svg: 128, px: 48 },
+  64: { svg: 128, px: 64 },
+  96: { svg: 128, px: 96 },
+  128: { svg: 128, px: 128 },
+  256: { svg: 128, px: 256 },
+  'action': { svg: 128, px: 256 },
 };
 
 // Render at 1x DPI so output pixels match the declared icon size exactly.
@@ -28,15 +27,23 @@ const browser = await chromium.launch();
 const context = await browser.newContext({ deviceScaleFactor: DPR });
 
 for (const [key, value] of Object.entries(sizeToSvg)) {
-  const isSpecial = typeof value === 'object';
-  const svgSize = isSpecial ? value.svg : value;
-  const outSize = isSpecial ? value.px : Number(key);
-  const outName = isSpecial ? `icon-${key}.png` : `icon-${key}.png`;
+  const svgSize = value.svg;
+  const outSize = value.px;
+  const outName = `icon-${key}.png`;
 
   const page = await context.newPage();
   await page.setViewportSize({ width: outSize, height: outSize });
-  await page.goto(`file://${iconsDir}/icon-${svgSize}.svg`);
-  await page.waitForTimeout(300);
+  // Inline the SVG content so it fills the viewport regardless of intrinsic
+  // width/height. Strips explicit width/height attrs and forces 100%/100%.
+  // Strip width/height from the outer <svg> only (keep rect/child dims intact).
+  const svgSource = readFileSync(`${iconsDir}/icon-${svgSize}.svg`, 'utf8')
+    .replace(/<svg\b[^>]*?>/, (tag) => tag.replace(/\s(width|height)="[^"]*"/g, ''));
+  const html = `<!DOCTYPE html><html><head><style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: transparent; }
+      svg { display: block; width: 100%; height: 100%; }
+    </style></head><body>${svgSource}</body></html>`;
+  await page.setContent(html);
+  await page.waitForTimeout(200);
   const buf = await page.screenshot({ type: 'png', omitBackground: true });
   const outPath = `${iconsDir}/${outName}`;
   writeFileSync(outPath, buf);
