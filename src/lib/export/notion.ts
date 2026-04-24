@@ -69,6 +69,7 @@ export class NotionAdapter implements ExportAdapter {
     await this.ensureProperties(databaseId, {
       'LLM Provider': { rich_text: {} },
       'LLM Model': { rich_text: {} },
+      Genre: { rich_text: {} },
     });
 
     // Upload thumbnail to Notion if available
@@ -168,6 +169,7 @@ export class NotionAdapter implements ExportAdapter {
     },
     Tags: { multi_select: {} },
     'Reading Time': { number: {} },
+    Genre: { rich_text: {} },
     'LLM Provider': { rich_text: {} },
     'LLM Model': { rich_text: {} },
     Status: {

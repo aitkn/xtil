@@ -4,6 +4,12 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.6
+
+**Notion export fix**
+
+- Fixed Notion export failing with "Genre is not a property that exists" — the Genre column is now auto-added to existing Notion databases on the next export
+
 ## 1.2.5
 
 **Warm rebrand + fresh model lineup**
