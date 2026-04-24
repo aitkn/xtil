@@ -1,6 +1,6 @@
 {
   "name": "xtil",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Extract the signal, distill the insight. Genre-aware AI summaries with fact-checks, diagrams, chat refinement and export.",
   "private": true,
   "type": "module",
