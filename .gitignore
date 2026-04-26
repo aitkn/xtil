@@ -10,5 +10,4 @@ demo-output/
 website/verify-*.png
 website/check-*.png
 website/.firebase/
-website/firebase-debug.log
 src/lib/llm/.model-catalog-diff.json
