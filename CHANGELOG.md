@@ -4,6 +4,15 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.7
+
+**GitHub fixes + steady streaming**
+
+- Fixed GitHub issue summaries showing only the title with the body and discussion missing — caused by GitHub's recent issue page redesign
+- Fixed GitHub pull request summaries appearing as generic — they now show as PR / Issue / Code / Repo / Commit / Release with the right framing
+- Cleaned up PR titles, status (open / closed / merged), and +/- line counts that had stopped extracting after the redesign
+- Long summaries and chat replies no longer time out at the 2-minute mark — the timeout now only triggers when the response actually stalls
+
 ## 1.2.6
 
 **Notion export fix**

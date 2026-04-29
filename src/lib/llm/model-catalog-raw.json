@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-04-24T19:58:51.290Z",
+  "_generated": "2026-04-29T02:36:10.463Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -75,12 +75,12 @@
           "maxOutput": 128000,
           "inputPrice": 5,
           "outputPrice": 25,
-          "vision": true,
-          "reasoning": false,
-          "webSearch": true
+          "vision": true
         },
         "claude-opus-4-7": {
-          "name": "Claude Opus 4.7"
+          "name": "Claude Opus 4.7",
+          "reasoning": false,
+          "webSearch": true
         },
         "claude-sonnet-4-20250514": {
           "name": "Claude Sonnet 4",
@@ -118,8 +118,7 @@
           "maxOutput": 8000,
           "inputPrice": 0.28,
           "outputPrice": 0.42,
-          "vision": false,
-          "reasoning": false
+          "vision": false
         },
         "deepseek-reasoner": {
           "name": "DeepSeek-V3.2 Reasoning",
@@ -131,9 +130,11 @@
           "reasoning": true
         },
         "deepseek-v4-flash": {
+          "reasoning": false,
           "name": "deepseek-v4-flash"
         },
         "deepseek-v4-pro": {
+          "reasoning": true,
           "name": "deepseek-v4-pro"
         }
       }
@@ -743,6 +744,8 @@
           "name": "gpt-5.4-pro-2026-03-05"
         },
         "gpt-5.5": {
+          "reasoning": true,
+          "webSearch": true,
           "name": "gpt-5.5"
         },
         "gpt-5.5-2026-04-23": {
@@ -1000,6 +1003,8 @@
           "name": "grok-4.20-0309-non-reasoning"
         },
         "grok-4.20-0309-reasoning": {
+          "reasoning": true,
+          "webSearch": true,
           "name": "grok-4.20-0309-reasoning"
         },
         "grok-4.20-multi-agent-0309": {
