@@ -511,10 +511,20 @@ export function MetadataHeader({ content, summary, earlyGenre, providerName, mod
       })()}
       {(() => {
         const genre = summary?.genre || earlyGenre;
-        if (!genre || genre === 'generic' || genre === 'software') return null;
+        if (!genre || genre === 'generic') return null;
+        const subGenre = summary?.subGenre;
+        const titleCase = (s: string) => s.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        // For 'software' (GitHub), prefer subGenre (PR / Issue / Code / Repo / Commit / Release)
+        // since the user already knows they're on GitHub — the page-type is the signal that matters.
+        const githubLabels: Record<string, string> = {
+          pr: 'PR', issue: 'Issue', code: 'Code', repo: 'Repo', commit: 'Commit', release: 'Release',
+        };
+        const label = genre === 'software' && subGenre
+          ? (githubLabels[subGenre] ?? titleCase(subGenre))
+          : titleCase(genre);
         return (
           <span
-            title={summary?.subGenre ? `${genre} / ${summary.subGenre}` : genre}
+            title={subGenre ? `${genre} / ${subGenre}` : genre}
             style={{
               backgroundColor: 'var(--md-sys-color-surface-container-highest)',
               color: 'var(--md-sys-color-on-surface-variant)',
@@ -524,7 +534,7 @@ export function MetadataHeader({ content, summary, earlyGenre, providerName, mod
               fontWeight: 600,
             }}
           >
-            {genre.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+            {label}
           </span>
         );
       })()}
