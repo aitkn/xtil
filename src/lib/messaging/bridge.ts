@@ -12,6 +12,12 @@ export interface SendMessageOptions {
    * making progress" — receiving one resets the inactivity timer. Use this
    * for streaming flows (SUMMARIZE → SUMMARY_CHUNK, CHAT_MESSAGE → CHAT_CHUNK)
    * so a long generation doesn't trip the timeout while chunks are arriving.
+   *
+   * The listener is scoped to the request's `tabId` when both the outgoing
+   * message and the incoming broadcast carry one — this prevents a chunk
+   * stream for one tab from keeping a stuck request in another tab alive.
+   * If either side omits `tabId`, the listener falls back to runtime-wide
+   * matching (acceptable for single-side-panel usage).
    */
   keepAliveTypes?: readonly string[];
 }
@@ -33,14 +39,20 @@ export function sendMessage<T extends Message>(
     const armTimer = () => { timer = setTimeout(onTimeout, MESSAGE_TIMEOUT_MS); };
 
     const keepAliveTypes = options?.keepAliveTypes;
+    const requestTabId = (message as { tabId?: unknown }).tabId;
     const activityListener = keepAliveTypes && keepAliveTypes.length > 0
       ? (msg: unknown) => {
           if (settled) return;
-          const t = (msg as { type?: unknown } | undefined)?.type;
-          if (typeof t === 'string' && keepAliveTypes.includes(t)) {
-            clearTimeout(timer);
-            armTimer();
+          const incoming = msg as { type?: unknown; tabId?: unknown } | undefined;
+          const t = incoming?.type;
+          if (typeof t !== 'string' || !keepAliveTypes.includes(t)) return;
+          // Scope by tabId when both sides have one — prevents one tab's
+          // chunks from keeping a stuck request in another tab alive.
+          if (requestTabId !== undefined && incoming?.tabId !== undefined && incoming.tabId !== requestTabId) {
+            return;
           }
+          clearTimeout(timer);
+          armTimer();
         }
       : null;
 
