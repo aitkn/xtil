@@ -237,7 +237,7 @@ function extractReactIssueComments(doc: Document, bodyContainer: Element | null)
     comments.push({
       author,
       body: text,
-      isBot: /\[bot\]$/i.test(author),
+      isBot: row ? isBot(row, author) : false,
       isAuthor: !!associationEl && /author/i.test(textOf(associationEl)),
       timestamp,
     });
