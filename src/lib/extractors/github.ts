@@ -208,7 +208,8 @@ function extractReactIssueComments(doc: Document, bodyContainer: Element | null)
 
   for (const md of containers) {
     if (bodyContainer && bodyContainer.contains(md)) continue;
-    // Pick the outermost .markdown-body for each comment to avoid double-counting nested wrappers
+    // Pick the nearest ancestor .markdown-body to dedupe nested wrappers (in
+    // today's DOM there's at most one extra level, so nearest == outermost).
     const outer = md.parentElement?.closest('.markdown-body') as Element | null;
     const body = outer ?? md;
     if (seen.has(body)) continue;
@@ -227,7 +228,11 @@ function extractReactIssueComments(doc: Document, bodyContainer: Element | null)
     const authorEl =
       row?.querySelector('[data-testid="comment-author-association"] ~ a, a[data-testid="actor-link"], a.author, a[data-hovercard-type="user"]') ?? null;
     const author = textOf(authorEl);
-    if (!author) continue;
+    if (!author) {
+      // Make a regression observable rather than silent if GitHub reshuffles the comment header DOM
+      console.warn('[xTil github] dropped issue comment with no resolvable author', body);
+      continue;
+    }
 
     const timeEl = row?.querySelector('relative-time, time');
     const timestamp = timeEl?.getAttribute('datetime') || undefined;
@@ -426,22 +431,32 @@ function extractPR(url: string, doc: Document): ExtractedContent {
       doc.querySelector('h1[class*="PageHeader-Title"]') ||
       doc.querySelector('h1.gh-header-title');
     title = textOf(titleEl);
-    // The React PageHeader h1 includes the "#NN" suffix glued onto the title
-    if (prNumber && title.endsWith(`#${prNumber}`)) {
+    // The React PageHeader h1 glues "#NN" directly to the title (no whitespace).
+    // Only strip the glued case so titles that legitimately mention "#NN"
+    // (e.g. "Fix issue #5") aren't truncated.
+    if (prNumber && new RegExp(`\\S#${prNumber}$`).test(title)) {
       title = title.slice(0, -`#${prNumber}`.length).trim();
     }
-    // The global search-bar h1 must never be used as the PR title
-    if (title.startsWith('Search code')) title = '';
+    // The global search-bar h1 must never be used as the PR title. Reject by
+    // structure (sr-only or inside a search form) instead of an English string.
+    if (titleEl && (
+      titleEl.matches?.('.sr-only') ||
+      titleEl.closest('form[role="search"], [role="search"]')
+    )) {
+      title = '';
+    }
   }
   if (!title) title = prNumber ? `Pull Request #${prNumber}` : 'Pull Request';
 
-  // State badge — React DOM uses `prc-StateLabel-...`; legacy used `.State`
+  // State badge — most specific selectors first. `[class*="StateLabel"]` is a
+  // last-resort fallback because the same prc-StateLabel-… class is used by
+  // status pills on linked PRs/issues that may render before the page header.
   const stateEl =
-    doc.querySelector('[class*="StateLabel"]') ||
+    doc.querySelector('[data-testid="header-state"]') ||
+    doc.querySelector('[data-testid="state-badge"]') ||
     doc.querySelector('.State') ||
     doc.querySelector('[title="Status: Open"], [title="Status: Closed"], [title="Status: Merged"]') ||
-    doc.querySelector('[data-testid="state-badge"]') ||
-    doc.querySelector('[data-testid="header-state"]');
+    doc.querySelector('[class*="StateLabel"]');
   let stateText = textOf(stateEl).toLowerCase();
   // Fallback: scan for state in aria-labels or the header meta area
   if (!stateText) {
@@ -628,9 +643,14 @@ function extractIssue(url: string, doc: Document): ExtractedContent {
     doc.querySelector('.js-comment-body');
   const description = markdownBodyToText(descBody);
 
-  // Comments — try React DOM first, then fall back to legacy timeline scraper
-  const reactComments = extractReactIssueComments(doc, issueBodyContainer);
-  const comments = reactComments.length > 0 ? reactComments : extractTimelineComments(doc).slice(1);
+  // Comments — only use the React extractor when the React body container is
+  // actually present. On legacy DOMs `issueBodyContainer` is null, and the
+  // React sweep would re-pick up the legacy `.markdown-body` body (which has
+  // an `a.author` next to it) as the first "comment", duplicating the
+  // description above. The legacy timeline scraper handles those pages.
+  const comments = issueBodyContainer
+    ? extractReactIssueComments(doc, issueBodyContainer)
+    : extractTimelineComments(doc).slice(1);
 
   // Build content
   const lines: string[] = [];
