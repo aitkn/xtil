@@ -3,23 +3,59 @@ import type { Message } from './types';
 const chromeRuntime = (globalThis as unknown as { chrome: { runtime: typeof chrome.runtime } }).chrome.runtime;
 const chromeTabs = (globalThis as unknown as { chrome: { tabs: typeof chrome.tabs } }).chrome.tabs;
 
-const MESSAGE_TIMEOUT_MS = 120_000; // 2 minutes
+// 120s is an inactivity (idle) timeout — see SendMessageOptions.keepAliveTypes.
+const MESSAGE_TIMEOUT_MS = 120_000;
 
-export function sendMessage<T extends Message>(message: T): Promise<Message> {
+export interface SendMessageOptions {
+  /**
+   * Broadcast message types whose arrival counts as "the request is still
+   * making progress" — receiving one resets the inactivity timer. Use this
+   * for streaming flows (SUMMARIZE → SUMMARY_CHUNK, CHAT_MESSAGE → CHAT_CHUNK)
+   * so a long generation doesn't trip the timeout while chunks are arriving.
+   */
+  keepAliveTypes?: readonly string[];
+}
+
+export function sendMessage<T extends Message>(
+  message: T,
+  options?: SendMessageOptions,
+): Promise<Message> {
   return new Promise((resolve, reject) => {
     let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
 
-    const timer = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        reject(new Error(`Message "${message.type}" timed out after ${MESSAGE_TIMEOUT_MS / 1000}s`));
-      }
-    }, MESSAGE_TIMEOUT_MS);
+    const onTimeout = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(`Message "${message.type}" timed out after ${MESSAGE_TIMEOUT_MS / 1000}s with no activity`));
+    };
+    const armTimer = () => { timer = setTimeout(onTimeout, MESSAGE_TIMEOUT_MS); };
+
+    const keepAliveTypes = options?.keepAliveTypes;
+    const activityListener = keepAliveTypes && keepAliveTypes.length > 0
+      ? (msg: unknown) => {
+          if (settled) return;
+          const t = (msg as { type?: unknown } | undefined)?.type;
+          if (typeof t === 'string' && keepAliveTypes.includes(t)) {
+            clearTimeout(timer);
+            armTimer();
+          }
+        }
+      : null;
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (activityListener) chromeRuntime.onMessage.removeListener(activityListener);
+    };
+
+    if (activityListener) chromeRuntime.onMessage.addListener(activityListener);
+    armTimer();
 
     chromeRuntime.sendMessage(message, (response: unknown) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cleanup();
       if (chromeRuntime.lastError) {
         reject(new Error(chromeRuntime.lastError.message));
       } else {

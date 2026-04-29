@@ -275,7 +275,7 @@ async function runMermaidFixAttempt(
     summary: annotatedSummary,
     content,
     theme,
-  }) as ChatResponseMessage;
+  }, { keepAliveTypes: ['CHAT_CHUNK'] }) as ChatResponseMessage;
 
   // Update debug panel with the actual conversation from this fix attempt
   if (fixResponse.conversationLog?.length && setConversationLog) {
@@ -1307,7 +1307,7 @@ export function App() {
         content: extractedContent,
         userInstructions,
         tabId: originTabId ?? undefined,
-      }) as SummaryResultMessage;
+      }, { keepAliveTypes: ['SUMMARY_CHUNK', 'GENRE_CLASSIFIED'] }) as SummaryResultMessage;
 
       // Store raw LLM responses and system prompt for debug panel BEFORE
       // checking success — they're available even when summarization fails
@@ -1729,7 +1729,7 @@ export function App() {
         content,
         tabId: originTabId ?? undefined,
         webSearch: opts?.webSearch || undefined,
-      }) as ChatResponseMessage;
+      }, { keepAliveTypes: ['CHAT_CHUNK'] }) as ChatResponseMessage;
 
       if (!response.success || !response.message) {
         throw new Error(response.error || 'Chat failed');
