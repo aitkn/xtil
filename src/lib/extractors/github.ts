@@ -189,6 +189,68 @@ function extractTimelineComments(doc: Document): TimelineComment[] {
   return comments;
 }
 
+/**
+ * Extract issue comments from the React DOM.
+ *
+ * The React issue page renders each comment with class `.markdown-body`
+ * (often wrapped in `[data-testid="markdown-body"]`). The body lives inside
+ * `[data-testid="issue-body"]`; everything else is either a comment or a
+ * timeline event (referenced PR, label change, etc.). We iterate
+ * `.markdown-body` elements outside the body container, climb to a wrapping
+ * timeline row, and pull author/timestamp from there.
+ */
+function extractReactIssueComments(doc: Document, bodyContainer: Element | null): TimelineComment[] {
+  const containers = doc.querySelectorAll('.markdown-body');
+  if (containers.length === 0) return [];
+
+  const comments: TimelineComment[] = [];
+  const seen = new Set<Element>();
+
+  for (const md of containers) {
+    if (bodyContainer && bodyContainer.contains(md)) continue;
+    // Pick the nearest ancestor .markdown-body to dedupe nested wrappers (in
+    // today's DOM there's at most one extra level, so nearest == outermost).
+    const outer = md.parentElement?.closest('.markdown-body') as Element | null;
+    const body = outer ?? md;
+    if (seen.has(body)) continue;
+    seen.add(body);
+
+    const text = markdownBodyToText(body);
+    if (!text) continue;
+
+    // Walk up to a row-level wrapper that exposes author + timestamp
+    const row =
+      body.closest('[data-testid^="timeline-row"]') ||
+      body.closest('[data-testid*="comment"]') ||
+      body.closest('article, [role="article"]') ||
+      body.parentElement;
+
+    const authorEl =
+      row?.querySelector('[data-testid="comment-author-association"] ~ a, a[data-testid="actor-link"], a.author, a[data-hovercard-type="user"]') ?? null;
+    const author = textOf(authorEl);
+    if (!author) {
+      // Make a regression observable rather than silent if GitHub reshuffles the comment header DOM
+      console.warn('[xTil github] dropped issue comment with no resolvable author', body);
+      continue;
+    }
+
+    const timeEl = row?.querySelector('relative-time, time');
+    const timestamp = timeEl?.getAttribute('datetime') || undefined;
+
+    const associationEl = row?.querySelector('[data-testid="comment-author-association"]') ?? null;
+
+    comments.push({
+      author,
+      body: text,
+      isBot: row ? isBot(row, author) : false,
+      isAuthor: !!associationEl && /author/i.test(textOf(associationEl)),
+      timestamp,
+    });
+  }
+
+  return comments;
+}
+
 /** Extract review (inline) comments */
 function extractReviewComments(doc: Document): ReviewComment[] {
   const comments: ReviewComment[] = [];
@@ -354,29 +416,47 @@ function extractPR(url: string, doc: Document): ExtractedContent {
   const prNumberMatch = url.match(/\/pull\/(\d+)/);
   const prNumber = prNumberMatch ? parseInt(prNumberMatch[1], 10) : undefined;
 
-  // Title — try multiple selectors, fall back to <title> parsing
-  const titleEl =
-    doc.querySelector('.gh-header-title .js-issue-title') ||
-    doc.querySelector('h1 bdi') ||
-    doc.querySelector('[data-testid="issue-title"]') ||
-    doc.querySelector('h1.gh-header-title') ||
-    doc.querySelector('h1');
-  let title = textOf(titleEl);
+  // Title — <title> parsing is most reliable since the React PageHeader h1
+  // glues the PR number to the title (e.g. "PR title#123") and the legacy
+  // `.gh-header-title` selectors are gone in the migrated DOM.
   // GitHub <title> format: "PR title by author · Pull Request #123 · owner/repo · GitHub"
   const docTitle = doc.title || '';
   const titleMatch = docTitle.match(/^(.+?)\s+by\s+.+?\s+·\s+Pull Request\s+#\d+/);
-  const docTitleParsed = titleMatch ? titleMatch[1].trim() : '';
-  // Prefer <title> when DOM-extracted title is empty, generic, or matches the page name
-  if ((!title || title === 'GitHub' || title === 'Pull Request') && docTitleParsed) {
-    title = docTitleParsed;
+  let title = titleMatch ? titleMatch[1].trim() : '';
+  if (!title) {
+    const titleEl =
+      doc.querySelector('.gh-header-title .js-issue-title') ||
+      doc.querySelector('h1 bdi') ||
+      doc.querySelector('[data-testid="issue-title"]') ||
+      doc.querySelector('h1[class*="PageHeader-Title"]') ||
+      doc.querySelector('h1.gh-header-title');
+    title = textOf(titleEl);
+    // The React PageHeader h1 glues "#NN" directly to the title (no whitespace).
+    // Only strip the glued case so titles that legitimately mention "#NN"
+    // (e.g. "Fix issue #5") aren't truncated.
+    if (prNumber && new RegExp(`\\S#${prNumber}$`).test(title)) {
+      title = title.slice(0, -`#${prNumber}`.length).trim();
+    }
+    // The global search-bar h1 must never be used as the PR title. Reject by
+    // structure (sr-only or inside a search form) instead of an English string.
+    if (titleEl && (
+      titleEl.matches?.('.sr-only') ||
+      titleEl.closest('form[role="search"], [role="search"]')
+    )) {
+      title = '';
+    }
   }
   if (!title) title = prNumber ? `Pull Request #${prNumber}` : 'Pull Request';
 
-  // State badge — try multiple selectors and aria-label patterns
+  // State badge — most specific selectors first. `[class*="StateLabel"]` is a
+  // last-resort fallback because the same prc-StateLabel-… class is used by
+  // status pills on linked PRs/issues that may render before the page header.
   const stateEl =
+    doc.querySelector('[data-testid="header-state"]') ||
+    doc.querySelector('[data-testid="state-badge"]') ||
     doc.querySelector('.State') ||
     doc.querySelector('[title="Status: Open"], [title="Status: Closed"], [title="Status: Merged"]') ||
-    doc.querySelector('[data-testid="state-badge"]');
+    doc.querySelector('[class*="StateLabel"]');
   let stateText = textOf(stateEl).toLowerCase();
   // Fallback: scan for state in aria-labels or the header meta area
   if (!stateText) {
@@ -385,9 +465,9 @@ function extractPR(url: string, doc: Document): ExtractedContent {
   }
   // Fallback: check <title> for "Merged" or page body
   if (!stateText) {
-    const docTitle = (doc.title || '').toLowerCase();
-    if (docTitle.includes('merged')) stateText = 'merged';
-    else if (docTitle.includes('closed')) stateText = 'closed';
+    const docTitleLower = docTitle.toLowerCase();
+    if (docTitleLower.includes('merged')) stateText = 'merged';
+    else if (docTitleLower.includes('closed')) stateText = 'closed';
   }
   const prState: 'open' | 'closed' | 'merged' =
     stateText.includes('merged') ? 'merged'
@@ -396,26 +476,36 @@ function extractPR(url: string, doc: Document): ExtractedContent {
 
   // Author — try multiple selectors, fall back to <title> parsing
   const authorEl =
+    doc.querySelector('[data-testid="issue-body-header-author"]') ||
     doc.querySelector('.gh-header-meta .author') ||
     doc.querySelector('.js-issue-header-author') ||
     doc.querySelector('[data-testid="author"]');
   let author = textOf(authorEl);
   if (!author) {
-    const docTitle = doc.title || '';
     const authorMatch = docTitle.match(/by\s+(\S+)\s+·\s+Pull Request/);
     if (authorMatch) author = authorMatch[1];
   }
 
-  // Branch info
-  const headRef = textOf(doc.querySelector('.head-ref'));
+  // Branch info — `.base-ref` survived the React migration, `.head-ref` did not
   const baseRef = textOf(doc.querySelector('.base-ref'));
+  const headRef = textOf(
+    doc.querySelector('.head-ref') ||
+    doc.querySelector('[class*="headRef"], [class*="head-ref"]'),
+  );
 
-  // Stats (+N/-N)
-  const diffstatEl = doc.querySelector('.diffstat, #diffstat');
-  const diffstat = textOf(diffstatEl);
+  // Stats (+N/-N) — React DOM puts the wrapper around the diff state badges
+  const diffstatEl =
+    doc.querySelector('.diffstat, #diffstat') ||
+    doc.querySelector('[class*="diffStatesWrapper"]');
+  const diffstatRaw = textOf(diffstatEl);
+  const addMatch = diffstatRaw.match(/\+[\d,]+/);
+  const delMatch = diffstatRaw.match(/-[\d,]+/);
+  const diffstat = [addMatch?.[0], delMatch?.[0]].filter(Boolean).join(' ') || diffstatRaw;
 
   // Labels
-  const labelEls = doc.querySelectorAll('.IssueLabel, .js-issue-labels .IssueLabel');
+  const labelEls = doc.querySelectorAll(
+    '[data-testid="issue-labels"] a, .IssueLabel, .js-issue-labels .IssueLabel',
+  );
   const labels = Array.from(labelEls).map(el => textOf(el)).filter(Boolean);
 
   // PR description (first comment body)
@@ -490,21 +580,49 @@ function extractPR(url: string, doc: Document): ExtractedContent {
 }
 
 function extractIssue(url: string, doc: Document): ExtractedContent {
-  // Title
-  const titleEl = doc.querySelector('.gh-header-title .js-issue-title') || doc.querySelector('h1 bdi');
-  const title = textOf(titleEl) || 'Issue';
+  // Issue number from URL (always reliable)
+  const issueNumberMatch = url.match(/\/issues\/(\d+)/);
+  const issueNumber = issueNumberMatch ? parseInt(issueNumberMatch[1], 10) : undefined;
 
-  // State
-  const stateEl = doc.querySelector('.State, [title="Status: Open"], [title="Status: Closed"]');
-  const stateText = textOf(stateEl).toLowerCase();
+  // Title — React DOM exposes [data-testid="issue-title"]; legacy DOM uses
+  // .gh-header-title .js-issue-title. h1 bdi happens to match in both.
+  const titleEl =
+    doc.querySelector('[data-testid="issue-title"]') ||
+    doc.querySelector('.gh-header-title .js-issue-title') ||
+    doc.querySelector('h1 bdi');
+  let title = textOf(titleEl);
+  // Reject the global search-bar h1 which leaks into other fallbacks
+  if (title.startsWith('Search code')) title = '';
+  if (!title) {
+    const docTitleMatch = (doc.title || '').match(/^(.+?)\s+·\s+Issue\s+#\d+/);
+    if (docTitleMatch) title = docTitleMatch[1].trim();
+  }
+  if (!title) title = issueNumber ? `Issue #${issueNumber}` : 'Issue';
+
+  // State — React DOM exposes [data-testid="header-state"]; legacy used .State
+  const stateEl =
+    doc.querySelector('[data-testid="header-state"]') ||
+    doc.querySelector('.State, [title="Status: Open"], [title="Status: Closed"]');
+  let stateText = textOf(stateEl).toLowerCase();
+  if (!stateText) {
+    // Fallback: status icon's aria-label/title (e.g. "Closed issue")
+    const stateIcon = doc.querySelector(
+      '[aria-label*="Closed issue" i], [aria-label*="Open issue" i], [title*="Closed" i], [title*="Open" i]',
+    );
+    stateText = (stateIcon?.getAttribute('aria-label') || stateIcon?.getAttribute('title') || '').toLowerCase();
+  }
   const issueState: 'open' | 'closed' = stateText.includes('closed') ? 'closed' : 'open';
 
-  // Author
-  const authorEl = doc.querySelector('.gh-header-meta .author, .js-issue-header-author');
+  // Author — React DOM exposes [data-testid="issue-body-header-author"]
+  const authorEl =
+    doc.querySelector('[data-testid="issue-body-header-author"]') ||
+    doc.querySelector('.gh-header-meta .author, .js-issue-header-author');
   const author = textOf(authorEl);
 
-  // Labels
-  const labelEls = doc.querySelectorAll('.IssueLabel, .js-issue-labels .IssueLabel');
+  // Labels — React DOM groups them under [data-testid="issue-labels"]
+  const labelEls = doc.querySelectorAll(
+    '[data-testid="issue-labels"] a, .IssueLabel, .js-issue-labels .IssueLabel',
+  );
   const labels = Array.from(labelEls).map(el => textOf(el)).filter(Boolean);
 
   // Assignees
@@ -515,17 +633,28 @@ function extractIssue(url: string, doc: Document): ExtractedContent {
   const milestoneEl = doc.querySelector('.milestone-name, a.Truncate[href*="milestone"]');
   const milestone = textOf(milestoneEl);
 
-  // Issue body
-  const descBody = doc.querySelector('.js-discussion .js-comment-container:first-of-type .js-comment-body, .js-comment-body');
+  // Issue body — React DOM wraps it in [data-testid="issue-body"] containing a
+  // [data-testid="markdown-body"] (also class .markdown-body). Pick the first
+  // .markdown-body inside it to avoid grabbing nested duplicates.
+  const issueBodyContainer = doc.querySelector('[data-testid="issue-body"]');
+  const descBody =
+    issueBodyContainer?.querySelector('.markdown-body, [data-testid="markdown-body"]') ||
+    doc.querySelector('.js-discussion .js-comment-container:first-of-type .js-comment-body') ||
+    doc.querySelector('.js-comment-body');
   const description = markdownBodyToText(descBody);
 
-  // Comments
-  const allComments = extractTimelineComments(doc);
-  const comments = allComments.slice(1);
+  // Comments — only use the React extractor when the React body container is
+  // actually present. On legacy DOMs `issueBodyContainer` is null, and the
+  // React sweep would re-pick up the legacy `.markdown-body` body (which has
+  // an `a.author` next to it) as the first "comment", duplicating the
+  // description above. The legacy timeline scraper handles those pages.
+  const comments = issueBodyContainer
+    ? extractReactIssueComments(doc, issueBodyContainer)
+    : extractTimelineComments(doc).slice(1);
 
   // Build content
   const lines: string[] = [];
-  lines.push(`# ${title}`);
+  lines.push(`# ${issueNumber ? `#${issueNumber} ` : ''}${title}`);
   lines.push('');
   lines.push(`**State:** ${issueState} | **Author:** ${author || 'unknown'}`);
   if (labels.length) lines.push(`**Labels:** ${labels.join(', ')}`);
