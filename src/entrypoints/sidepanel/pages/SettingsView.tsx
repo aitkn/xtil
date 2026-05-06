@@ -130,13 +130,16 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
     const result: Record<string, ModelInfo[]> = {};
     for (const def of PROVIDER_DEFINITIONS) {
       const pid = def.id;
-      let models = getCatalogModels(pid);
+      // Models the runtime confirmed are gone from the provider's /models list.
+      // Hide them from the picker even if they're still in the bundled catalog.
+      const discontinued = new Set(settings.discoveredDiscontinued?.[pid] ?? []);
+      let models = getCatalogModels(pid).filter((m) => !discontinued.has(m.id));
 
       // Append cached API extras (genuinely new models from previous fetches)
       if (settings.cachedModels?.[pid]) {
         const catalogIds = getCatalogModelIds(pid);
         const extras = settings.cachedModels[pid].filter(
-          (m) => !catalogIds.has(m.id) && !isModelExcluded(pid, m.id),
+          (m) => !catalogIds.has(m.id) && !isModelExcluded(pid, m.id) && !discontinued.has(m.id),
         );
         models = [...models, ...extras];
       }

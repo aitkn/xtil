@@ -2,6 +2,7 @@ import { getSettings, saveSettings } from '@/lib/storage/settings';
 import { getActiveProviderConfig } from '@/lib/storage/types';
 import { createProvider, getProviderDefinition } from '@/lib/llm/registry';
 import { fetchModels, getCatalogEntry } from '@/lib/llm/models';
+import { handleDiscontinuationOnError } from '@/lib/llm/deprecation';
 import { summarize, ImageRequestError } from '@/lib/summarizer/summarizer';
 import { getSystemPrompt } from '@/lib/summarizer/prompts';
 import { fetchImages } from '@/lib/images/fetcher';
@@ -759,10 +760,24 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
       throw err;
     }
   } catch (err) {
+    // If the model was retired, persist the swap before bubbling the error so
+    // the next attempt uses the new model automatically. The user-facing
+    // message tells them we've already switched.
+    let surfaced = err instanceof Error ? err.message : String(err);
+    try {
+      const settings = await getSettings();
+      const llmConfig = getActiveProviderConfig(settings);
+      const result = await handleDiscontinuationOnError(err, llmConfig);
+      if (result) {
+        const newName = result.notice.toName || result.notice.to;
+        const provName = result.notice.providerName || result.notice.providerId;
+        surfaced = `${provName} retired ${result.notice.from}. Switched to ${newName} — please try again.`;
+      }
+    } catch { /* deprecation handler is best-effort */ }
     return {
       type: 'SUMMARY_RESULT',
       success: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: surfaced,
       rawResponses,
       systemPrompt: actualSystemPrompt,
       conversationLog: lastConversation.length > 0 ? lastConversation : undefined,
@@ -976,10 +991,21 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
 
     return { type: 'CHAT_RESPONSE', success: true, message: response, rawResponses, conversationLog, lastRequestBody: lastRequestBody || undefined, lastResponseBody: lastResponseBody || undefined };
   } catch (err) {
+    let surfaced = err instanceof Error ? err.message : String(err);
+    try {
+      const settings = await getSettings();
+      const llmConfig = getActiveProviderConfig(settings);
+      const result = await handleDiscontinuationOnError(err, llmConfig);
+      if (result) {
+        const newName = result.notice.toName || result.notice.to;
+        const provName = result.notice.providerName || result.notice.providerId;
+        surfaced = `${provName} retired ${result.notice.from}. Switched to ${newName} — please try again.`;
+      }
+    } catch { /* deprecation handler is best-effort */ }
     return {
       type: 'CHAT_RESPONSE',
       success: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: surfaced,
     };
   } finally {
     if (tabId != null) activeChats.delete(tabId);
@@ -1058,17 +1084,24 @@ async function handleTestLLMConnection(): Promise<ConnectionTestResultMessage> {
   try {
     const settings = await getSettings();
     const llmConfig = getActiveProviderConfig(settings);
-    const provider = createProvider(llmConfig);
     // Call sendChat directly instead of testConnection() so errors propagate.
     // If sendChat doesn't throw, the connection works (even if response is empty
     // due to e.g. Gemini safety filters on trivial prompts).
-    await provider.sendChat(
-      [{ role: 'user', content: 'Reply with "ok"' }],
-      { maxTokens: 10 },
+    const { provider: workingProvider, config: workingConfig } = await runWithDiscontinuationHandling(
+      llmConfig,
+      async (cfg) => {
+        const p = createProvider(cfg);
+        await p.sendChat(
+          [{ role: 'user', content: 'Reply with "ok"' }],
+          { maxTokens: 10 },
+        );
+        return { provider: p, config: cfg };
+      },
+      { retry: true },
     );
 
     // Probe vision capabilities
-    const vision = await getModelVision(provider, llmConfig.providerId, llmConfig.model);
+    const vision = await getModelVision(workingProvider, workingConfig.providerId, workingConfig.model);
 
     return { type: 'CONNECTION_TEST_RESULT', success: true, visionSupport: vision };
   } catch (err) {
@@ -1101,7 +1134,50 @@ async function handleProbeVision(msg: import('@/lib/messaging/types').ProbeVisio
     const vision = await getModelVision(provider, llmConfig.providerId, llmConfig.model);
     return { type: 'PROBE_VISION_RESULT', success: true, vision } as Message;
   } catch (err) {
-    return { type: 'PROBE_VISION_RESULT', success: false, error: err instanceof Error ? err.message : String(err) } as Message;
+    let surfaced = err instanceof Error ? err.message : String(err);
+    try {
+      const cfg = msg.providerId && msg.model ? {
+        providerId: msg.providerId,
+        apiKey: msg.apiKey || '',
+        model: msg.model,
+        endpoint: msg.endpoint,
+        contextWindow: 100000,
+      } : getActiveProviderConfig(await getSettings());
+      const result = await handleDiscontinuationOnError(err, cfg);
+      if (result) {
+        const newName = result.notice.toName || result.notice.to;
+        const provName = result.notice.providerName || result.notice.providerId;
+        surfaced = `${provName} retired ${result.notice.from}. Switched to ${newName} — please try again.`;
+      }
+    } catch { /* best-effort */ }
+    return { type: 'PROBE_VISION_RESULT', success: false, error: surfaced } as Message;
+  }
+}
+
+/**
+ * Run an LLM-using callback. If the underlying call fails because the model is
+ * gone from the provider's /models list, persist a swap to a capability-matched
+ * fallback (`handleDiscontinuationOnError`), then either retry once (if the
+ * caller opted in) or rethrow with a friendly message that tells the user we've
+ * already updated their settings.
+ */
+async function runWithDiscontinuationHandling<T>(
+  llmConfig: import('@/lib/llm/types').ProviderConfig,
+  fn: (config: import('@/lib/llm/types').ProviderConfig) => Promise<T>,
+  opts?: { retry?: boolean },
+): Promise<T> {
+  try {
+    return await fn(llmConfig);
+  } catch (err) {
+    const result = await handleDiscontinuationOnError(err, llmConfig);
+    if (!result) throw err;
+    if (opts?.retry) {
+      return await fn(result.newConfig);
+    }
+    const newName = result.notice.toName || result.notice.to;
+    throw new Error(
+      `${result.notice.providerId === 'xai' ? 'xAI' : (result.notice.providerName || result.notice.providerId)} retired ${result.notice.from}. Switched to ${newName} — please try again.`,
+    );
   }
 }
 

@@ -932,6 +932,22 @@ export function App() {
     });
   }, [setThemeMode]);
 
+  // Show any pending model-migration notice (e.g. an LLM model was discontinued
+  // by the provider and the runtime auto-swapped to a fallback) and clear it.
+  useEffect(() => {
+    const notices = settings.pendingMigrationNotices;
+    if (!notices?.length) return;
+    const newest = notices[notices.length - 1];
+    const provName = newest.providerName || newest.providerId;
+    const toName = newest.toName || newest.to;
+    setToast({
+      message: `${provName} retired ${newest.from}. Switched to ${toName}.`,
+      type: 'info',
+    });
+    sendMessage({ type: 'SAVE_SETTINGS', settings: { pendingMigrationNotices: [] } }).catch(() => {});
+    setSettings((s) => ({ ...s, pendingMigrationNotices: [] }));
+  }, [settings.pendingMigrationNotices]);
+
   // Auto-extract on mount
   useEffect(() => {
     extractContent();

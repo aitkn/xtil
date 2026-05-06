@@ -29,6 +29,21 @@ export interface Settings {
   enableImageAnalysis?: boolean;
   autoSearchFactCheck?: boolean;
   onboardingCompleted?: boolean;
+  /** Models the runtime confirmed are no longer offered by the provider. Per-provider lists. */
+  discoveredDiscontinued?: Record<string, string[]>;
+  /** One-shot notice shown after an automatic model swap; cleared once the side panel renders it. */
+  pendingMigrationNotices?: MigrationNotice[];
+}
+
+export interface MigrationNotice {
+  providerId: string;
+  from: string;
+  to: string;
+  /** Display name of the new model, when known. */
+  toName?: string;
+  /** Display name of the retired provider (e.g. "xAI (Grok)"), when known. */
+  providerName?: string;
+  at: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
