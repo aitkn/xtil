@@ -932,6 +932,51 @@ export function App() {
     });
   }, [setThemeMode]);
 
+  // Keep React state in sync when the background mutates settings on its own —
+  // notably the model auto-swap on a discontinuation. Without this, a stale
+  // SettingsView debounced-save would clobber the swap on the next user edit.
+  useEffect(() => {
+    const chromeStorage = (globalThis as unknown as { chrome: { storage: typeof chrome.storage } }).chrome.storage;
+    const handler = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      area: chrome.storage.AreaName,
+    ) => {
+      if (area !== 'local') return;
+      const change = changes['xtil_settings'];
+      if (!change) return;
+      const next = change.newValue as Settings | undefined;
+      if (next) setSettings(next);
+    };
+    chromeStorage.onChanged.addListener(handler);
+    return () => chromeStorage.onChanged.removeListener(handler);
+  }, []);
+
+  // Show any pending model-migration notices (e.g. an LLM model was discontinued
+  // by the provider and the runtime auto-swapped to a fallback) and clear them.
+  // We surface all accumulated notices, not just the latest, and remove them
+  // from storage by `at` timestamp so concurrently-added notices aren't lost.
+  useEffect(() => {
+    const notices = settings.pendingMigrationNotices;
+    if (!notices?.length) return;
+    const describe = (n: typeof notices[number]) => {
+      const provName = n.providerName || n.providerId;
+      const toName = n.toName || n.to;
+      return `${provName} retired ${n.from} → ${toName}`;
+    };
+    const message = notices.length === 1
+      ? `${describe(notices[0])}.`
+      : `Migrated ${notices.length} retired models: ${notices.map(describe).join('; ')}.`;
+    setToast({ message, type: 'info' });
+    const timestamps = notices.map((n) => n.at);
+    sendMessage({ type: 'CLEAR_MIGRATION_NOTICES', timestamps }).catch(() => {});
+    setSettings((s) => ({
+      ...s,
+      pendingMigrationNotices: (s.pendingMigrationNotices ?? []).filter(
+        (n) => !timestamps.includes(n.at),
+      ),
+    }));
+  }, [settings.pendingMigrationNotices]);
+
   // Auto-extract on mount
   useEffect(() => {
     extractContent();

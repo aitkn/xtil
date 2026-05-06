@@ -2,6 +2,7 @@ import { getSettings, saveSettings } from '@/lib/storage/settings';
 import { getActiveProviderConfig } from '@/lib/storage/types';
 import { createProvider, getProviderDefinition } from '@/lib/llm/registry';
 import { fetchModels, getCatalogEntry } from '@/lib/llm/models';
+import { handleDiscontinuationOnError } from '@/lib/llm/deprecation';
 import { summarize, ImageRequestError } from '@/lib/summarizer/summarizer';
 import { getSystemPrompt } from '@/lib/summarizer/prompts';
 import { fetchImages } from '@/lib/images/fetcher';
@@ -218,6 +219,10 @@ async function handleMessage(message: Message): Promise<Message> {
       return handleGetSettings();
     case 'SAVE_SETTINGS':
       return handleSaveSettings(message.settings);
+    case 'CLEAR_MIGRATION_NOTICES':
+      return handleClearMigrationNotices(
+        (message as import('@/lib/messaging/types').ClearMigrationNoticesMessage).timestamps,
+      );
     case 'FETCH_NOTION_DATABASES':
       return handleFetchNotionDatabases();
     case 'FETCH_MODELS':
@@ -759,10 +764,14 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
       throw err;
     }
   } catch (err) {
+    // If the model was retired, persist the swap before bubbling the error so
+    // the next attempt uses the new model automatically. The user-facing
+    // message tells them we've already switched.
+    const surfaced = await surfaceDiscontinuationError(err, getActiveProviderConfig(await getSettings()));
     return {
       type: 'SUMMARY_RESULT',
       success: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: surfaced,
       rawResponses,
       systemPrompt: actualSystemPrompt,
       conversationLog: lastConversation.length > 0 ? lastConversation : undefined,
@@ -976,10 +985,11 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
 
     return { type: 'CHAT_RESPONSE', success: true, message: response, rawResponses, conversationLog, lastRequestBody: lastRequestBody || undefined, lastResponseBody: lastResponseBody || undefined };
   } catch (err) {
+    const surfaced = await surfaceDiscontinuationError(err, getActiveProviderConfig(await getSettings()));
     return {
       type: 'CHAT_RESPONSE',
       success: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: surfaced,
     };
   } finally {
     if (tabId != null) activeChats.delete(tabId);
@@ -1058,17 +1068,24 @@ async function handleTestLLMConnection(): Promise<ConnectionTestResultMessage> {
   try {
     const settings = await getSettings();
     const llmConfig = getActiveProviderConfig(settings);
-    const provider = createProvider(llmConfig);
     // Call sendChat directly instead of testConnection() so errors propagate.
     // If sendChat doesn't throw, the connection works (even if response is empty
     // due to e.g. Gemini safety filters on trivial prompts).
-    await provider.sendChat(
-      [{ role: 'user', content: 'Reply with "ok"' }],
-      { maxTokens: 10 },
+    const { provider: workingProvider, config: workingConfig } = await runWithDiscontinuationHandling(
+      llmConfig,
+      async (cfg) => {
+        const p = createProvider(cfg);
+        await p.sendChat(
+          [{ role: 'user', content: 'Reply with "ok"' }],
+          { maxTokens: 10 },
+        );
+        return { provider: p, config: cfg };
+      },
+      { retry: true },
     );
 
     // Probe vision capabilities
-    const vision = await getModelVision(provider, llmConfig.providerId, llmConfig.model);
+    const vision = await getModelVision(workingProvider, workingConfig.providerId, workingConfig.model);
 
     return { type: 'CONNECTION_TEST_RESULT', success: true, visionSupport: vision };
   } catch (err) {
@@ -1084,24 +1101,71 @@ async function handleTestLLMConnection(): Promise<ConnectionTestResultMessage> {
 }
 
 async function handleProbeVision(msg: import('@/lib/messaging/types').ProbeVisionMessage): Promise<Message> {
+  const settings = await getSettings();
+  // Use provided config (from unsaved UI state) or fall back to saved settings
+  const llmConfig = msg.providerId && msg.model ? {
+    providerId: msg.providerId,
+    apiKey: msg.apiKey || '',
+    model: msg.model,
+    endpoint: msg.endpoint,
+    contextWindow: 100000,
+  } : getActiveProviderConfig(settings);
+  if (!llmConfig.apiKey && llmConfig.providerId !== 'self-hosted') {
+    return { type: 'PROBE_VISION_RESULT', success: false, error: 'No API key' } as Message;
+  }
   try {
-    const settings = await getSettings();
-    // Use provided config (from unsaved UI state) or fall back to saved settings
-    const llmConfig = msg.providerId && msg.model ? {
-      providerId: msg.providerId,
-      apiKey: msg.apiKey || '',
-      model: msg.model,
-      endpoint: msg.endpoint,
-      contextWindow: 100000,
-    } : getActiveProviderConfig(settings);
-    if (!llmConfig.apiKey && llmConfig.providerId !== 'self-hosted') {
-      return { type: 'PROBE_VISION_RESULT', success: false, error: 'No API key' } as Message;
-    }
     const provider = createProvider(llmConfig);
     const vision = await getModelVision(provider, llmConfig.providerId, llmConfig.model);
     return { type: 'PROBE_VISION_RESULT', success: true, vision } as Message;
   } catch (err) {
-    return { type: 'PROBE_VISION_RESULT', success: false, error: err instanceof Error ? err.message : String(err) } as Message;
+    const surfaced = await surfaceDiscontinuationError(err, llmConfig);
+    return { type: 'PROBE_VISION_RESULT', success: false, error: surfaced } as Message;
+  }
+}
+
+/**
+ * If `err` indicates the configured model has been discontinued, persist the
+ * swap (handleDiscontinuationOnError) and return the friendly user-facing
+ * message. Otherwise return the original error message verbatim.
+ */
+async function surfaceDiscontinuationError(
+  err: unknown,
+  llmConfig: import('@/lib/llm/types').ProviderConfig,
+): Promise<string> {
+  try {
+    const result = await handleDiscontinuationOnError(err, llmConfig);
+    if (result) {
+      const newName = result.notice.toName || result.notice.to;
+      const provName = result.notice.providerName || result.notice.providerId;
+      return `${provName} retired ${result.notice.from}. Switched to ${newName} — please try again.`;
+    }
+  } catch { /* best-effort — fall through to raw error */ }
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Run an LLM-using callback. If the underlying call fails because the model is
+ * gone from the provider's /models list, persist a swap to a capability-matched
+ * fallback (`handleDiscontinuationOnError`), then either retry once (if the
+ * caller opted in) or rethrow with a friendly message that tells the user we've
+ * already updated their settings.
+ */
+async function runWithDiscontinuationHandling<T>(
+  llmConfig: import('@/lib/llm/types').ProviderConfig,
+  fn: (config: import('@/lib/llm/types').ProviderConfig) => Promise<T>,
+  opts?: { retry?: boolean },
+): Promise<T> {
+  try {
+    return await fn(llmConfig);
+  } catch (err) {
+    if (opts?.retry) {
+      const result = await handleDiscontinuationOnError(err, llmConfig);
+      if (!result) throw err;
+      return await fn(result.newConfig);
+    }
+    const surfaced = await surfaceDiscontinuationError(err, llmConfig);
+    if (surfaced === (err instanceof Error ? err.message : String(err))) throw err;
+    throw new Error(surfaced);
   }
 }
 
@@ -1181,6 +1245,28 @@ async function handleSaveSettings(partial: object): Promise<SaveSettingsResultMe
     return { type: 'SAVE_SETTINGS_RESULT', success: true };
   } catch {
     return { type: 'SAVE_SETTINGS_RESULT', success: false };
+  }
+}
+
+/**
+ * Remove migration notices the side panel has displayed. Reads the latest
+ * pendingMigrationNotices through the storage write queue and filters out
+ * only the entries whose `at` timestamps the side panel reported, so notices
+ * added concurrently by the background script aren't lost.
+ */
+async function handleClearMigrationNotices(
+  timestamps: number[],
+): Promise<import('@/lib/messaging/types').ClearMigrationNoticesResultMessage> {
+  try {
+    const seen = new Set(timestamps);
+    await saveSettings((current) => ({
+      pendingMigrationNotices: (current.pendingMigrationNotices ?? []).filter(
+        (n) => !seen.has(n.at),
+      ),
+    }));
+    return { type: 'CLEAR_MIGRATION_NOTICES_RESULT', success: true };
+  } catch {
+    return { type: 'CLEAR_MIGRATION_NOTICES_RESULT', success: false };
   }
 }
 

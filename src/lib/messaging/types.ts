@@ -39,7 +39,9 @@ export type MessageType =
   | 'CLOSE_ONBOARDING_TABS'
   | 'CLOSE_ONBOARDING_TABS_RESULT'
   | 'IFRAME_COMMENTS'
-  | 'GENRE_CLASSIFIED';
+  | 'GENRE_CLASSIFIED'
+  | 'CLEAR_MIGRATION_NOTICES'
+  | 'CLEAR_MIGRATION_NOTICES_RESULT';
 
 export interface ExtractContentMessage {
   type: 'EXTRACT_CONTENT';
@@ -171,6 +173,17 @@ export interface SaveSettingsMessage {
 
 export interface SaveSettingsResultMessage {
   type: 'SAVE_SETTINGS_RESULT';
+  success: boolean;
+}
+
+export interface ClearMigrationNoticesMessage {
+  type: 'CLEAR_MIGRATION_NOTICES';
+  /** Timestamps (`MigrationNotice.at`) of the notices the side panel displayed. */
+  timestamps: number[];
+}
+
+export interface ClearMigrationNoticesResultMessage {
+  type: 'CLEAR_MIGRATION_NOTICES_RESULT';
   success: boolean;
 }
 
@@ -329,4 +342,6 @@ export type Message =
   | CloseOnboardingTabsMessage
   | CloseOnboardingTabsResultMessage
   | IframeCommentsMessage
-  | GenreClassifiedMessage;
+  | GenreClassifiedMessage
+  | ClearMigrationNoticesMessage
+  | ClearMigrationNoticesResultMessage;

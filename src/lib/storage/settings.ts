@@ -43,9 +43,22 @@ export async function getSettings(): Promise<Settings> {
   return { ...DEFAULT_SETTINGS, ...(stored as Partial<Settings>) };
 }
 
-export async function saveSettings(partial: Partial<Settings>): Promise<Settings> {
-  const current = await getSettings();
-  const updated = { ...current, ...partial };
-  await chromeStorage.local.set({ [STORAGE_KEY]: updated });
-  return updated;
+// Serialize concurrent writes within this process. chrome.storage doesn't expose
+// a CAS primitive, so two concurrent saveSettings() calls would each read-then-
+// write and the second one would clobber the first's mutations. Chaining keeps
+// every write atomic relative to other writes in this process.
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+export async function saveSettings(
+  partial: Partial<Settings> | ((current: Settings) => Partial<Settings>),
+): Promise<Settings> {
+  const next = writeQueue.then(async () => {
+    const current = await getSettings();
+    const patch = typeof partial === 'function' ? partial(current) : partial;
+    const updated = { ...current, ...patch };
+    await chromeStorage.local.set({ [STORAGE_KEY]: updated });
+    return updated;
+  });
+  writeQueue = next.catch(() => undefined);
+  return next;
 }
