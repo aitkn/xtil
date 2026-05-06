@@ -1,8 +1,8 @@
 import type { ModelInfo, ProviderConfig } from './types';
-import type { MigrationNotice, Settings } from '../storage/types';
+import type { MigrationNotice } from '../storage/types';
 import { fetchModels, getCatalogEntry } from './models';
 import { getProviderDefinition } from './registry';
-import { getSettings, saveSettings } from '../storage/settings';
+import { saveSettings } from '../storage/settings';
 
 const MODEL_ERROR_PATTERNS = [
   /\bmodel[_\s-]*not[_\s-]*found\b/i,
@@ -133,9 +133,4 @@ export async function handleDiscontinuationOnError(
   });
 
   return { newConfig, notice };
-}
-
-/** Set of models the runtime has confirmed are discontinued for this provider. */
-export function getDiscoveredDiscontinued(settings: Settings, providerId: string): Set<string> {
-  return new Set(settings.discoveredDiscontinued?.[providerId] ?? []);
 }

@@ -932,6 +932,25 @@ export function App() {
     });
   }, [setThemeMode]);
 
+  // Keep React state in sync when the background mutates settings on its own —
+  // notably the model auto-swap on a discontinuation. Without this, a stale
+  // SettingsView debounced-save would clobber the swap on the next user edit.
+  useEffect(() => {
+    const chromeStorage = (globalThis as unknown as { chrome: { storage: typeof chrome.storage } }).chrome.storage;
+    const handler = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      area: chrome.storage.AreaName,
+    ) => {
+      if (area !== 'local') return;
+      const change = changes['xtil_settings'];
+      if (!change) return;
+      const next = change.newValue as Settings | undefined;
+      if (next) setSettings(next);
+    };
+    chromeStorage.onChanged.addListener(handler);
+    return () => chromeStorage.onChanged.removeListener(handler);
+  }, []);
+
   // Show any pending model-migration notices (e.g. an LLM model was discontinued
   // by the provider and the runtime auto-swapped to a fallback) and clear them.
   // We surface all accumulated notices, not just the latest, and remove them
