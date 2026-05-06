@@ -219,6 +219,10 @@ async function handleMessage(message: Message): Promise<Message> {
       return handleGetSettings();
     case 'SAVE_SETTINGS':
       return handleSaveSettings(message.settings);
+    case 'CLEAR_MIGRATION_NOTICES':
+      return handleClearMigrationNotices(
+        (message as import('@/lib/messaging/types').ClearMigrationNoticesMessage).timestamps,
+      );
     case 'FETCH_NOTION_DATABASES':
       return handleFetchNotionDatabases();
     case 'FETCH_MODELS':
@@ -763,17 +767,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
     // If the model was retired, persist the swap before bubbling the error so
     // the next attempt uses the new model automatically. The user-facing
     // message tells them we've already switched.
-    let surfaced = err instanceof Error ? err.message : String(err);
-    try {
-      const settings = await getSettings();
-      const llmConfig = getActiveProviderConfig(settings);
-      const result = await handleDiscontinuationOnError(err, llmConfig);
-      if (result) {
-        const newName = result.notice.toName || result.notice.to;
-        const provName = result.notice.providerName || result.notice.providerId;
-        surfaced = `${provName} retired ${result.notice.from}. Switched to ${newName} — please try again.`;
-      }
-    } catch { /* deprecation handler is best-effort */ }
+    const surfaced = await surfaceDiscontinuationError(err, getActiveProviderConfig(await getSettings()));
     return {
       type: 'SUMMARY_RESULT',
       success: false,
@@ -991,17 +985,7 @@ ${chatFormatInstructions}${imageCapabilityNote}`;
 
     return { type: 'CHAT_RESPONSE', success: true, message: response, rawResponses, conversationLog, lastRequestBody: lastRequestBody || undefined, lastResponseBody: lastResponseBody || undefined };
   } catch (err) {
-    let surfaced = err instanceof Error ? err.message : String(err);
-    try {
-      const settings = await getSettings();
-      const llmConfig = getActiveProviderConfig(settings);
-      const result = await handleDiscontinuationOnError(err, llmConfig);
-      if (result) {
-        const newName = result.notice.toName || result.notice.to;
-        const provName = result.notice.providerName || result.notice.providerId;
-        surfaced = `${provName} retired ${result.notice.from}. Switched to ${newName} — please try again.`;
-      }
-    } catch { /* deprecation handler is best-effort */ }
+    const surfaced = await surfaceDiscontinuationError(err, getActiveProviderConfig(await getSettings()));
     return {
       type: 'CHAT_RESPONSE',
       success: false,
@@ -1117,41 +1101,46 @@ async function handleTestLLMConnection(): Promise<ConnectionTestResultMessage> {
 }
 
 async function handleProbeVision(msg: import('@/lib/messaging/types').ProbeVisionMessage): Promise<Message> {
+  const settings = await getSettings();
+  // Use provided config (from unsaved UI state) or fall back to saved settings
+  const llmConfig = msg.providerId && msg.model ? {
+    providerId: msg.providerId,
+    apiKey: msg.apiKey || '',
+    model: msg.model,
+    endpoint: msg.endpoint,
+    contextWindow: 100000,
+  } : getActiveProviderConfig(settings);
+  if (!llmConfig.apiKey && llmConfig.providerId !== 'self-hosted') {
+    return { type: 'PROBE_VISION_RESULT', success: false, error: 'No API key' } as Message;
+  }
   try {
-    const settings = await getSettings();
-    // Use provided config (from unsaved UI state) or fall back to saved settings
-    const llmConfig = msg.providerId && msg.model ? {
-      providerId: msg.providerId,
-      apiKey: msg.apiKey || '',
-      model: msg.model,
-      endpoint: msg.endpoint,
-      contextWindow: 100000,
-    } : getActiveProviderConfig(settings);
-    if (!llmConfig.apiKey && llmConfig.providerId !== 'self-hosted') {
-      return { type: 'PROBE_VISION_RESULT', success: false, error: 'No API key' } as Message;
-    }
     const provider = createProvider(llmConfig);
     const vision = await getModelVision(provider, llmConfig.providerId, llmConfig.model);
     return { type: 'PROBE_VISION_RESULT', success: true, vision } as Message;
   } catch (err) {
-    let surfaced = err instanceof Error ? err.message : String(err);
-    try {
-      const cfg = msg.providerId && msg.model ? {
-        providerId: msg.providerId,
-        apiKey: msg.apiKey || '',
-        model: msg.model,
-        endpoint: msg.endpoint,
-        contextWindow: 100000,
-      } : getActiveProviderConfig(await getSettings());
-      const result = await handleDiscontinuationOnError(err, cfg);
-      if (result) {
-        const newName = result.notice.toName || result.notice.to;
-        const provName = result.notice.providerName || result.notice.providerId;
-        surfaced = `${provName} retired ${result.notice.from}. Switched to ${newName} — please try again.`;
-      }
-    } catch { /* best-effort */ }
+    const surfaced = await surfaceDiscontinuationError(err, llmConfig);
     return { type: 'PROBE_VISION_RESULT', success: false, error: surfaced } as Message;
   }
+}
+
+/**
+ * If `err` indicates the configured model has been discontinued, persist the
+ * swap (handleDiscontinuationOnError) and return the friendly user-facing
+ * message. Otherwise return the original error message verbatim.
+ */
+async function surfaceDiscontinuationError(
+  err: unknown,
+  llmConfig: import('@/lib/llm/types').ProviderConfig,
+): Promise<string> {
+  try {
+    const result = await handleDiscontinuationOnError(err, llmConfig);
+    if (result) {
+      const newName = result.notice.toName || result.notice.to;
+      const provName = result.notice.providerName || result.notice.providerId;
+      return `${provName} retired ${result.notice.from}. Switched to ${newName} — please try again.`;
+    }
+  } catch { /* best-effort — fall through to raw error */ }
+  return err instanceof Error ? err.message : String(err);
 }
 
 /**
@@ -1169,15 +1158,14 @@ async function runWithDiscontinuationHandling<T>(
   try {
     return await fn(llmConfig);
   } catch (err) {
-    const result = await handleDiscontinuationOnError(err, llmConfig);
-    if (!result) throw err;
     if (opts?.retry) {
+      const result = await handleDiscontinuationOnError(err, llmConfig);
+      if (!result) throw err;
       return await fn(result.newConfig);
     }
-    const newName = result.notice.toName || result.notice.to;
-    throw new Error(
-      `${result.notice.providerId === 'xai' ? 'xAI' : (result.notice.providerName || result.notice.providerId)} retired ${result.notice.from}. Switched to ${newName} — please try again.`,
-    );
+    const surfaced = await surfaceDiscontinuationError(err, llmConfig);
+    if (surfaced === (err instanceof Error ? err.message : String(err))) throw err;
+    throw new Error(surfaced);
   }
 }
 
@@ -1257,6 +1245,28 @@ async function handleSaveSettings(partial: object): Promise<SaveSettingsResultMe
     return { type: 'SAVE_SETTINGS_RESULT', success: true };
   } catch {
     return { type: 'SAVE_SETTINGS_RESULT', success: false };
+  }
+}
+
+/**
+ * Remove migration notices the side panel has displayed. Reads the latest
+ * pendingMigrationNotices through the storage write queue and filters out
+ * only the entries whose `at` timestamps the side panel reported, so notices
+ * added concurrently by the background script aren't lost.
+ */
+async function handleClearMigrationNotices(
+  timestamps: number[],
+): Promise<import('@/lib/messaging/types').ClearMigrationNoticesResultMessage> {
+  try {
+    const seen = new Set(timestamps);
+    await saveSettings((current) => ({
+      pendingMigrationNotices: (current.pendingMigrationNotices ?? []).filter(
+        (n) => !seen.has(n.at),
+      ),
+    }));
+    return { type: 'CLEAR_MIGRATION_NOTICES_RESULT', success: true };
+  } catch {
+    return { type: 'CLEAR_MIGRATION_NOTICES_RESULT', success: false };
   }
 }
 

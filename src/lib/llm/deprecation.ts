@@ -96,17 +96,6 @@ export async function handleDiscontinuationOnError(
   const fallback = pickFallbackModel(liveModels, ctx);
   if (!fallback) return null;
 
-  const settings = await getSettings();
-  const existing = settings.providerConfigs[config.providerId] || config;
-  const newConfig: ProviderConfig = {
-    ...existing,
-    model: fallback.id,
-    contextWindow: fallback.contextWindow || existing.contextWindow,
-  };
-
-  const discoveredFor = new Set(settings.discoveredDiscontinued?.[config.providerId] ?? []);
-  discoveredFor.add(config.model);
-
   const notice: MigrationNotice = {
     providerId: config.providerId,
     from: config.model,
@@ -116,16 +105,31 @@ export async function handleDiscontinuationOnError(
     at: Date.now(),
   };
 
-  await saveSettings({
-    providerConfigs: {
-      ...settings.providerConfigs,
-      [config.providerId]: newConfig,
-    },
-    discoveredDiscontinued: {
-      ...settings.discoveredDiscontinued,
-      [config.providerId]: [...discoveredFor],
-    },
-    pendingMigrationNotices: [...(settings.pendingMigrationNotices ?? []), notice],
+  // Use the function form of saveSettings so the merge runs against the freshest
+  // snapshot under the storage write queue — concurrent failures (e.g. summary +
+  // vision probe failing on the same retired model) won't lose each other's
+  // notices or discoveredDiscontinued entries.
+  let newConfig!: ProviderConfig;
+  await saveSettings((current) => {
+    const existing = current.providerConfigs[config.providerId] || config;
+    newConfig = {
+      ...existing,
+      model: fallback.id,
+      contextWindow: fallback.contextWindow || existing.contextWindow,
+    };
+    const discoveredFor = new Set(current.discoveredDiscontinued?.[config.providerId] ?? []);
+    discoveredFor.add(config.model);
+    return {
+      providerConfigs: {
+        ...current.providerConfigs,
+        [config.providerId]: newConfig,
+      },
+      discoveredDiscontinued: {
+        ...current.discoveredDiscontinued,
+        [config.providerId]: [...discoveredFor],
+      },
+      pendingMigrationNotices: [...(current.pendingMigrationNotices ?? []), notice],
+    };
   });
 
   return { newConfig, notice };

@@ -932,20 +932,30 @@ export function App() {
     });
   }, [setThemeMode]);
 
-  // Show any pending model-migration notice (e.g. an LLM model was discontinued
-  // by the provider and the runtime auto-swapped to a fallback) and clear it.
+  // Show any pending model-migration notices (e.g. an LLM model was discontinued
+  // by the provider and the runtime auto-swapped to a fallback) and clear them.
+  // We surface all accumulated notices, not just the latest, and remove them
+  // from storage by `at` timestamp so concurrently-added notices aren't lost.
   useEffect(() => {
     const notices = settings.pendingMigrationNotices;
     if (!notices?.length) return;
-    const newest = notices[notices.length - 1];
-    const provName = newest.providerName || newest.providerId;
-    const toName = newest.toName || newest.to;
-    setToast({
-      message: `${provName} retired ${newest.from}. Switched to ${toName}.`,
-      type: 'info',
-    });
-    sendMessage({ type: 'SAVE_SETTINGS', settings: { pendingMigrationNotices: [] } }).catch(() => {});
-    setSettings((s) => ({ ...s, pendingMigrationNotices: [] }));
+    const describe = (n: typeof notices[number]) => {
+      const provName = n.providerName || n.providerId;
+      const toName = n.toName || n.to;
+      return `${provName} retired ${n.from} → ${toName}`;
+    };
+    const message = notices.length === 1
+      ? `${describe(notices[0])}.`
+      : `Migrated ${notices.length} retired models: ${notices.map(describe).join('; ')}.`;
+    setToast({ message, type: 'info' });
+    const timestamps = notices.map((n) => n.at);
+    sendMessage({ type: 'CLEAR_MIGRATION_NOTICES', timestamps }).catch(() => {});
+    setSettings((s) => ({
+      ...s,
+      pendingMigrationNotices: (s.pendingMigrationNotices ?? []).filter(
+        (n) => !timestamps.includes(n.at),
+      ),
+    }));
   }, [settings.pendingMigrationNotices]);
 
   // Auto-extract on mount
