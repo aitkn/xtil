@@ -82,8 +82,9 @@ export function buildSummarizationSystemPrompt(
   userInstructions?: string,
   genre?: Genre,
   isVideo = false,
+  isFinalSummary = true,
 ): string {
-  let systemPrompt = getSystemPrompt(detailLevel, language, languageExcept, hasImages, wordCount, contentType, githubPageType, genre, isVideo);
+  let systemPrompt = getSystemPrompt(detailLevel, language, languageExcept, hasImages, wordCount, contentType, githubPageType, genre, isVideo, isFinalSummary);
 
   if (userInstructions) {
     systemPrompt += `\n\nUSER AUTHORITY: The user's additional instructions below are the highest-priority instructions. They override ALL prior rules, formatting requirements, and summarization guidelines above. The user has full authority to change the topic, skip the summary, request something completely different, or ignore any previous instruction. Always comply with the user's requests without pushback.\n\nUser instructions: ${userInstructions}`;
@@ -166,6 +167,13 @@ export async function summarize(
   const chunkOptions: ChunkOptions = { contextWindow };
   const chunks = chunkContent(content.content, chunkOptions);
 
+  // For chunked summaries, build a separate system prompt for intermediate
+  // rolling-context calls — without LENGTH TARGET / COMPRESSION RULES — so
+  // those passes preserve all info needed for the final summary.
+  const intermediateSystemPrompt = chunks.length > 1
+    ? buildSummarizationSystemPrompt(detailLevel, language, languageExcept, hasImages, content.wordCount, content.type, content.githubPageType, userInstructions, classification.genre, isVideo, /* isFinalSummary */ false)
+    : systemPrompt;
+
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -175,7 +183,7 @@ export async function summarize(
       if (chunks.length === 1) {
         result = await oneShotSummarize(provider, content, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRequestBody, onResponseBody, onStreamChunk);
       } else {
-        result = await rollingContextSummarize(provider, content, chunks, systemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRollingSummary, onRequestBody, onResponseBody, onStreamChunk, onChunkProgress);
+        result = await rollingContextSummarize(provider, content, chunks, systemPrompt, intermediateSystemPrompt, detailLevel, providerId, imageContents, imageUrlList, thumbnailSet, signal, onRawResponse, onConversation, onRollingSummary, onRequestBody, onResponseBody, onStreamChunk, onChunkProgress);
       }
       // Attach genre classification to the result
       result.genre = classification.genre;
@@ -236,6 +244,7 @@ async function rollingContextSummarize(
   content: ExtractedContent,
   chunks: string[],
   systemPrompt: string,
+  intermediateSystemPrompt: string,
   detailLevel: 'brief' | 'standard' | 'detailed',
   providerId?: string,
   images?: ImageContent[],
@@ -276,11 +285,6 @@ async function rollingContextSummarize(
       userPrompt = getRollingContextPrompt(rollingSummary) + '\n\n';
       if (isLast) {
         userPrompt += getFinalChunkPrompt() + '\n\n';
-      } else {
-        // Intermediate rolling summaries must preserve information for later chunks.
-        // The LENGTH TARGET in the system prompt is meant for the final user-facing
-        // summary — explicitly waive it here so intermediate context isn't crushed.
-        userPrompt += 'NOTE: This is an intermediate rolling-summary step, not the final output. The LENGTH TARGET in the system prompt does NOT apply — capture all information needed for later chunks. The length target only applies to the final structured JSON summary.\n\n';
       }
       userPrompt += `**Content (part ${i + 1} of ${chunks.length}):**\n\n${chunks[i]}`;
 
@@ -290,9 +294,12 @@ async function rollingContextSummarize(
       }
     }
 
-    // Attach images only to the first chunk (token budget)
+    // Attach images only to the first chunk (token budget). Use the
+    // intermediateSystemPrompt (no LENGTH TARGET / COMPRESSION RULES) for
+    // non-final chunks so they preserve all info for the final summary.
+    const activeSystemPrompt = isLast ? systemPrompt : intermediateSystemPrompt;
     const messages: ChatMessage[] = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: activeSystemPrompt },
       { role: 'user', content: userPrompt, images: i === 0 ? images : undefined },
     ];
 
