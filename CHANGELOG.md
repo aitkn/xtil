@@ -4,6 +4,13 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.9
+
+**Grok 4.3 + pre-empt xAI May retirements**
+
+- Added Grok 4.3 (1M context, $1.25 / $2.50 per M tokens) as the new xAI flagship — cheaper than Grok 4.20 with strong reasoning
+- Removed Grok 4.1 Fast variants ahead of xAI's May 15 retirement; if you had one selected, the extension auto-swaps to a working alternative on the next request
+
 ## 1.2.8
 
 **Tighter summaries + automatic model recovery**
