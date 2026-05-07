@@ -846,7 +846,7 @@ const DOC_PARSERS = [
         },
         body: JSON.stringify({
           model: 'gpt-4.1-mini',
-          max_completion_tokens: 4096,
+          max_tokens: 4096,
           messages: [{ role: 'user', content: prompt }],
           response_format: { type: 'json_object' },
         }),
@@ -870,7 +870,7 @@ const DOC_PARSERS = [
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'grok-4-1-fast-non-reasoning',
+          model: 'grok-4.3',
           max_tokens: 4096,
           messages: [{ role: 'user', content: prompt }],
           response_format: { type: 'json_object' },
@@ -932,6 +932,12 @@ ${docsText}`;
         continue;
       }
       const parsed = JSON.parse(jsonMatch[0]);
+      // Empty parse = success-but-useless; fall through to next provider.
+      // Otherwise a parser that returns {} silently short-circuits the chain.
+      if (Object.keys(parsed).length === 0) {
+        failures.push(`${parser.name}: parsed 0 models`);
+        continue;
+      }
       console.log(`  Parsed via ${parser.name} (${Object.keys(parsed).length} models)`);
       return parsed;
     } catch (err) {
