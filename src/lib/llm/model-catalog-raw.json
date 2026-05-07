@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-04-29T02:36:10.463Z",
+  "_generated": "2026-05-07T06:38:49.895Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -347,36 +347,6 @@
           "name": "Gemini Robotics-ER 1.6 Preview",
           "contextWindow": 131072,
           "maxOutput": 65536
-        },
-        "gemma-3-12b-it": {
-          "name": "Gemma 3 12B",
-          "contextWindow": 32768,
-          "maxOutput": 8192
-        },
-        "gemma-3-1b-it": {
-          "name": "Gemma 3 1B",
-          "contextWindow": 32768,
-          "maxOutput": 8192
-        },
-        "gemma-3-27b-it": {
-          "name": "Gemma 3 27B",
-          "contextWindow": 131072,
-          "maxOutput": 8192
-        },
-        "gemma-3-4b-it": {
-          "name": "Gemma 3 4B",
-          "contextWindow": 32768,
-          "maxOutput": 8192
-        },
-        "gemma-3n-e2b-it": {
-          "name": "Gemma 3n E2B",
-          "contextWindow": 8192,
-          "maxOutput": 2048
-        },
-        "gemma-3n-e4b-it": {
-          "name": "Gemma 3n E4B",
-          "contextWindow": 8192,
-          "maxOutput": 2048
         },
         "gemma-4-26b-a4b-it": {
           "name": "Gemma 4 26B A4B IT",
@@ -1010,6 +980,9 @@
         "grok-4.20-multi-agent-0309": {
           "name": "grok-4.20-multi-agent-0309"
         },
+        "grok-4.3": {
+          "name": "grok-4.3"
+        },
         "grok-code-fast-1": {
           "name": "Grok Code Fast 1",
           "contextWindow": 262144,
@@ -1027,6 +1000,9 @@
           "name": "Grok Imagine Image Pro",
           "vision": false,
           "textGeneration": false
+        },
+        "grok-imagine-image-quality": {
+          "name": "grok-imagine-image-quality"
         },
         "grok-imagine-video": {
           "name": "Grok Imagine Video",

@@ -4,6 +4,13 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.8
+
+**Tighter summaries + automatic model recovery**
+
+- Summaries are now substantially shorter and less repetitive — a length target proportional to the source keeps each section tight without dropping content, so combined sections no longer rival or exceed the original article
+- When the AI model you're using gets retired by its provider, xTil now auto-detects it, switches to a capability-matched alternative, and shows a one-time notice — no more "model not found" errors after provider deprecations
+
 ## 1.2.7
 
 **GitHub fixes + steady streaming**
