@@ -803,13 +803,90 @@ async function fetchDocPage(url) {
   }
 }
 
-async function parseDocsWithLLM(providerName, docsText) {
-  const anthropicKey = API_KEYS.anthropic;
-  if (!anthropicKey) {
-    console.warn('  No Anthropic API key, skipping LLM doc parsing');
-    return {};
-  }
+// Doc-parser providers, tried in order. Each entry runs the same prompt and
+// returns the model's text response (or throws on any non-2xx). The first
+// successful parse wins; if all fail, we return {} and let the warnings tell
+// the user. Multiple providers exist so a single dead key doesn't silently
+// kill the whole layer.
+const DOC_PARSERS = [
+  {
+    name: 'Anthropic',
+    keyEnv: 'anthropic',
+    call: async (apiKey, prompt) => {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 4096,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`${res.status} — ${body.slice(0, 300)}`);
+      }
+      const data = await res.json();
+      return data.content?.[0]?.text || '';
+    },
+  },
+  {
+    name: 'OpenAI',
+    keyEnv: 'openai',
+    call: async (apiKey, prompt) => {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4.1-mini',
+          max_tokens: 4096,
+          messages: [{ role: 'user', content: prompt }],
+          response_format: { type: 'json_object' },
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`${res.status} — ${body.slice(0, 300)}`);
+      }
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || '';
+    },
+  },
+  {
+    name: 'xAI',
+    keyEnv: 'xai',
+    call: async (apiKey, prompt) => {
+      const res = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'grok-4.3',
+          max_tokens: 4096,
+          messages: [{ role: 'user', content: prompt }],
+          response_format: { type: 'json_object' },
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`${res.status} — ${body.slice(0, 300)}`);
+      }
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || '';
+    },
+  },
+];
 
+async function parseDocsWithLLM(providerName, docsText) {
   const prompt = `You are extracting model metadata from a pricing/models documentation page for ${providerName}.
 
 Extract ALL models mentioned with their specifications. For each model, provide:
@@ -840,42 +917,35 @@ Respond with ONLY a JSON object mapping model IDs to their metadata. Omit fields
 Documentation text:
 ${docsText}`;
 
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4096,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!res.ok) {
-      console.warn(`  LLM parse failed: ${res.status}`);
-      return {};
+  const failures = [];
+  for (const parser of DOC_PARSERS) {
+    const apiKey = API_KEYS[parser.keyEnv];
+    if (!apiKey) {
+      failures.push(`${parser.name}: no key`);
+      continue;
     }
-
-    const data = await res.json();
-    const text = data.content?.[0]?.text || '';
-
-    // Extract JSON from response (may be wrapped in markdown code blocks)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.warn('  LLM response had no JSON');
-      return {};
+    try {
+      const text = await parser.call(apiKey, prompt);
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        failures.push(`${parser.name}: no JSON in response`);
+        continue;
+      }
+      const parsed = JSON.parse(jsonMatch[0]);
+      // Empty parse = success-but-useless; fall through to next provider.
+      // Otherwise a parser that returns {} silently short-circuits the chain.
+      if (Object.keys(parsed).length === 0) {
+        failures.push(`${parser.name}: parsed 0 models`);
+        continue;
+      }
+      console.log(`  Parsed via ${parser.name} (${Object.keys(parsed).length} models)`);
+      return parsed;
+    } catch (err) {
+      failures.push(`${parser.name}: ${err.message}`);
     }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    return parsed;
-  } catch (err) {
-    console.warn(`  LLM parse error: ${err.message}`);
-    return {};
   }
+  console.warn(`  LLM parse failed across all providers — ${failures.join(' | ')}`);
+  return {};
 }
 
 // ---------------------------------------------------------------------------
