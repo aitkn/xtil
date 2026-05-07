@@ -746,16 +746,19 @@ async function fetchGoogleApiModels(apiKey) {
  * data here is authoritative — pricing is reported live by xAI, no LLM in the
  * loop, so it must override any LLM-parsed doc data downstream.
  */
-async function fetchXaiApiModels(apiKey) {
+async function fetchXaiApiModels(apiKey, baseUrl) {
   // Layer A: every model id from /v1/models (chat + image + video).
-  const ids = await fetchOpenAIApiModels(apiKey, 'https://api.x.ai');
+  const ids = await fetchOpenAIApiModels(apiKey, baseUrl);
   // Layer B: structured pricing/modality for language models.
   try {
-    const res = await fetch('https://api.x.ai/v1/language-models', {
+    const res = await fetch(`${baseUrl}/v1/language-models`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
     if (!res.ok) {
-      console.warn(`  xAI /v1/language-models → ${res.status}`);
+      // Loud warning — pricing may silently fall back to LLM-parsed docs,
+      // which is the failure mode this whole API-authoritative path was
+      // designed to prevent. If you see this, treat xAI prices as suspect.
+      console.warn(`  ⚠ xAI /v1/language-models → ${res.status}: pricing/modality data NOT refreshed; xAI entries may be stale or rely on doc-parsed values.`);
       return ids;
     }
     const data = await res.json();
@@ -789,7 +792,7 @@ async function fetchApiModels(providerId, apiKey) {
     case 'google':
       return fetchGoogleApiModels(apiKey);
     case 'xai':
-      return fetchXaiApiModels(apiKey);
+      return fetchXaiApiModels(apiKey, provider.baseUrl);
     case 'deepseek':
       return fetchOpenAIApiModels(apiKey, provider.baseUrl);
     default:
