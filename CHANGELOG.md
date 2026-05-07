@@ -4,6 +4,13 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.10
+
+**Cheaper Grok summaries via automatic caching**
+
+- xTil now uses xAI's newer API for all Grok requests, which automatically caches your repeated content (system prompts, page text on follow-ups). On Grok 4.3, cached input tokens cost 6× less, so chat refinements and re-summaries on the same page get noticeably cheaper without changing how you use it.
+- Future-proofs xTil against xAI's pending retirement of the older Chat Completions endpoint.
+
 ## 1.2.9
 
 **Grok 4.3 + pre-empt xAI May retirements**
