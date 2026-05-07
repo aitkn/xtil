@@ -276,6 +276,11 @@ async function rollingContextSummarize(
       userPrompt = getRollingContextPrompt(rollingSummary) + '\n\n';
       if (isLast) {
         userPrompt += getFinalChunkPrompt() + '\n\n';
+      } else {
+        // Intermediate rolling summaries must preserve information for later chunks.
+        // The LENGTH TARGET in the system prompt is meant for the final user-facing
+        // summary — explicitly waive it here so intermediate context isn't crushed.
+        userPrompt += 'NOTE: This is an intermediate rolling-summary step, not the final output. The LENGTH TARGET in the system prompt does NOT apply — capture all information needed for later chunks. The length target only applies to the final structured JSON summary.\n\n';
       }
       userPrompt += `**Content (part ${i + 1} of ${chunks.length}):**\n\n${chunks[i]}`;
 
