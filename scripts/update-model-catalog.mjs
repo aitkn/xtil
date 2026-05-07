@@ -739,6 +739,41 @@ async function fetchGoogleApiModels(apiKey) {
   }
 }
 
+/**
+ * xAI exposes a richer endpoint at /v1/language-models that returns structured
+ * pricing and modality info for each chat-capable model. We merge that on top
+ * of /v1/models (which lists every model id, including image/video gen). API
+ * data here is authoritative — pricing is reported live by xAI, no LLM in the
+ * loop, so it must override any LLM-parsed doc data downstream.
+ */
+async function fetchXaiApiModels(apiKey) {
+  // Layer A: every model id from /v1/models (chat + image + video).
+  const ids = await fetchOpenAIApiModels(apiKey, 'https://api.x.ai');
+  // Layer B: structured pricing/modality for language models.
+  try {
+    const res = await fetch('https://api.x.ai/v1/language-models', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) {
+      console.warn(`  xAI /v1/language-models → ${res.status}`);
+      return ids;
+    }
+    const data = await res.json();
+    for (const m of data.models ?? []) {
+      // xAI returns prices in 10^-10 USD per token; divide by 10000 for $/M tokens.
+      const enrichment = {};
+      if (m.prompt_text_token_price != null) enrichment.inputPrice = m.prompt_text_token_price / 10000;
+      if (m.completion_text_token_price != null) enrichment.outputPrice = m.completion_text_token_price / 10000;
+      if (Array.isArray(m.input_modalities)) enrichment.vision = m.input_modalities.includes('image');
+      ids[m.id] = { ...(ids[m.id] || {}), ...enrichment };
+    }
+    return ids;
+  } catch (err) {
+    console.warn(`  xAI /v1/language-models fetch failed: ${err.message}`);
+    return ids;
+  }
+}
+
 async function fetchApiModels(providerId, apiKey) {
   const provider = PROVIDERS[providerId];
   if (!apiKey) {
@@ -754,7 +789,7 @@ async function fetchApiModels(providerId, apiKey) {
     case 'google':
       return fetchGoogleApiModels(apiKey);
     case 'xai':
-      return fetchOpenAIApiModels(apiKey, provider.baseUrl);
+      return fetchXaiApiModels(apiKey);
     case 'deepseek':
       return fetchOpenAIApiModels(apiKey, provider.baseUrl);
     default:
@@ -958,16 +993,20 @@ const PRESERVE_FIELDS = ['reasoning', 'webSearch'];
 function mergeModelEntry(baseline, api, docs, existing) {
   const merged = { ...baseline };
 
-  // API layer overrides baseline (per non-null field)
-  if (api) {
-    for (const [key, val] of Object.entries(api)) {
+  // Docs layer (LLM-parsed) overrides baseline. May contain hallucinated
+  // capabilities or stale prices — applied first so structured API data wins.
+  if (docs) {
+    for (const [key, val] of Object.entries(docs)) {
       if (val != null) merged[key] = val;
     }
   }
 
-  // Docs layer overrides both (per non-null field)
-  if (docs) {
-    for (const [key, val] of Object.entries(docs)) {
+  // API layer is authoritative — overrides baseline AND docs. Provider APIs
+  // report live structured data (prices, context windows, modalities) without
+  // LLM interpretation, so they're the most trustworthy source for any field
+  // they expose.
+  if (api) {
+    for (const [key, val] of Object.entries(api)) {
       if (val != null) merged[key] = val;
     }
   }

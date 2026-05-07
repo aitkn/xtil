@@ -304,8 +304,8 @@
         "grok-4.20-0309-reasoning": {
           "name": "Grok 4.20 (Reasoning)",
           "contextWindow": 2000000,
-          "inputPrice": 2,
-          "outputPrice": 6,
+          "inputPrice": 1.25,
+          "outputPrice": 2.5,
           "vision": true,
           "textGeneration": true,
           "reasoning": true,
