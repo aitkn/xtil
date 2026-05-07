@@ -6,6 +6,28 @@ import { GENRE_TEMPLATES, type Genre, type DetailLevel, type SizeCategory, type 
 export const COMMENT_LIMITS: Record<string, number> = { brief: 50, standard: 200, detailed: 1000 };
 
 /**
+ * Length-proportional soft target (in words) for the combined summary output.
+ * Used as guidance in the system prompt; not enforced via max_tokens, since
+ * truncation tends to drop sections or cut sentences mid-stream. The model is
+ * told to compress within each section rather than skip sections to fit.
+ */
+export function getOutputTargetWords(
+  wordCount: number,
+  detailLevel: DetailLevel,
+): number {
+  const config = {
+    brief:    { ratio: 0.06, floor: 80,  cap: 250 },
+    standard: { ratio: 0.18, floor: 200, cap: 700 },
+    detailed: { ratio: 0.35, floor: 400, cap: 1400 },
+  }[detailLevel];
+
+  const proportional = Math.round(wordCount * config.ratio);
+  const target = Math.max(config.floor, Math.min(config.cap, proportional));
+  // Never aim to write more than the source — would force the model to pad.
+  return Math.min(target, wordCount);
+}
+
+/**
  * Format comments for inclusion in a prompt.
  * Sorts by likes (most-liked first), caps to a detail-level-dependent limit,
  * and appends a note when some comments were omitted.
@@ -38,7 +60,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
   pt: 'Portuguese', ru: 'Russian', zh: 'Chinese', ja: 'Japanese', ko: 'Korean',
 };
 
-export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', language: string, languageExcept: string[] = [], imageAnalysisEnabled = false, wordCount = 1500, contentType?: string, githubPageType?: string, genre?: Genre, isVideo = false): string {
+export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', language: string, languageExcept: string[] = [], imageAnalysisEnabled = false, wordCount = 1500, contentType?: string, githubPageType?: string, genre?: Genre, isVideo = false, isFinalSummary = true): string {
   const targetLang = LANGUAGE_NAMES[language] || language;
   // Remove target language from exceptions — translating target→target is a no-op
   const exceptLangs = languageExcept
@@ -65,6 +87,8 @@ Every field value must be in the chosen output language. No mixing languages wit
   }
 
   const size: 'short' | 'medium' | 'long' = wordCount < 500 ? 'short' : wordCount < 3000 ? 'medium' : 'long';
+
+  const targetWords = getOutputTargetWords(wordCount, detailLevel);
 
   // All detail+size-dependent values in one place — every guideline references these.
   // Brief is flat (same output regardless of article size).
@@ -450,6 +474,12 @@ Every field value must be in the chosen output language. No mixing languages wit
   const role = genreTemplate?.role
     ?? (isGitHub ? 'an expert software engineer and content summarizer' : 'an expert content summarizer');
 
+  // Closing reminder leverages recency bias — repeat the soft length target right before generation.
+  // Skipped for intermediate rolling-context calls, which need to preserve all info for downstream chunks.
+  const budgetReminder = isFinalSummary
+    ? `\n\nREMINDER — LENGTH: aim for ~${targetWords} words total across all summary fields. Keep every section the schema requires; just write each one tightly. Do NOT skip sections to save words.`
+    : '';
+
   // Build a short, punchy language reminder for the very end of the prompt (recency bias)
   let langReminder: string;
   if (language === 'auto') {
@@ -465,7 +495,17 @@ Every field value must be in the chosen output language. No mixing languages wit
 
 Content: ~${wordCount.toLocaleString()} words → classified as "${size}" (thresholds: short <500, medium 500-3000, long 3000+). The ranges below are tuned for this size tier. If the content is near a threshold boundary, blend smoothly — do not produce drastically different output for 490 vs 510 words.
 
-You MUST respond with valid JSON matching this exact structure (no markdown code fences, just raw JSON):
+${isFinalSummary ? `LENGTH TARGET: aim for ~${targetWords} words across ALL summary fields combined. This is a soft guideline — produce all the sections specified below, but make each one tighter rather than dropping sections to hit the target. Going somewhat over is fine for dense source material; going far over (2× target) means you are padding.
+
+COMPRESSION RULES (apply within every field — compress, don't skip):
+- No transitional or throat-clearing phrases ("It's worth noting", "In conclusion", "This article discusses", "The author argues that").
+- Don't restate the prompt or echo the source title in the body.
+- tldr → keyTakeaways → summary → conclusion must each add NEW information. Do not paraphrase the same point across fields.
+- Prefer specific nouns, numbers, and named entities over hedged generalizations ("several", "various", "many things").
+- Drop any sentence whose removal wouldn't change the reader's understanding.
+- Do NOT skip sections to save words — produce every section the schema asks for, just write each one concisely.
+
+` : ''}You MUST respond with valid JSON matching this exact structure (no markdown code fences, just raw JSON):
 {
   "text": "",
   "summary": {
@@ -484,6 +524,7 @@ Image Analysis Instructions:
 - For each non-thumbnail image, decide the best approach: embed as \`![description](url)\` in the summary (subject to the limit above), describe it in text, or discard if not informative.
 - If you see image URLs listed in the text that you believe are critical to understanding the content but were NOT attached, you may include \`"requestedImages": ["url1", "url2"]\` (max 3 URLs) at the top level of the response alongside "text" and "summary". The system will fetch them and re-run. Only request images that are clearly referenced in the text and essential for understanding.
 - Do NOT request images if the attached images already cover the key visuals.` : '') : '')
+  + budgetReminder
   + langReminder;
 }
 
