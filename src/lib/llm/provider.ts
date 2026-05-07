@@ -89,30 +89,66 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 
   /**
-   * Responses API — used for web search on OpenAI and xAI.
-   * OpenAI: web_search_preview tool; xAI: web_search tool.
-   * Chat Completions API only supports 'function'/'custom' tool types.
+   * Responses API routing:
+   * - OpenAI: only for web search (Chat Completions handles everything else fine).
+   * - xAI: default for everything (auto-caching, off the deprecated Chat Completions path),
+   *   except when any message carries images — xAI Responses API is text-only.
    */
-  private async sendResponsesApi(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
-    const url = `${this.endpoint}/v1/responses`;
-    // Separate system messages into `instructions`, rest into `input`
+  private shouldUseResponsesApi(messages: ChatMessage[], options?: ChatOptions): boolean {
+    if (this.isOpenAI) return options?.webSearch === true;
+    if (this.id === 'xai') return !messages.some(m => m.images?.length);
+    return false;
+  }
+
+  /**
+   * Build the Responses API request body. Shared between non-streaming and streaming paths.
+   * Routes JSON mode/schema through `text.format`, web search through `tools`, and
+   * caps output via `max_output_tokens` (Responses-API native).
+   */
+  private buildResponsesBody(messages: ChatMessage[], options: ChatOptions | undefined, stream: boolean): Record<string, unknown> {
     const instructions = messages
       .filter(m => m.role === 'system')
       .map(m => m.content)
       .join('\n\n') || undefined;
     // OpenAI Responses API uses different content part types (input_text/input_image);
-    // xAI Responses API doesn't support multi-part content at all — text only.
+    // xAI Responses API is text-only — image-bearing messages are routed elsewhere.
     const input = messages
       .filter(m => m.role !== 'system')
       .map(m => this.isOpenAI ? this.formatResponsesMessage(m) : ({ role: m.role, content: m.content }));
 
-    const searchTool = this.isOpenAI ? 'web_search_preview' : 'web_search';
     const body: Record<string, unknown> = {
       model: this.config.model,
       input,
-      tools: [{ type: searchTool }],
+      stream,
     };
     if (instructions) body.instructions = instructions;
+    if (options?.webSearch) {
+      body.tools = [{ type: this.isOpenAI ? 'web_search_preview' : 'web_search' }];
+    }
+    if (options?.maxTokens) body.max_output_tokens = options.maxTokens;
+    if (!this.isReasoning) body.temperature = options?.temperature ?? 0.3;
+    if (options?.jsonSchema) {
+      body.text = {
+        format: {
+          type: 'json_schema',
+          name: options.jsonSchema.name,
+          schema: options.jsonSchema.schema,
+          strict: false,
+        },
+      };
+    } else if (options?.jsonMode) {
+      body.text = { format: { type: 'json_object' } };
+    }
+    return body;
+  }
+
+  /**
+   * Non-streaming Responses API call. Default path for xAI (auto-caching) and the
+   * web-search path for OpenAI. xAI: web_search tool; OpenAI: web_search_preview.
+   */
+  private async sendResponsesApi(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
+    const url = `${this.endpoint}/v1/responses`;
+    const body = this.buildResponsesBody(messages, options, false);
 
     const timeoutController = new AbortController();
     const timer = setTimeout(() => timeoutController.abort(), 120_000);
@@ -163,9 +199,48 @@ export class OpenAICompatibleProvider implements LLMProvider {
     }
   }
 
+  /**
+   * Streaming Responses API call. Yields output_text deltas as they arrive.
+   * Matches OpenAI's Responses API SSE event spec, which xAI mirrors.
+   */
+  private async *streamResponsesApi(messages: ChatMessage[], options?: ChatOptions): AsyncGenerator<string> {
+    const url = `${this.endpoint}/v1/responses`;
+    const body = this.buildResponsesBody(messages, options, true);
+    const bodyJson = JSON.stringify(body);
+    options?.onRequestBody?.(bodyJson);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.config.apiKey}`,
+      },
+      body: bodyJson,
+      signal: options?.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(parseApiError(response.status, errorText));
+    }
+
+    let accumulated = '';
+    try {
+      for await (const evt of parseResponsesSSEStream(response)) {
+        if (evt.type === 'response.output_text.delta' && typeof evt.delta === 'string') {
+          accumulated += evt.delta;
+          yield evt.delta;
+        }
+      }
+    } finally {
+      if (accumulated) {
+        options?.onResponseBody?.(JSON.stringify({ output_text: accumulated }));
+      }
+    }
+  }
+
   async sendChat(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
-    // OpenAI & xAI web search requires the Responses API (not Chat Completions)
-    if (options?.webSearch && (this.isOpenAI || this.id === 'xai')) {
+    if (this.shouldUseResponsesApi(messages, options)) {
       return this.sendResponsesApi(messages, options);
     }
 
@@ -226,10 +301,8 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 
   async *streamChat(messages: ChatMessage[], options?: ChatOptions): AsyncGenerator<string> {
-    // OpenAI & xAI web search requires the Responses API (non-streaming)
-    if (options?.webSearch && (this.isOpenAI || this.id === 'xai')) {
-      const result = await this.sendResponsesApi(messages, options);
-      yield result;
+    if (this.shouldUseResponsesApi(messages, options)) {
+      yield* this.streamResponsesApi(messages, options);
       return;
     }
 
@@ -289,6 +362,44 @@ export class OpenAICompatibleProvider implements LLMProvider {
     } catch {
       return false;
     }
+  }
+}
+
+/**
+ * Parse Responses-API SSE stream into typed events. Yields each `data:` JSON event
+ * untouched so callers can dispatch on `type` (response.output_text.delta, etc.).
+ */
+export async function* parseResponsesSSEStream(response: Response): AsyncGenerator<Record<string, unknown>> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const data = trimmed.slice(6);
+        if (data === '[DONE]') return;
+
+        try {
+          yield JSON.parse(data);
+        } catch {
+          // skip malformed JSON lines
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
   }
 }
 
