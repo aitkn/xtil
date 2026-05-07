@@ -209,30 +209,43 @@ export class OpenAICompatibleProvider implements LLMProvider {
     const bodyJson = JSON.stringify(body);
     options?.onRequestBody?.(bodyJson);
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.apiKey}`,
-      },
-      body: bodyJson,
-      signal: options?.signal,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(parseApiError(response.status, errorText));
-    }
+    const timeoutController = new AbortController();
+    const timer = setTimeout(() => timeoutController.abort(), 120_000);
+    const signal = options?.signal
+      ? AbortSignal.any([timeoutController.signal, options.signal])
+      : timeoutController.signal;
 
     let accumulated = '';
     try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.config.apiKey}`,
+        },
+        body: bodyJson,
+        signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(parseApiError(response.status, errorText));
+      }
+
       for await (const evt of parseResponsesSSEStream(response)) {
         if (evt.type === 'response.output_text.delta' && typeof evt.delta === 'string') {
           accumulated += evt.delta;
           yield evt.delta;
         }
       }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        if (options?.signal?.aborted) throw new Error('Summarization cancelled');
+        throw new Error('LLM request timed out after 120s');
+      }
+      throw err;
     } finally {
+      clearTimeout(timer);
       if (accumulated) {
         options?.onResponseBody?.(JSON.stringify({ output_text: accumulated }));
       }
