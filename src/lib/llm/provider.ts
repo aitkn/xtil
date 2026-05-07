@@ -302,6 +302,13 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
   async *streamChat(messages: ChatMessage[], options?: ChatOptions): AsyncGenerator<string> {
     if (this.shouldUseResponsesApi(messages, options)) {
+      // Web search returns inline <grok:render> citation tags that we strip on the
+      // full response. Per-delta stripping would corrupt tags that span chunks, so
+      // fall back to non-streaming for that path (matches pre-PR behaviour).
+      if (options?.webSearch) {
+        yield await this.sendResponsesApi(messages, options);
+        return;
+      }
       yield* this.streamResponsesApi(messages, options);
       return;
     }
