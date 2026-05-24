@@ -4,6 +4,13 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.11
+
+**Skim summaries faster with progressive reading**
+
+- New **Progressive reading** option in Settings: when enabled, the AI structures each summary paragraph with the most important point first, supporting context next, and minor details last — so you can stop reading once you have what you need and jump to the next paragraph. Less-essential phrases are dimmed so your eye glides past them; hover over a dimmed phrase to bring it back to full opacity.
+- Optional and off by default. Available at Standard and Detailed detail levels (skipped at Brief, since a brief summary is already a single short paragraph).
+
 ## 1.2.10
 
 **Cheaper Grok summaries via automatic caching**

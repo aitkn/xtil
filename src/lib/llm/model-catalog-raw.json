@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-05-07T16:59:17.033Z",
+  "_generated": "2026-05-24T20:20:42.567Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -42,7 +42,7 @@
           "inputPrice": 1,
           "outputPrice": 5,
           "vision": true,
-          "reasoning": true,
+          "reasoning": false,
           "webSearch": false
         },
         "claude-opus-4-1-20250805": {
@@ -140,7 +140,7 @@
           "maxOutput": 384000,
           "inputPrice": 0.0028,
           "outputPrice": 0.28,
-          "vision": true,
+          "vision": false,
           "reasoning": true,
           "webSearch": false
         },
@@ -150,7 +150,7 @@
           "maxOutput": 384000,
           "inputPrice": 0.0145,
           "outputPrice": 3.48,
-          "vision": true,
+          "vision": false,
           "reasoning": true,
           "webSearch": false
         }
@@ -158,6 +158,11 @@
     },
     "google": {
       "models": {
+        "antigravity-preview-05-2026": {
+          "name": "Antigravity Agent Preview",
+          "contextWindow": 131072,
+          "maxOutput": 65536
+        },
         "deep-research-max-preview-04-2026": {
           "name": "Deep Research Max Preview (Apr-21-2026)",
           "contextWindow": 131072,
@@ -345,6 +350,11 @@
           "contextWindow": 1048576,
           "maxOutput": 65536
         },
+        "gemini-3.5-flash": {
+          "name": "Gemini 3.5 Flash",
+          "contextWindow": 1048576,
+          "maxOutput": 65536
+        },
         "gemini-flash-latest": {
           "name": "Gemini Flash Latest",
           "contextWindow": 1048576,
@@ -400,12 +410,12 @@
     "openai": {
       "models": {
         "chat-latest": {
-          "name": "ChatGPT chat-latest",
+          "name": "ChatGPT Chat Latest",
           "inputPrice": 5,
           "outputPrice": 30,
           "vision": false,
-          "reasoning": true,
-          "webSearch": true
+          "reasoning": false,
+          "webSearch": false
         },
         "chatgpt-4o-latest": {
           "name": "ChatGPT-4o Latest",
@@ -516,15 +526,6 @@
         "gpt-4o-2024-11-20": {
           "name": "gpt-4o-2024-11-20"
         },
-        "gpt-4o-audio-preview": {
-          "name": "gpt-4o-audio-preview"
-        },
-        "gpt-4o-audio-preview-2024-12-17": {
-          "name": "gpt-4o-audio-preview-2024-12-17"
-        },
-        "gpt-4o-audio-preview-2025-06-03": {
-          "name": "gpt-4o-audio-preview-2025-06-03"
-        },
         "gpt-4o-mini": {
           "name": "GPT-4o mini",
           "contextWindow": 128000,
@@ -536,18 +537,6 @@
         },
         "gpt-4o-mini-2024-07-18": {
           "name": "gpt-4o-mini-2024-07-18"
-        },
-        "gpt-4o-mini-audio-preview": {
-          "name": "gpt-4o-mini-audio-preview"
-        },
-        "gpt-4o-mini-audio-preview-2024-12-17": {
-          "name": "gpt-4o-mini-audio-preview-2024-12-17"
-        },
-        "gpt-4o-mini-realtime-preview": {
-          "name": "gpt-4o-mini-realtime-preview"
-        },
-        "gpt-4o-mini-realtime-preview-2024-12-17": {
-          "name": "gpt-4o-mini-realtime-preview-2024-12-17"
         },
         "gpt-4o-mini-search-preview": {
           "name": "gpt-4o-mini-search-preview"
@@ -577,15 +566,6 @@
         },
         "gpt-4o-mini-tts-2025-12-15": {
           "name": "gpt-4o-mini-tts-2025-12-15"
-        },
-        "gpt-4o-realtime-preview": {
-          "name": "gpt-4o-realtime-preview"
-        },
-        "gpt-4o-realtime-preview-2024-12-17": {
-          "name": "gpt-4o-realtime-preview-2024-12-17"
-        },
-        "gpt-4o-realtime-preview-2025-06-03": {
-          "name": "gpt-4o-realtime-preview-2025-06-03"
         },
         "gpt-4o-search-preview": {
           "name": "gpt-4o-search-preview"
@@ -825,24 +805,24 @@
         },
         "gpt-image-1-mini": {
           "name": "GPT Image 1 Mini",
-          "inputPrice": 2,
-          "outputPrice": 0,
+          "inputPrice": 1,
+          "outputPrice": 4,
           "vision": true,
           "reasoning": false,
           "webSearch": false
         },
         "gpt-image-1.5": {
           "name": "GPT Image 1.5",
-          "inputPrice": 5,
-          "outputPrice": 10,
+          "inputPrice": 2.5,
+          "outputPrice": 5,
           "vision": true,
           "reasoning": false,
           "webSearch": false
         },
         "gpt-image-2": {
           "name": "GPT Image 2",
-          "inputPrice": 5,
-          "outputPrice": 30,
+          "inputPrice": 2.5,
+          "outputPrice": 15,
           "vision": true,
           "reasoning": false,
           "webSearch": false
@@ -857,6 +837,14 @@
           "name": "GPT Realtime 1.5",
           "inputPrice": 4,
           "outputPrice": 16,
+          "vision": true,
+          "reasoning": false,
+          "webSearch": false
+        },
+        "gpt-realtime-2": {
+          "name": "GPT Realtime 2",
+          "inputPrice": 4,
+          "outputPrice": 24,
           "vision": true,
           "reasoning": false,
           "webSearch": false
@@ -877,6 +865,12 @@
         },
         "gpt-realtime-mini-2025-12-15": {
           "name": "gpt-realtime-mini-2025-12-15"
+        },
+        "gpt-realtime-translate": {
+          "name": "gpt-realtime-translate"
+        },
+        "gpt-realtime-whisper": {
+          "name": "gpt-realtime-whisper"
         },
         "o1": {
           "name": "o1",
@@ -974,8 +968,8 @@
         },
         "o4-mini-2025-04-16": {
           "name": "O4 Mini 2025-04-16",
-          "inputPrice": 4,
-          "outputPrice": 16,
+          "inputPrice": 2,
+          "outputPrice": 8,
           "vision": false,
           "reasoning": true,
           "webSearch": false
@@ -993,15 +987,11 @@
         },
         "sora-2": {
           "name": "Sora 2",
-          "vision": true,
-          "reasoning": false,
-          "webSearch": false
+          "vision": true
         },
         "sora-2-pro": {
           "name": "Sora 2 Pro",
-          "vision": true,
-          "reasoning": false,
-          "webSearch": false
+          "vision": true
         }
       }
     },
@@ -1059,24 +1049,23 @@
           "webSearch": true
         },
         "grok-4-1-fast-non-reasoning": {
-          "name": "Grok 4-1 Fast Non-Reasoning",
-          "contextWindow": 2000000,
+          "name": "Grok 4.1 Fast (Non-Reasoning)",
+          "contextWindow": 2097152,
           "inputPrice": 0.2,
           "outputPrice": 0.5,
           "vision": true,
           "textGeneration": true,
-          "webSearch": false,
-          "reasoning": false
+          "webSearch": true
         },
         "grok-4-1-fast-reasoning": {
-          "name": "Grok 4-1 Fast Reasoning",
-          "contextWindow": 2000000,
+          "name": "Grok 4.1 Fast (Reasoning)",
+          "contextWindow": 2097152,
           "inputPrice": 0.2,
           "outputPrice": 0.5,
           "vision": true,
           "textGeneration": true,
           "reasoning": true,
-          "webSearch": false
+          "webSearch": true
         },
         "grok-4-fast-non-reasoning": {
           "name": "Grok 4 Fast (Non-Reasoning)",
@@ -1098,31 +1087,24 @@
           "webSearch": true
         },
         "grok-4.20-0309-non-reasoning": {
-          "name": "Grok 4.20 0309 Non-Reasoning",
-          "contextWindow": 2000000,
           "inputPrice": 1.25,
           "outputPrice": 2.5,
           "vision": true,
-          "reasoning": false,
-          "webSearch": false
+          "name": "grok-4.20-0309-non-reasoning"
         },
         "grok-4.20-0309-reasoning": {
-          "name": "Grok 4.20 0309 Reasoning",
-          "contextWindow": 2000000,
           "inputPrice": 1.25,
           "outputPrice": 2.5,
           "vision": true,
           "reasoning": true,
-          "webSearch": false
+          "webSearch": true,
+          "name": "grok-4.20-0309-reasoning"
         },
         "grok-4.20-multi-agent-0309": {
-          "name": "Grok 4.20 Multi-Agent 0309",
-          "contextWindow": 2000000,
           "inputPrice": 1.25,
           "outputPrice": 2.5,
           "vision": true,
-          "reasoning": false,
-          "webSearch": false
+          "name": "grok-4.20-multi-agent-0309"
         },
         "grok-4.3": {
           "name": "Grok 4.3",
@@ -1132,6 +1114,12 @@
           "vision": true,
           "reasoning": true,
           "webSearch": false
+        },
+        "grok-build-0.1": {
+          "inputPrice": 1,
+          "outputPrice": 2,
+          "vision": true,
+          "name": "grok-build-0.1"
         },
         "grok-code-fast-1": {
           "name": "Grok Code Fast 1",

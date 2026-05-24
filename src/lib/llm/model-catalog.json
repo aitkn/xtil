@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-05-07T12:00:00.000Z",
+  "_generated": "2026-05-24T20:22:28.000Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -10,7 +10,7 @@
           "inputPrice": 1,
           "outputPrice": 5,
           "vision": true,
-          "reasoning": true,
+          "reasoning": false,
           "webSearch": true
         },
         "claude-sonnet-4-6": {
@@ -142,6 +142,7 @@
         "gemini-3-pro-preview",
         "gemini-3.1-flash-lite",
         "gemini-3.1-pro-preview-customtools",
+        "gemini-3.5-flash",
         "gemini-flash-latest",
         "gemini-flash-lite-latest",
         "gemini-pro-latest",
@@ -324,6 +325,7 @@
         "grok-4-fast-reasoning",
         "grok-4.20-0309-non-reasoning",
         "grok-4.20-multi-agent-0309",
+        "grok-build-0.1",
         "grok-code-fast-1"
       ]
     }
