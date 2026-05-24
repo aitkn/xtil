@@ -175,6 +175,10 @@
       .markdown-content pre code { background: none; padding: 0; font-size: 12px; }
       .markdown-content img { max-width: 100%; height: auto; border-radius: var(--md-sys-shape-corner-small); }
 
+      /* Progressive reading: de-emphasize skip-worthy text so skimmers can ignore it. */
+      .markdown-content .dim { opacity: 0.5; transition: opacity 0.15s ease-out; }
+      .markdown-content .dim:hover { opacity: 1; }
+
       /* Mermaid diagram container */
       .markdown-content pre.mermaid {
         background: var(--md-sys-color-surface-container);
