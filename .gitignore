@@ -1,7 +1,8 @@
 node_modules/
 .output/
 .wxt/
-.claude/
+.claude/*
+!.claude/skills/
 *.log
 .env
 .playwright-user-data/
