@@ -715,6 +715,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
         onStreamChunk,
         onChunkProgress,
         onGenreClassified,
+        progressiveReading: settings.progressiveReading,
       });
       result.llmProvider = providerName;
       result.llmModel = llmConfig.model;

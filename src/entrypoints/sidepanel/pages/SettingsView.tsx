@@ -1378,6 +1378,32 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
 
       </div>
 
+      {/* === Progressive Reading Section === */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+          <input
+            type="checkbox"
+            id="progressiveReading"
+            name="progressive-reading"
+            checked={local.progressiveReading ?? false}
+            disabled={local.summaryDetailLevel === 'brief'}
+            onChange={(e) => setLocal({ ...local, progressiveReading: (e.target as HTMLInputElement).checked })}
+            style={{ margin: 0 }}
+          />
+          <label
+            htmlFor="progressiveReading"
+            style={{ font: 'var(--md-sys-typescale-label-medium)', color: local.summaryDetailLevel === 'brief' ? 'var(--md-sys-color-on-surface-variant)' : 'var(--md-sys-color-on-surface)', cursor: local.summaryDetailLevel === 'brief' ? 'default' : 'pointer' }}
+          >
+            Progressive reading (experimental)
+          </label>
+        </div>
+        <div style={{ font: 'var(--md-sys-typescale-body-small)', color: 'var(--md-sys-color-on-surface-variant)', marginTop: '2px', marginLeft: '26px' }}>
+          {local.summaryDetailLevel === 'brief'
+            ? 'Not used at Brief detail level'
+            : 'Order summary paragraphs inverted-pyramid and dim skip-worthy text so you can skim'}
+        </div>
+      </div>
+
       </SectionCard>
 
       {/* Footer — always visible */}

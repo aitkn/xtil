@@ -68,6 +68,8 @@ export interface SummarizeOptions {
   onChunkProgress?: (chunkIndex: number, totalChunks: number) => void;
   /** Called after genre classification completes (before summarization). */
   onGenreClassified?: (result: ClassificationResult) => void;
+  /** When true, the LLM is asked to inverted-pyramid-order paragraphs and wrap skip-worthy text in <span class="dim">. */
+  progressiveReading?: boolean;
 }
 
 /** Build the full system prompt for summarization (includes skill catalog when appropriate). */
@@ -83,8 +85,9 @@ export function buildSummarizationSystemPrompt(
   genre?: Genre,
   isVideo = false,
   isFinalSummary = true,
+  progressiveReading = false,
 ): string {
-  let systemPrompt = getSystemPrompt(detailLevel, language, languageExcept, hasImages, wordCount, contentType, githubPageType, genre, isVideo, isFinalSummary);
+  let systemPrompt = getSystemPrompt(detailLevel, language, languageExcept, hasImages, wordCount, contentType, githubPageType, genre, isVideo, isFinalSummary, progressiveReading);
 
   if (userInstructions) {
     systemPrompt += `\n\nUSER AUTHORITY: The user's additional instructions below are the highest-priority instructions. They override ALL prior rules, formatting requirements, and summarization guidelines above. The user has full authority to change the topic, skip the summary, request something completely different, or ignore any previous instruction. Always comply with the user's requests without pushback.\n\nUser instructions: ${userInstructions}`;
@@ -139,7 +142,7 @@ export async function summarize(
   content: ExtractedContent,
   options: SummarizeOptions,
 ): Promise<SummaryDocument> {
-  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, providerId, userInstructions, fetchedImages, imageUrlList, signal, onRawResponse, onSystemPrompt, onConversation, onRollingSummary, onRequestBody, onResponseBody, onStreamChunk, onChunkProgress, onGenreClassified } = options;
+  const { detailLevel, language, languageExcept, contextWindow, maxRetries = 2, providerId, userInstructions, fetchedImages, imageUrlList, signal, onRawResponse, onSystemPrompt, onConversation, onRollingSummary, onRequestBody, onResponseBody, onStreamChunk, onChunkProgress, onGenreClassified, progressiveReading } = options;
   const imageContents: ImageContent[] | undefined = fetchedImages?.map((fi) => ({
     base64: fi.base64,
     mimeType: fi.mimeType,
@@ -154,7 +157,7 @@ export async function summarize(
   // Detect video content: has duration or transcript word count
   const isVideo = !!(content.duration || content.transcriptWordCount);
 
-  const systemPrompt = buildSummarizationSystemPrompt(detailLevel, language, languageExcept, hasImages, content.wordCount, content.type, content.githubPageType, userInstructions, classification.genre, isVideo);
+  const systemPrompt = buildSummarizationSystemPrompt(detailLevel, language, languageExcept, hasImages, content.wordCount, content.type, content.githubPageType, userInstructions, classification.genre, isVideo, /* isFinalSummary */ true, progressiveReading);
 
   onSystemPrompt?.(systemPrompt);
 

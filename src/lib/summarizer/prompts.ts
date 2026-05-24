@@ -60,7 +60,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
   pt: 'Portuguese', ru: 'Russian', zh: 'Chinese', ja: 'Japanese', ko: 'Korean',
 };
 
-export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', language: string, languageExcept: string[] = [], imageAnalysisEnabled = false, wordCount = 1500, contentType?: string, githubPageType?: string, genre?: Genre, isVideo = false, isFinalSummary = true): string {
+export function getSystemPrompt(detailLevel: 'brief' | 'standard' | 'detailed', language: string, languageExcept: string[] = [], imageAnalysisEnabled = false, wordCount = 1500, contentType?: string, githubPageType?: string, genre?: Genre, isVideo = false, isFinalSummary = true, progressiveReading = false): string {
   const targetLang = LANGUAGE_NAMES[language] || language;
   // Remove target language from exceptions — translating target→target is a no-op
   const exceptLangs = languageExcept
@@ -426,6 +426,14 @@ Every field value must be in the chosen output language. No mixing languages wit
     `- "keyTakeaways": ${d.takeaways} items. Each: ${d.takeawayFormat}.`,
     `- "summary": ${d.summary}. Bold key terms, names, and statistics throughout.`,
   ];
+  // Progressive reading: inverted-pyramid ordering + skip-worthy text wrapped for dimming.
+  // Only applied to the final summary call ‑ intermediate rolling chunks must preserve all info verbatim.
+  // Skipped for "brief" detail (summary is already one short paragraph — ordering can't help skim).
+  if (progressiveReading && isFinalSummary && detailLevel !== 'brief') {
+    guidelines.push(
+      `- PROGRESSIVE READING (applies to "summary" only): structure each paragraph inverted-pyramid — most important point or fact first, supporting context next, minor qualifiers/asides/restatements last. Wrap genuinely SKIP-WORTHY text (qualifiers, throat-clearing, redundant restatement, low-stakes details) in \`<span class="dim">...</span>\` so a skimmer can ignore it. Never dim primary information or key facts — if the sentence carries new meaning, leave it un-dimmed. Keep **bold** for critical terms inside non-dim text. Aim for roughly 10–30% of the prose dimmed; if everything feels dim-worthy, you are dimming wrong. Apply this ONLY in the "summary" field — do not dim tldr, keyTakeaways, conclusion, quotes, or any other field.`,
+    );
+  }
   if (hasQuotes) guidelines.push(`- "notableQuotes": ${effectiveQuotes}${quotesExtra}`);
   guidelines.push(`- "conclusion": ${gConclusion || `${d.conclusion}.`}`);
   if (!skipProsCons) guidelines.push(`- "prosAndCons": ${gProsCons}`);

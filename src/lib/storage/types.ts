@@ -28,6 +28,8 @@ export interface Settings {
   modelCapabilities?: Record<string, ModelCapabilities>;
   enableImageAnalysis?: boolean;
   autoSearchFactCheck?: boolean;
+  /** Experimental: ask LLM to order paragraphs inverted-pyramid and mark skip-worthy text so users can skim. */
+  progressiveReading?: boolean;
   onboardingCompleted?: boolean;
   /** Models the runtime confirmed are no longer offered by the provider. Per-provider lists. */
   discoveredDiscontinued?: Record<string, string[]>;
