@@ -1385,7 +1385,7 @@ export function SettingsView({ settings, onSave, onTestLLM, onTestNotion, onFetc
             type="checkbox"
             id="progressiveReading"
             name="progressive-reading"
-            checked={local.progressiveReading ?? false}
+            checked={local.summaryDetailLevel === 'brief' ? false : (local.progressiveReading ?? false)}
             disabled={local.summaryDetailLevel === 'brief'}
             onChange={(e) => setLocal({ ...local, progressiveReading: (e.target as HTMLInputElement).checked })}
             style={{ margin: 0 }}

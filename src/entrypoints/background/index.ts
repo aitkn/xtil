@@ -757,6 +757,7 @@ async function handleSummarize(content: ExtractedContent, userInstructions?: str
           onStreamChunk,
           onChunkProgress,
           onGenreClassified,
+          progressiveReading: settings.progressiveReading,
         });
         result.llmProvider = providerName;
         result.llmModel = llmConfig.model;
@@ -833,12 +834,20 @@ async function handleChatMessage(
       : '';
 
     // --- SYSTEM MSG 1: Rules & instructions (cached across turns) ---
+    // progressiveReading is passed so refinement (+/-, regen) preserves dim spans and ordering.
+    // Other positional args stay at their defaults to preserve existing chat-refinement behavior.
     const summarizationPrompt = getSystemPrompt(
       settings.summaryDetailLevel,
       settings.summaryLanguage,
       settings.summaryLanguageExcept,
       hasImages,
       content.wordCount,
+      undefined, // contentType
+      undefined, // githubPageType
+      undefined, // genre
+      false,     // isVideo
+      true,      // isFinalSummary
+      settings.progressiveReading,
     );
 
     let imageCapabilityNote = '';
