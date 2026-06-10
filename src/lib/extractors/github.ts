@@ -976,33 +976,73 @@ function extractPRDiff(url: string, doc: Document): ExtractedContent {
 }
 
 function extractRelease(url: string, doc: Document): ExtractedContent {
-  // Tag name and title
-  const tagEl = doc.querySelector('.release-header .f1 a, .release-header .css-truncate-target');
-  const tagName = textOf(tagEl);
+  const u = new URL(url);
 
-  const titleEl = doc.querySelector('.release-header .markdown-title, .release-header h1');
-  const releaseTitle = textOf(titleEl) || tagName || 'Release';
+  // Tag name — the URL is the most reliable source (legacy `.release-header`
+  // wrappers were dropped in GitHub's redesigned release page).
+  const tagFromUrl = u.pathname.match(/\/releases\/tag\/(.+)$/);
+  const tagName = (tagFromUrl ? decodeURIComponent(tagFromUrl[1]) : '')
+    || textOf(doc.querySelector('.release-header .f1 a, .release-header .css-truncate-target'));
 
-  // Body
-  const bodyEl = doc.querySelector('.release-body .markdown-body');
+  // Title — legacy `.release-header` markup is gone; the redesigned page uses a
+  // bare <h1>. Reject the global search-bar / dialog h1s by structure, then
+  // fall back to parsing the document <title> ("Release {title} · owner/repo ·
+  // GitHub"), then the tag name.
+  let releaseTitle = textOf(
+    doc.querySelector('.release-header .markdown-title, .release-header h1'),
+  );
+  if (!releaseTitle) {
+    for (const h1 of doc.querySelectorAll('h1')) {
+      if (h1.matches('.sr-only') || h1.closest('form[role="search"], [role="search"], [class*="Overlay"]')) continue;
+      const t = textOf(h1);
+      if (t) { releaseTitle = t; break; }
+    }
+  }
+  if (!releaseTitle) {
+    const m = (doc.title || '').match(/^Release\s+(.+?)\s+·\s+[^·]+\s+·\s+GitHub\s*$/);
+    if (m) releaseTitle = m[1].trim();
+  }
+  if (!releaseTitle) releaseTitle = tagName || 'Release';
+
+  // Body — redesigned page exposes [data-test-selector="body-content"]; legacy
+  // page nested the body under `.release-body`. Fall back to any `.markdown-body`
+  // (a release page has only the notes body).
+  const bodyEl =
+    doc.querySelector('[data-test-selector="body-content"]') ||
+    doc.querySelector('.release-body .markdown-body') ||
+    doc.querySelector('.markdown-body');
   const body = markdownBodyToText(bodyEl);
 
-  // Author
-  const authorEl = doc.querySelector('.release-header .author, .release-header a[data-hovercard-type="user"]');
+  // Author — the releaser link carries `text-bold`/`color-fg-muted` in the new
+  // DOM; the broad hovercard selector is a last resort.
+  const authorEl =
+    doc.querySelector('.release-header .author, .release-header a[data-hovercard-type="user"]') ||
+    doc.querySelector('a.text-bold[data-hovercard-type="user"], a.color-fg-muted[data-hovercard-type="user"]') ||
+    doc.querySelector('a[data-hovercard-type="user"]');
   const author = textOf(authorEl);
 
-  // Date
-  const timeEl = doc.querySelector('.release-header relative-time, .release-header time');
+  // Date — first relative-time/time on a release page is the publish date.
+  const timeEl =
+    doc.querySelector('.release-header relative-time, .release-header time') ||
+    doc.querySelector('relative-time[datetime], time[datetime]');
   const publishDate = timeEl?.getAttribute('datetime') || undefined;
 
-  // Assets
-  const assetEls = doc.querySelectorAll('.release-main-section details .Box-row a[href*="/releases/download/"]');
+  // Assets — the downloadable files list. Skip download links that live inside
+  // the release body (e.g. an "Installer Hashes" table) so we don't duplicate
+  // body content. The real assets list is sometimes lazy-loaded and absent.
+  const assetEls = doc.querySelectorAll(
+    '.release-main-section details .Box-row a[href*="/releases/download/"], a[href*="/releases/download/"]',
+  );
   const assets: string[] = [];
+  const seenAssets = new Set<string>();
   for (const el of assetEls) {
+    if (bodyEl && bodyEl.contains(el)) continue;
     const name = textOf(el);
+    if (!name || seenAssets.has(name)) continue;
+    seenAssets.add(name);
     const sizeEl = el.closest('.Box-row')?.querySelector('.text-small, .color-fg-muted');
     const size = textOf(sizeEl);
-    if (name) assets.push(size ? `${name} (${size})` : name);
+    assets.push(size ? `${name} (${size})` : name);
   }
 
   // Build content

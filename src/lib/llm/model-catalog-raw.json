@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-05-24T20:20:42.567Z",
+  "_generated": "2026-06-10T20:28:42.296Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -35,12 +35,32 @@
           "outputPrice": 75,
           "vision": true
         },
+        "claude-fable-5": {
+          "name": "Claude Fable 5",
+          "contextWindow": 1000000,
+          "maxOutput": 128000,
+          "inputPrice": 10,
+          "outputPrice": 50,
+          "vision": true,
+          "reasoning": false,
+          "webSearch": false
+        },
         "claude-haiku-4-5-20251001": {
           "name": "Claude Haiku 4.5",
           "contextWindow": 200000,
           "maxOutput": 64000,
           "inputPrice": 1,
           "outputPrice": 5,
+          "vision": true,
+          "reasoning": false,
+          "webSearch": false
+        },
+        "claude-mythos-5": {
+          "name": "Claude Mythos 5",
+          "contextWindow": 1000000,
+          "maxOutput": 128000,
+          "inputPrice": 10,
+          "outputPrice": 50,
           "vision": true,
           "reasoning": false,
           "webSearch": false
@@ -79,6 +99,11 @@
         },
         "claude-opus-4-7": {
           "name": "Claude Opus 4.7",
+          "reasoning": true,
+          "webSearch": true
+        },
+        "claude-opus-4-8": {
+          "name": "Claude Opus 4.8",
           "contextWindow": 1000000,
           "maxOutput": 128000,
           "inputPrice": 5,
@@ -148,8 +173,8 @@
           "name": "DeepSeek V4 Pro",
           "contextWindow": 1000000,
           "maxOutput": 384000,
-          "inputPrice": 0.0145,
-          "outputPrice": 3.48,
+          "inputPrice": 0.003625,
+          "outputPrice": 0.87,
           "vision": false,
           "reasoning": true,
           "webSearch": false
@@ -302,6 +327,11 @@
           "vision": true,
           "webSearch": true
         },
+        "gemini-3-pro-image": {
+          "name": "Nano Banana Pro",
+          "contextWindow": 131072,
+          "maxOutput": 32768
+        },
         "gemini-3-pro-image-preview": {
           "name": "Nano Banana Pro",
           "contextWindow": 131072,
@@ -315,6 +345,11 @@
           "outputPrice": 12,
           "vision": true,
           "webSearch": true
+        },
+        "gemini-3.1-flash-image": {
+          "name": "Nano Banana 2",
+          "contextWindow": 65536,
+          "maxOutput": 65536
         },
         "gemini-3.1-flash-image-preview": {
           "name": "Nano Banana 2",
@@ -727,13 +762,19 @@
         "gpt-5.4-2026-03-05": {
           "name": "gpt-5.4-2026-03-05"
         },
+        "gpt-5.4-cyber": {
+          "name": "GPT-5.4 Cyber",
+          "vision": false,
+          "reasoning": false,
+          "webSearch": false
+        },
         "gpt-5.4-mini": {
           "name": "GPT-5.4 Mini",
           "inputPrice": 0.375,
           "outputPrice": 2.25,
           "vision": false,
           "reasoning": true,
-          "webSearch": true
+          "webSearch": false
         },
         "gpt-5.4-mini-2026-03-17": {
           "name": "gpt-5.4-mini-2026-03-17"
@@ -744,7 +785,7 @@
           "outputPrice": 0.625,
           "vision": false,
           "reasoning": true,
-          "webSearch": true
+          "webSearch": false
         },
         "gpt-5.4-nano-2026-03-17": {
           "name": "gpt-5.4-nano-2026-03-17"
@@ -806,7 +847,7 @@
         "gpt-image-1-mini": {
           "name": "GPT Image 1 Mini",
           "inputPrice": 1,
-          "outputPrice": 4,
+          "outputPrice": 0,
           "vision": true,
           "reasoning": false,
           "webSearch": false
@@ -834,12 +875,7 @@
           "name": "gpt-realtime"
         },
         "gpt-realtime-1.5": {
-          "name": "GPT Realtime 1.5",
-          "inputPrice": 4,
-          "outputPrice": 16,
-          "vision": true,
-          "reasoning": false,
-          "webSearch": false
+          "name": "gpt-realtime-1.5"
         },
         "gpt-realtime-2": {
           "name": "GPT Realtime 2",
@@ -853,12 +889,7 @@
           "name": "gpt-realtime-2025-08-28"
         },
         "gpt-realtime-mini": {
-          "name": "GPT Realtime Mini",
-          "inputPrice": 0.6,
-          "outputPrice": 2.4,
-          "vision": true,
-          "reasoning": false,
-          "webSearch": false
+          "name": "gpt-realtime-mini"
         },
         "gpt-realtime-mini-2025-10-06": {
           "name": "gpt-realtime-mini-2025-10-06"
@@ -867,10 +898,14 @@
           "name": "gpt-realtime-mini-2025-12-15"
         },
         "gpt-realtime-translate": {
-          "name": "gpt-realtime-translate"
+          "name": "GPT Realtime Translate",
+          "reasoning": false,
+          "webSearch": false
         },
         "gpt-realtime-whisper": {
-          "name": "gpt-realtime-whisper"
+          "name": "GPT Realtime Whisper",
+          "reasoning": false,
+          "webSearch": false
         },
         "o1": {
           "name": "o1",
@@ -987,11 +1022,15 @@
         },
         "sora-2": {
           "name": "Sora 2",
-          "vision": true
+          "vision": true,
+          "reasoning": false,
+          "webSearch": false
         },
         "sora-2-pro": {
           "name": "Sora 2 Pro",
-          "vision": true
+          "vision": true,
+          "reasoning": false,
+          "webSearch": false
         }
       }
     },
@@ -1112,14 +1151,17 @@
           "inputPrice": 1.25,
           "outputPrice": 2.5,
           "vision": true,
-          "reasoning": true,
+          "reasoning": false,
           "webSearch": false
         },
         "grok-build-0.1": {
+          "name": "Grok Build 0.1",
+          "contextWindow": 256000,
           "inputPrice": 1,
           "outputPrice": 2,
           "vision": true,
-          "name": "grok-build-0.1"
+          "reasoning": false,
+          "webSearch": false
         },
         "grok-code-fast-1": {
           "name": "Grok Code Fast 1",
@@ -1146,6 +1188,9 @@
           "name": "Grok Imagine Video",
           "vision": false,
           "textGeneration": false
+        },
+        "grok-imagine-video-1.5-preview": {
+          "name": "grok-imagine-video-1.5-preview"
         }
       }
     }

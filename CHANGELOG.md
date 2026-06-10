@@ -4,6 +4,13 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.12
+
+**GitHub release pages summarize again + Claude Opus 4.8**
+
+- Fixed GitHub release pages (like a project's "v0.100.0" release tag) coming up empty with no text to summarize — GitHub changed how these pages are built, and xTil now reads the release notes, title, author, and date correctly again.
+- Added Claude Opus 4.8, replacing Opus 4.7 at the same price. DeepSeek V4 Pro is now significantly cheaper to run.
+
 ## 1.2.11
 
 **Skim summaries faster with progressive reading**

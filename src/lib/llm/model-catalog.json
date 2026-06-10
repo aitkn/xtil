@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-05-24T20:22:28.000Z",
+  "_generated": "2026-06-10T20:28:42.296Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -31,25 +31,28 @@
           "outputPrice": 1.25,
           "vision": true
         },
-        "claude-opus-4-7": {
-          "name": "Claude Opus 4.7",
+        "claude-opus-4-8": {
+          "name": "Claude Opus 4.8",
           "contextWindow": 1000000,
           "maxOutput": 128000,
           "inputPrice": 5,
           "outputPrice": 25,
           "vision": true,
           "reasoning": true,
-          "webSearch": true
+          "webSearch": false
         }
       },
       "excluded": [
         "claude-3-5-haiku-20241022",
         "claude-3-5-sonnet-20241022",
         "claude-3-opus-20240229",
+        "claude-fable-5",
+        "claude-mythos-5",
         "claude-opus-4-1-20250805",
         "claude-opus-4-20250514",
         "claude-opus-4-5-20251101",
         "claude-opus-4-6",
+        "claude-opus-4-7",
         "claude-sonnet-4-20250514",
         "claude-sonnet-4-5-20250929"
       ]
@@ -69,8 +72,8 @@
           "name": "DeepSeek-V4 Pro",
           "contextWindow": 1000000,
           "maxOutput": 384000,
-          "inputPrice": 1.74,
-          "outputPrice": 3.48,
+          "inputPrice": 0.003625,
+          "outputPrice": 0.87,
           "vision": false,
           "reasoning": true
         }
@@ -216,7 +219,7 @@
           "outputPrice": 4.5,
           "vision": true,
           "reasoning": true,
-          "webSearch": true
+          "webSearch": false
         },
         "gpt-5-nano": {
           "name": "GPT-5 nano",
@@ -236,7 +239,7 @@
           "outputPrice": 1.25,
           "vision": true,
           "reasoning": true,
-          "webSearch": true
+          "webSearch": false
         },
         "o3": {
           "name": "o3",
@@ -274,6 +277,7 @@
         "gpt-5.2",
         "gpt-5.2-chat-latest",
         "gpt-5.2-pro",
+        "gpt-5.4-cyber",
         "gpt-5.4-pro",
         "gpt-5.5-pro",
         "o1",
@@ -299,7 +303,7 @@
           "outputPrice": 2.5,
           "vision": true,
           "textGeneration": true,
-          "reasoning": true,
+          "reasoning": false,
           "webSearch": true
         },
         "grok-4.20-0309-reasoning": {
