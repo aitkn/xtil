@@ -1,24 +1,33 @@
 {
-  "_generated": "2026-06-10T20:28:42.296Z",
+  "_generated": "2026-07-10T07:09:40.000Z",
   "providers": {
     "anthropic": {
       "models": {
+        "claude-sonnet-5": {
+          "name": "Claude Sonnet 5",
+          "contextWindow": 1000000,
+          "maxOutput": 128000,
+          "inputPrice": 3,
+          "outputPrice": 15,
+          "vision": true,
+          "reasoning": true
+        },
+        "claude-opus-4-8": {
+          "name": "Claude Opus 4.8",
+          "contextWindow": 1000000,
+          "maxOutput": 128000,
+          "inputPrice": 5,
+          "outputPrice": 25,
+          "vision": true,
+          "reasoning": true,
+          "webSearch": false
+        },
         "claude-haiku-4-5-20251001": {
           "name": "Claude Haiku 4.5",
           "contextWindow": 200000,
           "maxOutput": 64000,
           "inputPrice": 1,
           "outputPrice": 5,
-          "vision": true,
-          "reasoning": false,
-          "webSearch": true
-        },
-        "claude-sonnet-4-6": {
-          "name": "Claude Sonnet 4.6",
-          "contextWindow": 1000000,
-          "maxOutput": 64000,
-          "inputPrice": 3,
-          "outputPrice": 15,
           "vision": true,
           "reasoning": true,
           "webSearch": true
@@ -30,16 +39,6 @@
           "inputPrice": 0.25,
           "outputPrice": 1.25,
           "vision": true
-        },
-        "claude-opus-4-8": {
-          "name": "Claude Opus 4.8",
-          "contextWindow": 1000000,
-          "maxOutput": 128000,
-          "inputPrice": 5,
-          "outputPrice": 25,
-          "vision": true,
-          "reasoning": true,
-          "webSearch": false
         }
       },
       "excluded": [
@@ -48,13 +47,15 @@
         "claude-3-opus-20240229",
         "claude-fable-5",
         "claude-mythos-5",
+        "claude-mythos-preview",
         "claude-opus-4-1-20250805",
         "claude-opus-4-20250514",
         "claude-opus-4-5-20251101",
         "claude-opus-4-6",
         "claude-opus-4-7",
         "claude-sonnet-4-20250514",
-        "claude-sonnet-4-5-20250929"
+        "claude-sonnet-4-5-20250929",
+        "claude-sonnet-4-6"
       ]
     },
     "deepseek": {
@@ -65,16 +66,14 @@
           "maxOutput": 384000,
           "inputPrice": 0.14,
           "outputPrice": 0.28,
-          "vision": false,
           "reasoning": false
         },
         "deepseek-v4-pro": {
           "name": "DeepSeek-V4 Pro",
           "contextWindow": 1000000,
           "maxOutput": 384000,
-          "inputPrice": 0.003625,
+          "inputPrice": 0.435,
           "outputPrice": 0.87,
-          "vision": false,
           "reasoning": true
         }
       },
@@ -148,6 +147,7 @@
         "gemini-3.5-flash",
         "gemini-flash-latest",
         "gemini-flash-lite-latest",
+        "gemini-omni-flash-preview",
         "gemini-pro-latest",
         "gemini-1.5-flash",
         "gemini-1.5-pro",
@@ -162,31 +162,29 @@
     },
     "openai": {
       "models": {
-        "gpt-5.5": {
-          "name": "GPT-5.5",
+        "gpt-5.6-sol": {
+          "name": "GPT-5.6 Sol",
           "contextWindow": 1000000,
           "maxOutput": 128000,
           "inputPrice": 5,
           "outputPrice": 30,
-          "vision": true,
           "reasoning": true,
           "webSearch": true
         },
-        "gpt-5.4": {
-          "name": "GPT-5.4",
+        "gpt-5.6-terra": {
+          "name": "GPT-5.6 Terra",
           "maxOutput": 128000,
           "inputPrice": 2.5,
           "outputPrice": 15,
-          "vision": true,
           "reasoning": true,
           "webSearch": true
         },
-        "gpt-5.1": {
-          "name": "GPT-5.1",
+        "gpt-5.6-luna": {
+          "name": "GPT-5.6 Luna",
           "contextWindow": 200000,
           "maxOutput": 100000,
-          "inputPrice": 1.25,
-          "outputPrice": 10,
+          "inputPrice": 1,
+          "outputPrice": 6,
           "vision": true,
           "reasoning": true,
           "webSearch": true
@@ -217,7 +215,6 @@
           "maxOutput": 128000,
           "inputPrice": 0.75,
           "outputPrice": 4.5,
-          "vision": true,
           "reasoning": true,
           "webSearch": false
         },
@@ -237,7 +234,6 @@
           "maxOutput": 128000,
           "inputPrice": 0.2,
           "outputPrice": 1.25,
-          "vision": true,
           "reasoning": true,
           "webSearch": false
         },
@@ -253,7 +249,6 @@
         }
       },
       "excluded": [
-        "chat-latest",
         "chatgpt-4o-latest",
         "computer-use-preview",
         "gpt-3.5-turbo",
@@ -273,12 +268,14 @@
         "gpt-5-chat-latest",
         "gpt-5-pro",
         "gpt-5-search-api",
+        "gpt-5.1",
         "gpt-5.1-chat-latest",
         "gpt-5.2",
         "gpt-5.2-chat-latest",
         "gpt-5.2-pro",
-        "gpt-5.4-cyber",
+        "gpt-5.4",
         "gpt-5.4-pro",
+        "gpt-5.5",
         "gpt-5.5-pro",
         "o1",
         "o1-2024-12-17",
@@ -288,16 +285,13 @@
         "o3-deep-research",
         "o3-mini",
         "o3-pro",
-        "o4-mini-deep-research",
-        "sora-2",
-        "sora-2-pro"
+        "o4-mini-deep-research"
       ]
     },
     "xai": {
       "models": {
         "grok-4.3": {
           "name": "Grok 4.3",
-          "contextWindow": 1000000,
           "maxOutput": 1000000,
           "inputPrice": 1.25,
           "outputPrice": 2.5,
@@ -329,6 +323,7 @@
         "grok-4-fast-reasoning",
         "grok-4.20-0309-non-reasoning",
         "grok-4.20-multi-agent-0309",
+        "grok-4.5",
         "grok-build-0.1",
         "grok-code-fast-1"
       ]

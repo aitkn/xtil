@@ -4,12 +4,12 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
-## Unreleased
+## 1.2.13
 
-**Summarize the spoken content of X (Twitter) videos**
+**Summarize what's said in X (Twitter) videos + newer models**
 
-- When a tweet has a captioned video, xTil now pulls the video's closed-caption transcript into the summary — so the summary reflects what's actually said in the clip, not just the tweet's text. Works on both direct tweet pages and your feed.
-- Videos without captions show a brief "captions unavailable" note (the poster image is still included), and animated GIFs are ignored.
+- **X video captions**: when a tweet has a captioned video, xTil now folds the video's transcript into the summary — so you get what's actually said in the clip, not just the tweet text. Works on tweet pages, your feed, and X's full-screen video view. Videos without captions show a brief note (the poster image is still included), and animated GIFs are ignored.
+- Added **Claude Sonnet 5** (replacing Sonnet 4.6, with a much larger context window) and refreshed the OpenAI lineup to the newer **GPT-5.6** models.
 
 ## 1.2.12
 
