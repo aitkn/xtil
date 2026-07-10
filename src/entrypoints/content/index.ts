@@ -296,10 +296,13 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
 
   // Resolve video transcript from embedded players (non-YouTube, non-Netflix)
   if (content.type !== 'youtube' && content.type !== 'netflix') {
-    const transcript = await fetchEmbeddedVideoTranscript(document, window.location.href, langPrefs, summaryLang);
-    if (transcript) {
-      content.transcriptWordCount = transcript.split(/\s+/).filter(Boolean).length;
-      content.content += `\n\n## Transcript\n\n${transcript}`;
+    const result = await fetchEmbeddedVideoTranscript(document, window.location.href, langPrefs, summaryLang);
+    if (result && 'transcript' in result) {
+      content.transcriptWordCount = result.transcript.split(/\s+/).filter(Boolean).length;
+      content.content += `\n\n## Transcript\n\n${result.transcript}`;
+      content.wordCount = content.content.split(/\s+/).filter(Boolean).length;
+    } else if (result && result.status === 'no-captions') {
+      content.content += `\n\n*(Video present; captions unavailable.)*`;
       content.wordCount = content.content.split(/\s+/).filter(Boolean).length;
     }
   }
@@ -342,18 +345,20 @@ function findVideoRoot(doc: Document, _url: string): Document | Element {
  * Checks: Cloudflare Stream, Vimeo, Dailymotion, then generic HTML5 <video>.
  * Returns null if no supported video or no captions found.
  */
+type EmbeddedVideoResult = { transcript: string } | { status: 'no-captions' } | null;
+
 async function fetchEmbeddedVideoTranscript(
   doc: Document,
   url: string,
   langPrefs?: string[],
   summaryLang?: string,
-): Promise<string | null> {
+): Promise<EmbeddedVideoResult> {
   // Cloudflare Stream
   const cfVideoId = detectCloudflareStreamVideo(doc);
   if (cfVideoId) {
     try {
       const t = await fetchCloudflareStreamTranscript(cfVideoId, langPrefs, summaryLang);
-      if (t) return t;
+      if (t) return { transcript: t };
     } catch { /* fall through */ }
   }
 
@@ -362,7 +367,7 @@ async function fetchEmbeddedVideoTranscript(
   if (vimeo) {
     try {
       const t = await fetchVimeoTranscript(vimeo.videoId, langPrefs, summaryLang, vimeo.hash);
-      if (t) return t;
+      if (t) return { transcript: t };
     } catch { /* fall through */ }
   }
 
@@ -371,7 +376,7 @@ async function fetchEmbeddedVideoTranscript(
   if (dmVideoId) {
     try {
       const t = await fetchDailymotionTranscript(dmVideoId, langPrefs, summaryLang);
-      if (t) return t;
+      if (t) return { transcript: t };
     } catch { /* fall through */ }
   }
 
@@ -380,7 +385,7 @@ async function fetchEmbeddedVideoTranscript(
   if (jwMediaId) {
     try {
       const t = await fetchJwPlayerTranscript(jwMediaId, langPrefs, summaryLang);
-      if (t) return t;
+      if (t) return { transcript: t };
     } catch { /* fall through */ }
   }
 
@@ -390,7 +395,7 @@ async function fetchEmbeddedVideoTranscript(
   if (detectHTML5VideoWithTracks(videoRoot)) {
     try {
       const t = await fetchHTML5VideoTranscript(videoRoot, langPrefs, summaryLang);
-      if (t) return t;
+      if (t) return { transcript: t };
     } catch { /* fall through */ }
   }
 
