@@ -1,9 +1,9 @@
 import { parseHlsSubtitleTracks, pickBestTrack, parseVtt } from './transcript-lang';
 
 const SYNDICATION_ORIGIN = 'https://cdn.syndication.twimg.com';
-const VIDEO_ORIGIN = 'https://video.twimg.com';
 const FETCH_TIMEOUT_MS = 15_000;
 const CACHE_TTL_MS = 60_000;
+const CACHE_MAX = 50;
 
 /** Tweet body pulled from the syndication payload — used to summarize the tweet
  *  even when its <article> is absent from the DOM (X's fullscreen /video/ viewer). */
@@ -25,11 +25,6 @@ export function deriveSyndicationToken(id: string): string {
   return ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '');
 }
 
-/** Resolve an absolute-path or full URL against video.twimg.com. */
-export function resolveTwimgUrl(pathOrUrl: string): string {
-  if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl;
-  return `${VIDEO_ORIGIN}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
-}
 
 /** First real-video (type === 'video') HLS variant from a syndication payload. */
 export function pickVideoM3u8(json: unknown): string | null {
@@ -101,6 +96,12 @@ async function fetchJsonBounded(url: string): Promise<unknown | null> {
 // re-extraction would re-walk the whole syndication -> m3u8 -> VTT chain.
 const cache = new Map<string, { at: number; result: TwitterCaptionResult }>();
 
+// Cache key includes the language signature because langPrefs/summaryLang drive
+// pickBestTrack — a different language could select a different subtitle track.
+function cacheKey(tweetId: string, langPrefs?: string[], summaryLang?: string): string {
+  return `${tweetId}::${(langPrefs ?? []).join(',')}::${summaryLang ?? ''}`;
+}
+
 /**
  * Background-side orchestrator: tweet ID -> transcript + tweet body. Runs in the
  * service worker; host_permissions bypasses CORS for every hop.
@@ -110,13 +111,19 @@ export async function fetchTwitterVideoTranscript(
   langPrefs?: string[],
   summaryLang?: string,
 ): Promise<TwitterCaptionResult> {
-  const cached = cache.get(tweetId);
+  const key = cacheKey(tweetId, langPrefs, summaryLang);
+  const cached = cache.get(key);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.result;
 
   const result = await resolveTwitterVideo(tweetId, langPrefs, summaryLang);
   // Cache only when syndication actually responded (so transient failures retry).
   if ('transcript' in result || result.tweet !== null) {
-    cache.set(tweetId, { at: Date.now(), result });
+    // Bound the map: evict the oldest entry (insertion order) when at capacity.
+    if (cache.size >= CACHE_MAX) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    cache.set(key, { at: Date.now(), result });
   }
   return result;
 }
@@ -144,13 +151,16 @@ async function resolveTwitterVideo(
   if (tracks.length === 0) return { status: 'no-captions', tweet };
 
   const best = pickBestTrack(tracks, langPrefs, summaryLang);
-  const playlist = await fetchTextBounded(resolveTwimgUrl(best.baseUrl));
+  // Resolve the subtitle playlist + VTT relative to their parent URLs (standard HLS),
+  // which handles both absolute-path and directory-relative URIs.
+  const playlistUrl = new URL(best.baseUrl, m3u8Url).href;
+  const playlist = await fetchTextBounded(playlistUrl);
   if (playlist == null) return { status: 'no-captions', tweet };
 
   const vttRel = playlist.split('\n').find((l) => l.trim() && !l.startsWith('#'));
   if (!vttRel) return { status: 'no-captions', tweet };
 
-  const vtt = await fetchTextBounded(resolveTwimgUrl(vttRel.trim()));
+  const vtt = await fetchTextBounded(new URL(vttRel.trim(), playlistUrl).href);
   if (vtt == null) return { status: 'no-captions', tweet };
 
   const transcript = parseVtt(vtt);
