@@ -130,14 +130,22 @@ function formatSubTimestamp(ts: string): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/** Decode the HTML entities commonly seen in caption text. */
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+};
+
+/** Decode the HTML entities commonly seen in caption text (single pass — no double-decode). */
 function decodeEntities(s: string): string {
-  return s
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&');
+  return s.replace(/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z]+);/g, (m, body) => {
+    if (body[0] === '#') {
+      const code = body[1] === 'x' || body[1] === 'X'
+        ? parseInt(body.slice(2), 16)
+        : parseInt(body.slice(1), 10);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+    }
+    const named = NAMED_ENTITIES[body.toLowerCase()];
+    return named !== undefined ? named : m;
+  });
 }
 
 /**
