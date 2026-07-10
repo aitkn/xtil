@@ -480,9 +480,12 @@ function fetchTwitterCaptionsViaBackground(
   langPrefs?: string[],
   summaryLang?: string,
 ): Promise<{ transcript?: string; captionStatus?: 'no-captions' | 'no-video'; tweet?: TweetMeta } | null> {
-  const rt = (globalThis as unknown as { chrome: typeof chrome }).chrome.runtime;
   return new Promise((resolve) => {
     try {
+      // Read chrome inside the try: an invalidated extension context (e.g. after a
+      // reload) can make this access throw — degrade to null rather than propagate.
+      const rt = (globalThis as unknown as { chrome?: typeof chrome }).chrome?.runtime;
+      if (!rt) { resolve(null); return; }
       rt.sendMessage(
         { type: 'FETCH_TWITTER_CAPTIONS', tweetId, langPrefs, summaryLang },
         (resp: unknown) => {
