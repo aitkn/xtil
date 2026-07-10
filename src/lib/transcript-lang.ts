@@ -130,6 +130,16 @@ function formatSubTimestamp(ts: string): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/** Decode the HTML entities commonly seen in caption text. */
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
+}
+
 /**
  * Parse WebVTT into timestamped text lines: [H:MM:SS] text
  */
@@ -148,7 +158,7 @@ export function parseVtt(vtt: string): string {
         textParts.push(vttLines[i].trim());
         i++;
       }
-      const text = textParts.join(' ').replace(/<[^>]+>/g, '').trim();
+      const text = decodeEntities(textParts.join(' ').replace(/<[^>]+>/g, '')).trim();
       if (text) {
         lines.push(`[${formatSubTimestamp(match[1])}] ${text}`);
       }
@@ -178,7 +188,7 @@ export function parseSrt(srt: string): string {
         textParts.push(srtLines[i].trim());
         i++;
       }
-      const text = textParts.join(' ').replace(/<[^>]+>/g, '').trim();
+      const text = decodeEntities(textParts.join(' ').replace(/<[^>]+>/g, '')).trim();
       if (text) {
         lines.push(`[${formatSubTimestamp(match[1])}] ${text}`);
       }
@@ -187,4 +197,26 @@ export function parseSrt(srt: string): string {
     }
   }
   return lines.join('\n');
+}
+
+/**
+ * Parse #EXT-X-MEDIA:TYPE=SUBTITLES entries from an HLS master manifest.
+ * Shared by Cloudflare Stream and X/Twitter video.
+ */
+export function parseHlsSubtitleTracks(manifest: string): CaptionTrack[] {
+  const tracks: CaptionTrack[] = [];
+  for (const line of manifest.split('\n')) {
+    if (!line.includes('TYPE=SUBTITLES')) continue;
+    const lang = line.match(/LANGUAGE="([^"]+)"/)?.[1];
+    const name = line.match(/NAME="([^"]+)"/)?.[1];
+    const uri = line.match(/URI="([^"]+)"/)?.[1];
+    const isForced = line.includes('FORCED=YES');
+    if (!lang || !uri || isForced) continue;
+    tracks.push({
+      baseUrl: uri,
+      languageCode: lang,
+      name: name ? { simpleText: name } : undefined,
+    });
+  }
+  return tracks;
 }

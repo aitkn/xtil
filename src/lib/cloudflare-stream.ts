@@ -7,7 +7,7 @@
  * All URLs are publicly accessible (no auth needed). The manifest exposes
  * signed VTT URLs in the subtitle playlist.
  */
-import { pickBestTrack, parseVtt, type CaptionTrack } from './transcript-lang';
+import { pickBestTrack, parseVtt, parseHlsSubtitleTracks } from './transcript-lang';
 
 const CF_STREAM_IFRAME_RE = /(?:iframe\.cloudflarestream\.com|iframe\.videodelivery\.net|customer-[a-z0-9]+\.cloudflarestream\.com)\/([a-f0-9]{32})/;
 
@@ -63,26 +63,4 @@ export async function fetchCloudflareStreamTranscript(
   const vtt = await vttRes.text();
 
   return parseVtt(vtt);
-}
-
-/**
- * Parse #EXT-X-MEDIA:TYPE=SUBTITLES entries from HLS manifest into CaptionTrack format.
- */
-export function parseHlsSubtitleTracks(manifest: string): CaptionTrack[] {
-  const tracks: CaptionTrack[] = [];
-  for (const line of manifest.split('\n')) {
-    if (!line.includes('TYPE=SUBTITLES')) continue;
-    const lang = line.match(/LANGUAGE="([^"]+)"/)?.[1];
-    const name = line.match(/NAME="([^"]+)"/)?.[1];
-    const uri = line.match(/URI="([^"]+)"/)?.[1];
-    const isForced = line.includes('FORCED=YES');
-    if (!lang || !uri || isForced) continue;
-
-    tracks.push({
-      baseUrl: uri,
-      languageCode: lang,
-      name: name ? { simpleText: name } : undefined,
-    });
-  }
-  return tracks;
 }
