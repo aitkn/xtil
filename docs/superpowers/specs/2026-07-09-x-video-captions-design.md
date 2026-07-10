@@ -1,9 +1,10 @@
 # X (Twitter) Video Caption Support — Design
 
 **Date:** 2026-07-09
-**Status:** Approved (pending implementation plan)
+**Status:** Approved design, revised after code review (pending implementation plan)
 **Feature:** Include the spoken content of a tweet's video in xTil summaries, sourced
-from X's closed-caption (CC) track.
+from X's closed-caption (CC) track, by **extending the existing embedded-video
+transcript framework**.
 
 ## Goal
 
@@ -16,15 +17,52 @@ Explicitly **not** in scope:
 - Audio transcription / speech-to-text (we use X's existing CC track only).
 - Visual/frame analysis of the video.
 - Quoted-tweet videos.
+- Private / age-gated / login-only videos (they degrade to the no-captions fallback).
 
 ## Decisions (from brainstorming)
 
 | Question | Decision |
 | --- | --- |
 | What to extract from a video | Spoken content, via X's **closed captions** (not audio transcription). |
-| Behavior when a video has **no** CC track | Keep current behavior — include the poster thumbnail — and add a note: `*(Video present; no captions available.)*` |
+| Behavior when a video has **no** CC track | Keep current behavior — the poster thumbnail is already emitted as an image by the extractor — and add a note: `*(Video present; captions unavailable.)*` |
 | Surfaces covered | Direct tweet pages (`/status/<id>`) **and** feed (home/profile/search). |
-| Sourcing approach | Public **syndication CDN** endpoint, resolved in the background worker, wrapped in the existing YouTube/Netflix-style transcript-marker pattern. |
+| Sourcing approach | Public **syndication CDN** endpoint, wrapped in the **existing** `fetchEmbeddedVideoTranscript` framework (the same one used by Cloudflare Stream, Vimeo, Dailymotion, JW Player, HTML5). |
+
+## Architecture: extend the existing framework (revised after review)
+
+The codebase already has a per-provider embedded-video transcript framework for
+exactly this shape of problem — a page that is not a dedicated video type but embeds
+a video with captions. It lives in `fetchEmbeddedVideoTranscript`
+(`content/index.ts:345`) and dispatches to sibling modules in `src/lib/`
+(`cloudflare-stream.ts`, `vimeo.ts`, `dailymotion.ts`, `jwplayer.ts`,
+`html5-video.ts`). It **already runs for tweets**: the guard at `content/index.ts:298`
+is `content.type !== 'youtube' && content.type !== 'netflix'`, and tweets are
+type `'twitter'`. It simply has no X detector today.
+
+`cloudflare-stream.ts` in particular performs the **identical** master-m3u8 →
+subtitle-playlist → VTT chain we need (`fetchCloudflareStreamTranscript`, steps 1–6),
+inline from the content script — no MAIN-world bridge, no background worker, no
+transcript marker.
+
+**Therefore the original marker-based design is dropped.** No
+`[TWITTER_TRANSCRIPT:]` marker, no new resolution block in `content/index.ts`, no
+`twitter.ts` extractor change, no `App.tsx` change. We add one detector/fetcher pair
+to the existing chain and reuse the shared parsers.
+
+### Reused vs. genuinely new
+
+| Concern | Reused (already exists) | New |
+| --- | --- | --- |
+| Parse `#EXT-X-MEDIA:TYPE=SUBTITLES` | `parseHlsSubtitleTracks` (moving to `transcript-lang.ts`) | — |
+| Pick subtitle playlist line | first non-`#` line (as in `cloudflare-stream.ts:56`) | — |
+| Language/track selection | `pickBestTrack` (`transcript-lang.ts:58`) | — |
+| Parse WebVTT → `[H:MM:SS] text` | `parseVtt` (`transcript-lang.ts:136`) | — |
+| UI word-count wiring | `content.transcriptWordCount` + `App.tsx:2781` | — |
+| Poster fallback on no-CC | extractor already emits video posters as images (`twitter.ts:461`) | — |
+| Derive syndication token | — | `deriveSyndicationToken` |
+| Dig m3u8 out of syndication JSON | — | `pickVideoM3u8` |
+| Resolve relative twimg URLs | — | `resolveTwimgUrl` |
+| Fetch CORS-blocked syndication JSON | — | small background message |
 
 ## Feasibility (validated end-to-end against tweet `2075240393419936189`)
 
@@ -35,159 +73,177 @@ The full chain works with **no auth and no MAIN-world bridge**:
    `.m3u8` URL (`content_type: application/x-mpegURL`).
 2. `GET` the master `.m3u8` → contains `#EXT-X-MEDIA:TYPE=SUBTITLES,...,URI="..."`
    when captions exist (validated: auto-generated `en-gb` track).
-3. `GET` the subtitle playlist `.m3u8` → `.vtt` segment path(s).
-4. `GET` the `.vtt` → WebVTT with real spoken text wrapped in `<X-word-ms ...>` tags.
+3. `GET` the subtitle playlist `.m3u8` → **a single** `.vtt` segment path covering the
+   whole video (validated: one segment, `EXTINF:9731.11`).
+4. `GET` the `.vtt` → WebVTT with real spoken text wrapped in `<X-word-ms ...>` tags
+   (stripped by the shared `parseVtt`).
 
-The token is derived from the tweet ID (react-tweet algorithm):
+Token derivation (react-tweet algorithm):
 `((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '')`.
-For `2075240393419936189` this yields `513k5q5yoew`, which returns HTTP 200.
+For `2075240393419936189` → `513k5q5yoew` → HTTP 200. Token precision loss from
+`Number()` on 19-digit IDs is inherent to react-tweet and accepted.
 
-### CORS reality (decides where fetches run)
+### CORS reality (why only step 1 needs the background worker)
 
 Observed `Access-Control-Allow-Origin` values:
 
 | Resource | ACAO | Fetchable from x.com content script? |
 | --- | --- | --- |
-| syndication `tweet-result` | `https://platform.twitter.com` | **No** |
-| master / subtitle `.m3u8` | `https://x.com` | Yes |
-| `.vtt` | `*` | Yes |
+| syndication `tweet-result` | `https://platform.twitter.com` | **No** — needs background |
+| master / subtitle `.m3u8` | `https://x.com` | Yes (inline) |
+| `.vtt` | `*` | Yes (inline) |
 
-Because the syndication endpoint excludes `x.com`, the whole chain runs in the
-**background service worker**, which has `<all_urls>` host permission and bypasses
-CORS. This is the only deviation from the YouTube path (which resolves inline); the
-overall marker → resolve → transcript-section pattern is unchanged.
+Only the syndication fetch is CORS-blocked from the content script, so **only that
+step** is delegated to a narrow background message (`FETCH_TWITTER_SYNDICATION`); the
+`.m3u8` and `.vtt` are fetched inline exactly like `cloudflare-stream.ts` does today.
+The background worker has `<all_urls>` host permission (no manifest change).
 
 ## Data flow
 
 ```
-twitter.ts (content script, synchronous DOM parse)
-  Detects a video in the main tweet (direct) / target article (feed).
-  Appends a section:
-      ## Video Transcript
-
-      [Transcript available - fetching...]
-
-      [TWITTER_TRANSCRIPT:<tweetId>]
+content/index.ts : fetchEmbeddedVideoTranscript(doc, url, langPrefs, summaryLang)
+  ... existing branches (CF Stream, Vimeo, Dailymotion, JW, HTML5) ...
+  NEW branch:
+    tweetId = detectTwitterVideo(url, doc)      // null for GIFs / no real video / no id
+    if (tweetId):
+       result = await fetchTwitterVideoTranscript(tweetId, langPrefs, summaryLang)
+       -> { transcript } | { status: 'no-captions' }
         │
-content/index.ts (marker-resolution step, beside YOUTUBE_/NETFLIX_ blocks)
-  Sees [TWITTER_TRANSCRIPT:<id>] → chrome.runtime.sendMessage(FETCH_X_VIDEO_CC)
+fetchTwitterVideoTranscript (src/lib/twitter-video.ts):
+  1. sendMessage FETCH_TWITTER_SYNDICATION { tweetId }   // background, CORS-blocked step
+        background: token = deriveSyndicationToken(id)
+                    GET syndication tweet-result
+                    return pickVideoM3u8(json)  ->  { m3u8Url | null }
+  2. if no m3u8Url  -> { status: 'no-captions' }
+  3. GET master m3u8 (inline)  -> parseHlsSubtitleTracks -> pickBestTrack
+        if no tracks -> { status: 'no-captions' }
+  4. GET subtitle playlist (inline) -> first non-# line -> resolveTwimgUrl
+  5. GET vtt (inline) -> parseVtt  -> { transcript }
         │
-background/index.ts → FETCH_X_VIDEO_CC handler
-  1. token = deriveSyndicationToken(id)
-  2. GET syndication tweet-result → pickVideoM3u8() → master m3u8 URL
-  3. GET master m3u8 → parseMasterPlaylist() → selectSubtitleTrack(langPrefs, summaryLang)
-  4. GET subtitle playlist → parseSubtitlePlaylist() → vtt path(s)
-  5. GET vtt(s) → parseVtt() → clean transcript text
-  returns { transcript: string } | { transcript: null, reason: string }
-        │
-content/index.ts replaces the placeholder + marker with:
-  • transcript text                                   (CC found)
-  • *(Video present; no captions available.)*         (no CC / private / fetch error)
-  Poster thumbnail remains in richImages / thumbnailUrl in all cases.
+content/index.ts call site (single site, ~line 299), discriminated result:
+  • { transcript }        -> set content.transcriptWordCount;
+                             content.content += `\n\n## Transcript\n\n${transcript}`
+  • { status:'no-captions'} -> content.content += `\n\n*(Video present; captions unavailable.)*`
+  • null                  -> nothing (non-X or no video)
 ```
+
+`fetchEmbeddedVideoTranscript`'s return type changes from `string | null` to a
+discriminated `EmbeddedVideoResult = { transcript: string } | { status:
+'no-captions' } | null`. Existing branches keep returning
+transcript-or-null (mapped into the union); only the X branch ever returns
+`{ status: 'no-captions' }`, so other providers' behavior is unchanged.
 
 ## Components / files
 
 ### New
 
-- **`src/lib/twitter/captions.ts`** — pure, network-free functions (independently
-  verifiable):
+- **`src/lib/twitter-video.ts`** (sibling to `cloudflare-stream.ts` et al.):
+  - `detectTwitterVideo(url: string, doc: Document): string | null` — returns the
+    tweet ID iff the focal tweet contains a real video player. Uses `findVideoRoot`
+    (`content/index.ts:320`) to locate the visible tweet's article; requires
+    `[data-testid="videoPlayer"]` (or `videoComponent`) and **excludes**
+    `[data-testid="tweetGif"]`; resolves the tweet ID from the URL (`/status/<id>`)
+    or the article permalink, returning null when no real ID resolves (e.g. `/home`).
+  - `fetchTwitterVideoTranscript(tweetId, langPrefs?, summaryLang?): Promise<{ transcript: string } | { status: 'no-captions' }>` — orchestrates the chain above.
   - `deriveSyndicationToken(id: string): string`
-  - `pickVideoM3u8(syndicationJson: unknown): string | null` — first
-    `mediaDetails` video's `application/x-mpegURL` variant.
-  - `parseMasterPlaylist(text: string): SubtitleTrack[]` — parse
-    `#EXT-X-MEDIA:TYPE=SUBTITLES` lines (`LANGUAGE`, `NAME`, `URI`, `DEFAULT`).
-  - `selectSubtitleTrack(tracks, langPrefs, summaryLang): SubtitleTrack | null` —
-    prefer language match, then `DEFAULT=YES`, then first.
-  - `parseSubtitlePlaylist(text: string): string[]` — `.vtt` segment paths.
-  - `parseVtt(text: string): string` — clean transcript (see VTT parsing below).
-  - `resolveTwimgUrl(base: string, relative: string): string` — resolve relative
-    playlist/segment URIs against `https://video.twimg.com`.
+  - `pickVideoM3u8(syndicationJson: unknown): string | null` — first `mediaDetails`
+    video's `application/x-mpegURL` variant.
+  - `resolveTwimgUrl(relative: string): string` — resolve `/amplify_video/...` paths
+    against `https://video.twimg.com`.
 
 - **`scripts/verify-x-captions.mjs`** — CLI that runs the full chain for a tweet ID
-  and prints the resolved transcript. Manual verification aid (no test framework
-  added — repo has none).
+  and prints the resolved transcript. Manual verification aid (repo has no test
+  runner).
 
 ### Changed
 
-- **`src/lib/extractors/twitter.ts`** — in both `extractDirectTweet` and
-  `extractFeedTweet`, detect a video in the main/target article (a non-quoted
-  `<video>` element), determine the tweet ID (direct: from URL; feed: from the
-  article permalink), and append the `## Video Transcript` marker section. Existing
-  poster/thumbnail handling is unchanged.
-- **`src/entrypoints/background/index.ts`** — add the `FETCH_X_VIDEO_CC` message
-  handler orchestrating the fetch chain via `captions.ts`. Each fetch uses an
-  `AbortController` (~15 s timeout), consistent with `images/fetcher.ts`.
-- **`src/entrypoints/content/index.ts`** — add a `[TWITTER_TRANSCRIPT:` resolution
-  block next to the existing YouTube/Netflix blocks; call the background handler and
-  substitute the result (or the no-CC note).
-- **`src/lib/messaging/types.ts`** — add the `FETCH_X_VIDEO_CC` request/response
-  message shapes.
+- **`src/lib/transcript-lang.ts`**:
+  - Move `parseHlsSubtitleTracks` here from `cloudflare-stream.ts` (now shared by
+    two consumers); update `cloudflare-stream.ts` to import it.
+  - Add HTML-entity decoding to `parseVtt` (`&amp;`, `&#39;`, etc.) — benefits all
+    consumers (YouTube/Vimeo/Dailymotion/CF/X), fixing a pre-existing gap.
+- **`src/entrypoints/content/index.ts`**:
+  - Add the X branch to `fetchEmbeddedVideoTranscript`.
+  - Change its return type to `EmbeddedVideoResult` and update the single call site
+    (~line 299) to handle `{ transcript }`, `{ status: 'no-captions' }`, and `null`.
+- **`src/entrypoints/background/index.ts`** — add the `FETCH_TWITTER_SYNDICATION`
+  handler: derive token, fetch syndication JSON, return `pickVideoM3u8` result.
+  Fetch wrapped in an `AbortController` (~15 s), consistent with `images/fetcher.ts`.
+- **`src/lib/messaging/types.ts`** — add `FETCH_TWITTER_SYNDICATION` /
+  `FETCH_TWITTER_SYNDICATION_RESULT` to the `MessageType` union (line 6) **and** the
+  corresponding interfaces to the `Message` union (line 309).
 
-No manifest change — `host_permissions` is already `<all_urls>`.
+No manifest change — `host_permissions` is already `<all_urls>`. No `twitter.ts`
+extractor change and no `App.tsx` change.
 
-## VTT parsing
+## Detection details
 
-Sample cue from the validated tweet:
+- **GIF exclusion:** X serves animated GIFs as muted looping `<video>` elements, and
+  `extractArticleMedia` (`twitter.ts:486`) already treats them as media. Detection
+  therefore must target the real video-player container
+  (`[data-testid="videoPlayer"]` / `videoComponent`) and exclude
+  `[data-testid="tweetGif"]`, or every GIF tweet would fetch, find no captions, and
+  print the note.
+- **Tweet-ID reliability:** `extractArticlePermalink` (`twitter.ts:294`) falls back
+  to the page URL when no `/status/` link exists (e.g. `/home`). `detectTwitterVideo`
+  returns null unless a real numeric tweet ID resolves, so we never fetch with a
+  bogus ID.
 
-```
-00:00:00.000 --> 00:00:03.799
-<X-word-ms ms=200,300,... index=1 character_ranges=0-5,...>Hello, hello, hello. Yes sorry for being a bit late there's</X-word-ms>
-```
+## VTT parsing & format
 
-`parseVtt`:
-1. Drop the `WEBVTT` header, `NOTE` blocks, blank lines, numeric cue-index lines,
-   and cue-timing lines (`... --> ...`).
-2. Strip **all** `<...>` tags (removes `X-word-ms` wrappers and any `<c>`/`<i>`
-   styling), leaving the text content.
-3. Decode HTML entities (`&amp;`, `&#39;`, etc.).
-4. Trim each line; **dedupe consecutive identical lines** (X rolling captions can
-   repeat a line across cues).
-5. Join into flowing paragraph text.
-
-Expected output prefix for the sample: *"Hello, hello, hello. Yes sorry for being a
-bit late there's a lot of traffic but um hello welcome to AI engineers world
-fair…"*
+- Reuse the shared `parseVtt` → output is `[H:MM:SS] text`, **consistent with every
+  other transcript in the app** (and timestamps are useful for chat refinement).
+- The shared `parseVtt` strips all `<...>` tags (handles `<X-word-ms>`); we add HTML
+  entity decoding to it.
+- **Dedup / rolling captions:** the shared `parseVtt` does no dedup, and X's
+  segmented VTT for a VOD is a **single** `.vtt` file with clean, non-overlapping
+  sequential cues (validated). Rolling/overlapping cues are a live-caption
+  phenomenon not observed here, so we reuse `parseVtt` as-is (no overlap-merge —
+  YAGNI). **Known risk:** if a rolling X VTT is found in the wild, add overlap-aware
+  joining in the shared helper.
 
 ## Track & language selection
 
-`parseMasterPlaylist` yields all subtitle tracks. `selectSubtitleTrack` prefers a
-`LANGUAGE` matching `summaryLang`/`langPrefs`, then `DEFAULT=YES`, then the first
-track. Auto-generated tracks are accepted (the common case).
+Reuse `pickBestTrack`. X ships a single auto-generated caption track in the spoken
+language (no translations), so selection almost always falls through to the first
+track — `pickBestTrack` already handles this. No extra logic.
 
 ## Error handling & edge cases
 
-- **No video in tweet** → no marker emitted; nothing changes.
+- **No video / GIF / unresolved tweet ID** → `detectTwitterVideo` returns null;
+  nothing changes.
 - **No `video_info` / no SUBTITLES track / private or age-gated (syndication
-  403/404)** → handler returns `{ transcript: null, reason }`; content script writes
-  the no-CC note; poster kept.
-- **Token/endpoint drift or any network failure** → same graceful note; never a hard
-  error in the summary.
-- **Fetch timeouts** → per-request `AbortController` (~15 s).
-- **Quoted-tweet video** → out of scope (main tweet's `mediaDetails` only).
+  403/404) / any network failure** → `{ status: 'no-captions' }` → the note is
+  appended; poster is retained (already emitted by the extractor).
+- **Fetch timeouts** → `AbortController` (~15 s) on each request.
 - **Multiple videos** → X allows one video per tweet; use the first.
+- **Per-extraction cost** → one extra background round trip + up to three inline
+  fetches when a video tweet is opened. Acceptable; caching can be added later if
+  needed.
+
+## Naming conventions
+
+Standardize on `twitter` (matches the extractor file/type and the sibling video
+modules): `src/lib/twitter-video.ts`, `detectTwitterVideo`,
+`fetchTwitterVideoTranscript`, `FETCH_TWITTER_SYNDICATION`. No `X_`/`CC` mixing.
 
 ## Verification (matches repo's no-test-runner style)
 
 - `node scripts/verify-x-captions.mjs <tweetId>` prints the resolved transcript
-  (works live against real IDs; the design was validated against
-  `2075240393419936189`).
-- In-extension: `pnpm wxt build` → reload the extension → open the example tweet
-  (has CC) and a caption-less video tweet → confirm the transcript appears in the
-  first and the graceful note in the second → confirm a text-only tweet is
-  unaffected. Test both a direct `/status/` page and a feed.
-
-## Naming conventions
-
-- Marker: `[TWITTER_TRANSCRIPT:<tweetId>]` — consistent with `[YOUTUBE_TRANSCRIPT:…]`
-  and `[NETFLIX_TRANSCRIPT:…]`.
-- Section heading: `## Video Transcript` — distinguishes it from the tweet's own body
-  text (a tweet, unlike a YouTube page, already has prose content).
+  (validated against `2075240393419936189`).
+- In-extension: `pnpm wxt build` → reload → confirm:
+  - captioned video tweet (direct `/status/` **and** in feed) → transcript folded in,
+    `transcriptWordCount` reflected in the UI indicators;
+  - caption-less video tweet → the graceful note, poster retained;
+  - **GIF tweet → no note, no fetch** (regression guard);
+  - text-only tweet → unaffected.
 
 ## Risks
 
 - **Undocumented syndication endpoint / token algorithm** could change. Mitigation:
-  all failures degrade to the no-CC note; a future fallback (MAIN-world bridge using
-  the logged-in session, "Approach B/C") can be added without reworking the pattern.
-- **No private/age-gated/login-only video support** — accepted for MVP; those hit the
-  graceful fallback.
+  every failure degrades to the no-captions note; a future fallback (MAIN-world
+  bridge using the logged-in session) can be added behind the same detector without
+  reworking anything.
+- **No private/age-gated video support** — accepted for MVP; those hit the graceful
+  fallback.
+- **Rolling-VTT assumption** — see VTT section; revisit only if observed.
