@@ -8,7 +8,7 @@ import { getSystemPrompt } from '@/lib/summarizer/prompts';
 import { fetchImages } from '@/lib/images/fetcher';
 import { probeVision } from '@/lib/llm/vision-probe';
 import type { FetchedImage } from '@/lib/images/fetcher';
-import type { Message, ExtractResultMessage, SummaryResultMessage, ChatResponseMessage, ConnectionTestResultMessage, SettingsResultMessage, SaveSettingsResultMessage, NotionDatabasesResultMessage, ExportResultMessage, FetchModelsResultMessage } from '@/lib/messaging/types';
+import type { Message, ExtractResultMessage, SummaryResultMessage, ChatResponseMessage, ConnectionTestResultMessage, SettingsResultMessage, SaveSettingsResultMessage, NotionDatabasesResultMessage, ExportResultMessage, FetchModelsResultMessage, FetchTwitterCaptionsResultMessage } from '@/lib/messaging/types';
 import type { ChatMessage, ImageContent, VisionSupport, LLMProvider, ChatOptions } from '@/lib/llm/types';
 import { RESPONSE_SCHEMA, SCHEMA_ENFORCED_PROVIDERS } from '@/lib/llm/schemas';
 import type { SummaryDocument } from '@/lib/summarizer/types';
@@ -17,6 +17,7 @@ import type { IframeCommentsMessage } from '@/lib/messaging/types';
 import { parseRedditJson, buildRedditMarkdown } from '@/lib/extractors/reddit';
 import { extractText as pdfExtractText, getMeta as pdfGetMeta, extractImages as pdfExtractImages, getDocumentProxy, getResolvedPDFJS } from 'unpdf';
 import { getPersistedTabState, deletePersistedTabState, pruneStaleTabStates } from '@/lib/storage/tab-state';
+import { fetchTwitterVideoTranscript } from '@/lib/twitter-video';
 
 // Persist images across service worker restarts via chrome.storage.session
 const chromeStorage = () => (globalThis as unknown as { chrome: { storage: typeof chrome.storage } }).chrome.storage;
@@ -231,6 +232,8 @@ async function handleMessage(message: Message): Promise<Message> {
       return handleOpenTab((message as import('@/lib/messaging/types').OpenTabMessage).url);
     case 'CLOSE_ONBOARDING_TABS':
       return handleCloseOnboardingTabs();
+    case 'FETCH_TWITTER_CAPTIONS':
+      return handleFetchTwitterCaptions(message.tweetId, message.langPrefs, message.summaryLang);
     default:
       return { type: (message as Message).type, success: false, error: 'Unknown message type' } as Message;
   }
@@ -1406,6 +1409,26 @@ async function handleFetchModels(
   } catch (err) {
     return {
       type: 'FETCH_MODELS_RESULT',
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+async function handleFetchTwitterCaptions(
+  tweetId: string,
+  langPrefs?: string[],
+  summaryLang?: string,
+): Promise<FetchTwitterCaptionsResultMessage> {
+  try {
+    const r = await fetchTwitterVideoTranscript(tweetId, langPrefs, summaryLang);
+    if ('transcript' in r) {
+      return { type: 'FETCH_TWITTER_CAPTIONS_RESULT', success: true, transcript: r.transcript };
+    }
+    return { type: 'FETCH_TWITTER_CAPTIONS_RESULT', success: true, captionStatus: r.status };
+  } catch (err) {
+    return {
+      type: 'FETCH_TWITTER_CAPTIONS_RESULT',
       success: false,
       error: err instanceof Error ? err.message : String(err),
     };
