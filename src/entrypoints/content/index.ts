@@ -451,7 +451,7 @@ function fetchTwitterCaptionsViaBackground(
   langPrefs?: string[],
   summaryLang?: string,
 ): Promise<{ transcript?: string; captionStatus?: 'no-captions' | 'no-video' } | null> {
-  const rt = (globalThis as unknown as { chrome: { runtime: typeof chrome.runtime } }).chrome.runtime;
+  const rt = (globalThis as unknown as { chrome: typeof chrome }).chrome.runtime;
   return new Promise((resolve) => {
     try {
       rt.sendMessage(
