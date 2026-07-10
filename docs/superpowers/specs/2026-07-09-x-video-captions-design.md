@@ -156,8 +156,6 @@ providers' behavior is unchanged.
   - `resolveTwimgUrl(pathOrUrl: string): string`
   - `fetchTwitterVideoTranscript(tweetId, langPrefs?, summaryLang?): Promise<TwitterCaptionResult>`
     where `TwitterCaptionResult = { transcript: string } | { status: 'no-captions' } | { status: 'no-video' }`.
-- **`scripts/verify-x-captions.mjs`** — standalone Node diagnostic that runs the full
-  chain for a tweet ID and prints the transcript (validates the external data source).
 
 ### Changed
 
@@ -223,16 +221,19 @@ Standardize on `twitter` (matches the extractor file/type and sibling video modu
 `src/lib/twitter-video.ts`, `detectTweetVideo`, `fetchTwitterVideoTranscript`,
 `FETCH_TWITTER_CAPTIONS`.
 
-## Verification (matches repo's no-test-runner style)
+## Verification (matches how the other video providers were verified)
 
-- `node scripts/verify-x-captions.mjs <tweetId>` prints the resolved transcript
-  (validated against `2075240393419936189`). Note: Node has no CORS and no DOM, so the
-  diagnostic proves the **data source**, not the CORS bypass (moot — the background
-  bypasses CORS) or DOM detection (validated separately in DevTools).
-- In-extension: `pnpm wxt build` → reload → confirm: captioned video (direct **and**
-  feed) → transcript folded in with `transcriptWordCount` shown; caption-less video →
-  the note, poster retained; **GIF tweet → no note, no fetch artifact**; quoted-video
-  tweet whose own body has no video → no note; text-only tweet → unaffected.
+YouTube, Netflix, Cloudflare Stream, Vimeo, Dailymotion, and JW Player have no
+diagnostic/verification scripts — they are verified via `pnpm wxt build` (tsc
+typecheck) + in-extension manual testing. X captions follow the same pattern (the live
+data source was already validated end-to-end during design):
+
+- `pnpm wxt build` — typecheck/compile gate for every task.
+- DevTools: validate `detectTweetVideo`'s DOM heuristic on live tweets before wiring.
+- In-extension: reload → confirm captioned video (direct **and** feed) → transcript
+  folded in with `transcriptWordCount` shown; caption-less video → the note, poster
+  retained; **GIF tweet → no note**; quoted-video tweet whose own body has no video →
+  no note; text-only tweet → unaffected.
 
 ## Risks
 

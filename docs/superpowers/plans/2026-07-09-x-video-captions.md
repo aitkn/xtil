@@ -6,7 +6,7 @@
 
 **Architecture:** Extend the existing embedded-video transcript framework (`fetchEmbeddedVideoTranscript` in `src/entrypoints/content/index.ts`, which already runs for tweets). Detection reuses the proven helpers already in `src/lib/extractors/twitter.ts` (`<video>`+`pbs.twimg.com` poster, `isInsideQuotedTweet`, `pickMostVisibleArticle`, `findMainArticle`, `extractArticlePermalink`). Because syndication/`.m3u8` CORS blocks content-script fetches, the **entire fetch chain runs in the background service worker** (host permission `<all_urls>` bypasses CORS): tweet ID → syndication `tweet-result` → HLS master `.m3u8` → subtitle playlist → `.vtt` → text, reusing the shared `parseHlsSubtitleTracks`/`pickBestTrack`/`parseVtt`. Video-vs-GIF is decided authoritatively by the syndication `mediaDetails[].type` field, not the DOM.
 
-**Tech Stack:** WXT 0.20.x, Preact, TypeScript (strict), pnpm. Chrome MV3 (service-worker background + content script). No unit-test runner in the repo — verification is `pnpm wxt build` (tsc typecheck gate), a standalone Node diagnostic, and manual in-extension checks.
+**Tech Stack:** WXT 0.20.x, Preact, TypeScript (strict), pnpm. Chrome MV3 (service-worker background + content script). No unit-test runner in the repo — like every other video provider (YouTube, Netflix, Cloudflare, Vimeo, Dailymotion, JW), this feature is verified via `pnpm wxt build` (tsc typecheck gate) + in-extension manual testing. No diagnostic scripts.
 
 ## Global Constraints
 
@@ -14,136 +14,14 @@
 - **No manifest change** — `host_permissions` is already `['<all_urls>']`; background `fetch` to `cdn.syndication.twimg.com` and `video.twimg.com` bypasses CORS. (Content-script fetches would be CORS-blocked — that is why the chain lives in the background.)
 - **Path alias** `@/*` → `src/*` (entrypoints). Library modules under `src/lib/` import each other with **relative, extensionless** specifiers.
 - **After any code change**: `pnpm wxt build` must succeed, then reload the unpacked extension from `.output/chrome-mv3/` before manual testing.
-- **No new dependencies, no test framework.**
+- **No new dependencies, no test framework, no diagnostic scripts** — match the existing video providers exactly.
 - **Naming**: use `twitter` (not `X`/`CC`).
-- **Token algorithm (verbatim):** `((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '')`. For `id = "2075240393419936189"` this must equal `"513k5q5yoew"`.
+- **Token algorithm (verbatim):** `((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '')`. For `id = "2075240393419936189"` this equals `"513k5q5yoew"` (validated live during design).
 - **Video/GIF classification is authoritative from syndication**: `mediaDetails[].type` is `video` / `animated_gif` / `photo`; only `video` has captions. Never rely on DOM test IDs for this.
 
 ---
 
-### Task 1: Standalone live-chain diagnostic script
-
-Proves the external data source + parsing approach end-to-end before touching the extension. Self-contained plain JS (it validates the risky external pipeline; it does not import the extension modules). Node has no CORS/DOM, so this proves the **data source** only — not the CORS bypass (moot; background bypasses CORS) or DOM detection (validated in Task 4).
-
-**Files:**
-- Create: `scripts/verify-x-captions.mjs`
-
-**Interfaces:**
-- Consumes: nothing. Produces: a CLI (`node scripts/verify-x-captions.mjs [tweetId]`).
-
-- [ ] **Step 1: Write the diagnostic script**
-
-```js
-// scripts/verify-x-captions.mjs
-// Standalone diagnostic: exercises the X caption pipeline end-to-end against live
-// syndication + video.twimg.com. Mirrors (does not import) the extension parsing
-// logic so it can run with plain node and validate the external data source.
-
-const DEFAULT_ID = '2075240393419936189';
-const EXPECTED_TOKEN = '513k5q5yoew';
-
-function deriveSyndicationToken(id) {
-  return ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '');
-}
-function pickVideoM3u8(json) {
-  const media = json?.mediaDetails;
-  if (!Array.isArray(media)) return null;
-  for (const m of media) {
-    if (m?.type !== 'video') continue;
-    const variants = m?.video_info?.variants;
-    if (!Array.isArray(variants)) continue;
-    const hls = variants.find(v => v?.content_type === 'application/x-mpegURL' && typeof v?.url === 'string');
-    if (hls) return hls.url;
-  }
-  return null;
-}
-function resolveTwimgUrl(p) {
-  if (/^https?:\/\//.test(p)) return p;
-  return `https://video.twimg.com${p.startsWith('/') ? '' : '/'}${p}`;
-}
-function parseHlsSubtitleTracks(manifest) {
-  const tracks = [];
-  for (const line of manifest.split('\n')) {
-    if (!line.includes('TYPE=SUBTITLES')) continue;
-    const lang = line.match(/LANGUAGE="([^"]+)"/)?.[1];
-    const uri = line.match(/URI="([^"]+)"/)?.[1];
-    if (!lang || !uri || line.includes('FORCED=YES')) continue;
-    tracks.push({ languageCode: lang, uri });
-  }
-  return tracks;
-}
-function decodeEntities(s) {
-  return s
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&');
-}
-function parseVtt(vtt) {
-  const out = [];
-  const cueRe = /(\d{2}:\d{2}:\d{2}\.\d{3})\s+-->\s+\d{2}:\d{2}:\d{2}\.\d{3}/;
-  const lines = vtt.split('\n');
-  let i = 0;
-  while (i < lines.length) {
-    const match = lines[i].match(cueRe);
-    if (match) {
-      i++;
-      const parts = [];
-      while (i < lines.length && lines[i].trim()) { parts.push(lines[i].trim()); i++; }
-      const text = decodeEntities(parts.join(' ').replace(/<[^>]+>/g, '')).trim();
-      if (text) out.push(`[${match[1].slice(0, 8)}] ${text}`);
-    } else { i++; }
-  }
-  return out.join('\n');
-}
-
-async function get(url) {
-  return (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }));
-}
-
-async function main() {
-  const id = process.argv[2] || DEFAULT_ID;
-  const t = deriveSyndicationToken(DEFAULT_ID);
-  console.log(`token(${DEFAULT_ID}) = ${t}  [${t === EXPECTED_TOKEN ? 'PASS' : 'FAIL expected ' + EXPECTED_TOKEN}]`);
-
-  const synRes = await get(`https://cdn.syndication.twimg.com/tweet-result?id=${id}&lang=en&token=${deriveSyndicationToken(id)}`);
-  console.log('syndication:', synRes.status);
-  if (!synRes.ok) return;
-  const json = await synRes.json();
-  console.log('media types:', (json.mediaDetails || []).map(m => m.type).join(', ') || '(none)');
-  const m3u8 = pickVideoM3u8(json);
-  console.log('m3u8:', m3u8 || '(none — not a video)');
-  if (!m3u8) return;
-
-  const master = await (await get(m3u8)).text();
-  const tracks = parseHlsSubtitleTracks(master);
-  console.log('subtitle tracks:', tracks.map(x => x.languageCode).join(', ') || '(none)');
-  if (!tracks.length) { console.log('NO CAPTIONS'); return; }
-
-  const playlist = await (await get(resolveTwimgUrl(tracks[0].uri))).text();
-  const vttRel = playlist.split('\n').find(l => l.trim() && !l.startsWith('#'));
-  const vtt = await (await get(resolveTwimgUrl(vttRel.trim()))).text();
-  console.log('\n--- TRANSCRIPT ---\n' + parseVtt(vtt).slice(0, 1200));
-}
-main().catch(err => { console.error('ERROR:', err); process.exit(1); });
-```
-
-- [ ] **Step 2: Run it — expect the token PASS and a real transcript**
-
-Run: `node scripts/verify-x-captions.mjs`
-Expected: `token(2075240393419936189) = 513k5q5yoew  [PASS]`, `syndication: 200`, `media types: video`, an m3u8 URL, `subtitle tracks: en-gb`, and a transcript starting `[00:00:00] Hello, hello, hello. Yes sorry for being a bit late there's ...`
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add scripts/verify-x-captions.mjs
-git commit -m "feat: add X video caption pipeline diagnostic script"
-```
-
----
-
-### Task 2: Share `parseHlsSubtitleTracks` and add entity decoding to `parseVtt`
+### Task 1: Share `parseHlsSubtitleTracks` and add entity decoding to `parseVtt`
 
 Move the generic HLS subtitle parser into the shared module (about to gain a second consumer) and fix the pre-existing HTML-entity gap in `parseVtt` (benefits YouTube/Vimeo/Dailymotion/CF/X).
 
@@ -240,7 +118,7 @@ git commit -m "refactor: share parseHlsSubtitleTracks and add entity decoding to
 
 ---
 
-### Task 3: `twitter-video.ts` background orchestrator + pure helpers
+### Task 2: `twitter-video.ts` background orchestrator + pure helpers
 
 DOM-free module (safe to import in the service worker). Resolves a tweet ID to a transcript, with bounded fetches and syndication-based video/GIF classification.
 
@@ -248,7 +126,7 @@ DOM-free module (safe to import in the service worker). Resolves a tweet ID to a
 - Create: `src/lib/twitter-video.ts`
 
 **Interfaces:**
-- Consumes: `parseHlsSubtitleTracks`, `pickBestTrack`, `parseVtt` from `./transcript-lang` (Task 2).
+- Consumes: `parseHlsSubtitleTracks`, `pickBestTrack`, `parseVtt` from `./transcript-lang` (Task 1).
 - Produces:
   - `type TwitterCaptionResult = { transcript: string } | { status: 'no-captions' } | { status: 'no-video' }`
   - `deriveSyndicationToken(id: string): string`
@@ -366,12 +244,7 @@ export async function fetchTwitterVideoTranscript(
 Run: `pnpm wxt build`
 Expected: no TypeScript errors.
 
-- [ ] **Step 3: Cross-check the token against the diagnostic**
-
-Run: `node scripts/verify-x-captions.mjs`
-Expected: still prints `token(...) = 513k5q5yoew  [PASS]` (same one-line algorithm — confirms module and diagnostic agree).
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add src/lib/twitter-video.ts
@@ -380,7 +253,7 @@ git commit -m "feat: add twitter-video background orchestrator (syndication -> c
 
 ---
 
-### Task 4: `detectTweetVideo` in `twitter.ts` (reuse proven helpers) + DevTools validation
+### Task 3: `detectTweetVideo` in `twitter.ts` (reuse proven helpers) + DevTools validation
 
 Adds detection to the extractor, reusing its existing media/visibility/permalink/quoted-tweet helpers. Validated live in DevTools **before** it is wired in, so a wrong assumption surfaces here, not at the end.
 
@@ -467,7 +340,7 @@ git commit -m "feat: detect a tweet's own (non-quoted) native video"
 
 ---
 
-### Task 5: Add the caption message types
+### Task 4: Add the caption message types
 
 **Files:**
 - Modify: `src/lib/messaging/types.ts` (`MessageType` union ~line 44; two interfaces near `FetchImagesMessage` ~line 217; `Message` union ~line 347)
@@ -525,13 +398,13 @@ git commit -m "feat: add FETCH_TWITTER_CAPTIONS message types"
 
 ---
 
-### Task 6: Background handler
+### Task 5: Background handler
 
 **Files:**
 - Modify: `src/entrypoints/background/index.ts` (import; `case` in `handleMessage` switch before `default:` at ~line 234; handler near `handleFetchModels` ~line 1398)
 
 **Interfaces:**
-- Consumes: `fetchTwitterVideoTranscript` (Task 3); `FetchTwitterCaptionsResultMessage` (Task 5).
+- Consumes: `fetchTwitterVideoTranscript` (Task 2); `FetchTwitterCaptionsResultMessage` (Task 4).
 
 - [ ] **Step 1: Import the orchestrator + result type**
 
@@ -593,7 +466,7 @@ git commit -m "feat: add background handler for X video captions"
 
 ---
 
-### Task 7: Refactor `fetchEmbeddedVideoTranscript` to a discriminated return (no behavior change)
+### Task 6: Refactor `fetchEmbeddedVideoTranscript` to a discriminated return (no behavior change)
 
 Lets the single call site distinguish "found a transcript" from "found a video but no captions". No X code yet; existing providers behave identically.
 
@@ -677,13 +550,13 @@ git commit -m "refactor: discriminated result for embedded video transcript"
 
 ---
 
-### Task 8: Wire the X branch (the feature)
+### Task 7: Wire the X branch (the feature)
 
 **Files:**
 - Modify: `src/entrypoints/content/index.ts` (import; module-level `sendMessage` helper; new branch in `fetchEmbeddedVideoTranscript` before the generic HTML5 branch, ~line 387)
 
 **Interfaces:**
-- Consumes: `detectTweetVideo` (Task 4); `FETCH_TWITTER_CAPTIONS` handler (Task 6); `EmbeddedVideoResult` (Task 7).
+- Consumes: `detectTweetVideo` (Task 3); `FETCH_TWITTER_CAPTIONS` handler (Task 5); `EmbeddedVideoResult` (Task 6).
 
 - [ ] **Step 1: Import the detector**
 
@@ -754,7 +627,7 @@ git commit -m "feat: summarize X video closed captions"
 
 ---
 
-### Task 9: Verification matrix + changelog
+### Task 8: Verification matrix + changelog
 
 **Files:**
 - Modify: `CHANGELOG.md`
@@ -772,7 +645,7 @@ Build (`pnpm wxt build`), reload, and confirm each case:
 | Quoted video only | a tweet quoting a video tweet, own body no video | **no note** |
 | Text-only tweet | any text tweet | unchanged |
 
-If a case misbehaves, re-run the Task 4 DevTools snippet on that tweet to see whether detection or the background classification is at fault.
+If a case misbehaves, re-run the Task 3 DevTools snippet on that tweet to see whether detection or the background classification is at fault.
 
 - [ ] **Step 2: Add a changelog entry**
 
@@ -794,9 +667,10 @@ git commit -m "docs: changelog entry for X video captions"
 
 ## Notes for the implementer
 
-- **Live-data dependency:** Tasks 1, 3-cross-check, 8, and 9 hit the live syndication CDN + `video.twimg.com`. Without network, the diagnostic/manual steps can't run; the build gate still applies.
+- **Live-data dependency:** Tasks 3, 7, and 8 hit the live syndication CDN + `video.twimg.com` (via the extension/DevTools). Without network, the manual steps can't run; the build gate still applies.
 - **All fetches are in the background** (service worker), which bypasses CORS via `<all_urls>`. Do **not** move any of the syndication/`.m3u8`/`.vtt` fetches into the content script — syndication (`ACAO: platform.twitter.com`) and the `.m3u8` on a `twitter.com`-origin page would be CORS-blocked.
 - **Video vs GIF is decided by syndication** (`mediaDetails[].type`), not the DOM. Detection (`detectTweetVideo`) may return an ID for a GIF; the background returns `no-video` and the content branch shows nothing.
 - **Format:** transcripts use the shared `parseVtt` `[H:MM:SS] text` format. No dedup/overlap-merge (X VOD VTTs are single, non-rolling segments — see spec Risks).
 - **One video per tweet** (X constraint) — `pickVideoM3u8` returns the first `type === 'video'` variant.
+- **Verification matches the other video providers:** `pnpm wxt build` + in-extension manual testing. No unit tests, no diagnostic scripts.
 ```
