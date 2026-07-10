@@ -4,6 +4,13 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## Unreleased
+
+**Summarize the spoken content of X (Twitter) videos**
+
+- When a tweet has a captioned video, xTil now pulls the video's closed-caption transcript into the summary — so the summary reflects what's actually said in the clip, not just the tweet's text. Works on both direct tweet pages and your feed.
+- Videos without captions show a brief "captions unavailable" note (the poster image is still included), and animated GIFs are ignored.
+
 ## 1.2.12
 
 **GitHub release pages summarize again + Claude Opus 4.8**

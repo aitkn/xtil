@@ -2,6 +2,7 @@ import type { ExtractedContent, ExtractedComment } from '../extractors/types';
 import type { SummaryDocument } from '../summarizer/types';
 import type { ChatMessage, ModelInfo, VisionSupport } from '../llm/types';
 import type { Settings } from '../storage/types';
+import type { TweetMeta } from '../twitter-video';
 
 export type MessageType =
   | 'EXTRACT_CONTENT'
@@ -27,6 +28,8 @@ export type MessageType =
   | 'FETCH_MODELS_RESULT'
   | 'FETCH_IMAGES'
   | 'FETCH_IMAGES_RESULT'
+  | 'FETCH_TWITTER_CAPTIONS'
+  | 'FETCH_TWITTER_CAPTIONS_RESULT'
   | 'PROBE_VISION'
   | 'PROBE_VISION_RESULT'
   | 'CHECK_NOTION_DUPLICATE'
@@ -225,6 +228,24 @@ export interface FetchImagesResultMessage {
   error?: string;
 }
 
+export interface FetchTwitterCaptionsMessage {
+  type: 'FETCH_TWITTER_CAPTIONS';
+  tweetId: string;
+  langPrefs?: string[];
+  summaryLang?: string;
+}
+
+export interface FetchTwitterCaptionsResultMessage {
+  type: 'FETCH_TWITTER_CAPTIONS_RESULT';
+  success: boolean;
+  transcript?: string;
+  /** Present when there is no transcript: 'no-captions' -> note; 'no-video' -> nothing. */
+  captionStatus?: 'no-captions' | 'no-video';
+  /** Tweet body from syndication — used to summarize when the DOM <article> is absent. */
+  tweet?: TweetMeta;
+  error?: string;
+}
+
 // Unsaved credentials passed in message — user may be testing a new provider
 // config in Settings before saving. Falls back to saved settings if omitted.
 export interface ProbeVisionMessage {
@@ -330,6 +351,8 @@ export type Message =
   | FetchModelsResultMessage
   | FetchImagesMessage
   | FetchImagesResultMessage
+  | FetchTwitterCaptionsMessage
+  | FetchTwitterCaptionsResultMessage
   | ProbeVisionMessage
   | ProbeVisionResultMessage
   | CheckNotionDuplicateMessage

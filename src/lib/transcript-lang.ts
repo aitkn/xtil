@@ -130,6 +130,26 @@ function formatSubTimestamp(ts: string): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+};
+
+/** Decode the HTML entities commonly seen in caption text (single pass — no double-decode). */
+function decodeEntities(s: string): string {
+  return s.replace(/&(#\d+|#[xX][0-9a-fA-F]+|[a-zA-Z]+);/g, (m, body) => {
+    if (body[0] === '#') {
+      const code = body[1] === 'x' || body[1] === 'X'
+        ? parseInt(body.slice(2), 16)
+        : parseInt(body.slice(1), 10);
+      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff
+        ? String.fromCodePoint(code)
+        : m;
+    }
+    const named = NAMED_ENTITIES[body.toLowerCase()];
+    return named !== undefined ? named : m;
+  });
+}
+
 /**
  * Parse WebVTT into timestamped text lines: [H:MM:SS] text
  */
@@ -148,7 +168,7 @@ export function parseVtt(vtt: string): string {
         textParts.push(vttLines[i].trim());
         i++;
       }
-      const text = textParts.join(' ').replace(/<[^>]+>/g, '').trim();
+      const text = decodeEntities(textParts.join(' ').replace(/<[^>]+>/g, '')).trim();
       if (text) {
         lines.push(`[${formatSubTimestamp(match[1])}] ${text}`);
       }
@@ -178,7 +198,7 @@ export function parseSrt(srt: string): string {
         textParts.push(srtLines[i].trim());
         i++;
       }
-      const text = textParts.join(' ').replace(/<[^>]+>/g, '').trim();
+      const text = decodeEntities(textParts.join(' ').replace(/<[^>]+>/g, '')).trim();
       if (text) {
         lines.push(`[${formatSubTimestamp(match[1])}] ${text}`);
       }
@@ -187,4 +207,26 @@ export function parseSrt(srt: string): string {
     }
   }
   return lines.join('\n');
+}
+
+/**
+ * Parse #EXT-X-MEDIA:TYPE=SUBTITLES entries from an HLS master manifest.
+ * Shared by Cloudflare Stream and X/Twitter video.
+ */
+export function parseHlsSubtitleTracks(manifest: string): CaptionTrack[] {
+  const tracks: CaptionTrack[] = [];
+  for (const line of manifest.split('\n')) {
+    if (!line.includes('TYPE=SUBTITLES')) continue;
+    const lang = line.match(/LANGUAGE="([^"]+)"/)?.[1];
+    const name = line.match(/NAME="([^"]+)"/)?.[1];
+    const uri = line.match(/URI="([^"]+)"/)?.[1];
+    const isForced = line.includes('FORCED=YES');
+    if (!lang || !uri || isForced) continue;
+    tracks.push({
+      baseUrl: uri,
+      languageCode: lang,
+      name: name ? { simpleText: name } : undefined,
+    });
+  }
+  return tracks;
 }

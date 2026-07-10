@@ -814,6 +814,15 @@ export function App() {
           return;
         }
 
+        // Don't let an empty re-extraction clobber good content for the same URL.
+        // X's fullscreen /video/ viewer intermittently drops the tweet <article>
+        // from the DOM, so a re-extraction can momentarily come back with 0 words.
+        const prevGuard = contentRef.current;
+        if (prevGuard && prevGuard.url === response.data.url
+            && (response.data.wordCount ?? 0) === 0 && (prevGuard.wordCount ?? 0) > 0) {
+          return;
+        }
+
         // Quiet mode: skip update if content hasn't meaningfully changed
         if (quiet) {
           const prev = contentRef.current;

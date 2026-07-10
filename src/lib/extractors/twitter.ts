@@ -33,6 +33,48 @@ export const twitterExtractor: ContentExtractor = {
   },
 };
 
+/**
+ * Detect whether the focal tweet has its OWN (non-quoted) native video, and if so
+ * return the tweet ID. Reuses the extractor's proven media/visibility/permalink
+ * helpers. Returns null for text tweets, quoted-only videos, or when no numeric
+ * tweet ID resolves (e.g. /home).
+ *
+ * NOTE: X renders animated GIFs as <video> too, so this may return an ID for a GIF.
+ * The background classifies GIFs as no-video via the syndication `type` field, so a
+ * GIF never produces a note.
+ */
+export function detectTweetVideo(doc: Document, url: string): string | null {
+  // Fullscreen immersive viewer (/status/<id>/video/<n>) removes the tweet <article>
+  // from the DOM, so DOM-based detection can't fire. The URL itself is a reliable
+  // signal that this tweet has a video — the background confirms via syndication.
+  const videoRoute = url.match(/\/status\/(\d+)\/video\/\d+/);
+  if (videoRoute) return videoRoute[1];
+
+  const articles = doc.querySelectorAll('article');
+  if (articles.length === 0) return null;
+
+  const urlMatch = url.match(TWITTER_STATUS_RE);
+  if (urlMatch) {
+    // Direct tweet: the main tweet is the one authored by the URL's handle.
+    const mainArticle = findMainArticle(articles, urlMatch[1]);
+    return mainArticle && articleHasOwnVideo(mainArticle) ? urlMatch[2] : null;
+  }
+
+  // Feed: the most-visible article.
+  const article = pickMostVisibleArticle(Array.from(articles));
+  if (!articleHasOwnVideo(article)) return null;
+  return extractArticlePermalink(article, url).match(/\/status\/(\d+)/)?.[1] ?? null;
+}
+
+/** True iff the article has its own (non-quoted) <video> with a real media poster. */
+function articleHasOwnVideo(article: Element): boolean {
+  for (const video of article.querySelectorAll('video')) {
+    if (isInsideQuotedTweet(video, article)) continue;
+    if ((video.poster || '').includes('pbs.twimg.com')) return true;
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Direct tweet extraction (existing /status/ URL logic)
 // ---------------------------------------------------------------------------
