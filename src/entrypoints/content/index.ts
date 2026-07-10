@@ -10,6 +10,7 @@ import { detectDailymotionVideo, fetchDailymotionTranscript } from '@/lib/dailym
 import { detectHTML5VideoWithTracks, fetchHTML5VideoTranscript } from '@/lib/html5-video';
 import { detectJwPlayer, fetchJwPlayerTranscript } from '@/lib/jwplayer';
 import { detectTweetVideo } from '@/lib/extractors/twitter';
+import type { TweetMeta } from '@/lib/twitter-video';
 import { parseTTML } from '@/lib/netflix';
 
 export default defineContentScript({
@@ -299,16 +300,41 @@ async function extractAndResolve(langPrefs?: string[], summaryLang?: string, rea
   if (content.type !== 'youtube' && content.type !== 'netflix') {
     const result = await fetchEmbeddedVideoTranscript(document, window.location.href, langPrefs, summaryLang);
     if (result && 'transcript' in result) {
+      seedTweetFromSyndication(content, result.tweet);
       content.transcriptWordCount = result.transcript.split(/\s+/).filter(Boolean).length;
       content.content += `\n\n## Transcript\n\n${result.transcript}`;
       content.wordCount = content.content.split(/\s+/).filter(Boolean).length;
     } else if (result && result.status === 'no-captions') {
+      seedTweetFromSyndication(content, result.tweet);
       content.content += `\n\n*(Video present; captions unavailable.)*`;
       content.wordCount = content.content.split(/\s+/).filter(Boolean).length;
     }
   }
 
   return content;
+}
+
+/**
+ * When the tweet's <article> is absent from the DOM (X's fullscreen /video/ viewer),
+ * the extractor yields empty content. Seed it from the syndication tweet body so the
+ * summary still has the tweet text, author, and poster. No-op when the DOM already
+ * produced content.
+ */
+function seedTweetFromSyndication(content: ExtractedContent, tweet?: TweetMeta): void {
+  if (!tweet) return;
+  const domEmpty = content.wordCount === 0 || content.content.trim().length === 0;
+  if (!domEmpty) return;
+
+  const header = tweet.author
+    ? `# ${tweet.author}${tweet.handle ? ` (@${tweet.handle})` : ''}`
+    : '';
+  content.content = [header, '', tweet.text].filter((l) => l !== undefined).join('\n').trim();
+  if (tweet.text) {
+    content.title = tweet.text.slice(0, 120).trim() + (tweet.text.length > 120 ? '...' : '');
+  }
+  if (tweet.author && !content.author) content.author = tweet.author;
+  if (tweet.posterUrl && !content.thumbnailUrl) content.thumbnailUrl = tweet.posterUrl;
+  content.wordCount = content.content.split(/\s+/).filter(Boolean).length;
 }
 
 /**
@@ -346,7 +372,10 @@ function findVideoRoot(doc: Document, _url: string): Document | Element {
  * Checks: Cloudflare Stream, Vimeo, Dailymotion, then generic HTML5 <video>.
  * Returns null if no supported video or no captions found.
  */
-type EmbeddedVideoResult = { transcript: string } | { status: 'no-captions' } | null;
+type EmbeddedVideoResult =
+  | { transcript: string; tweet?: TweetMeta }
+  | { status: 'no-captions'; tweet?: TweetMeta }
+  | null;
 
 async function fetchEmbeddedVideoTranscript(
   doc: Document,
@@ -394,8 +423,8 @@ async function fetchEmbeddedVideoTranscript(
   const twitterId = detectTweetVideo(doc, url);
   if (twitterId) {
     const r = await fetchTwitterCaptionsViaBackground(twitterId, langPrefs, summaryLang);
-    if (r?.transcript) return { transcript: r.transcript };
-    if (r?.captionStatus === 'no-captions') return { status: 'no-captions' };
+    if (r?.transcript) return { transcript: r.transcript, tweet: r.tweet };
+    if (r?.captionStatus === 'no-captions') return { status: 'no-captions', tweet: r.tweet };
     // no-video / null -> fall through (no note)
   }
 
@@ -450,7 +479,7 @@ function fetchTwitterCaptionsViaBackground(
   tweetId: string,
   langPrefs?: string[],
   summaryLang?: string,
-): Promise<{ transcript?: string; captionStatus?: 'no-captions' | 'no-video' } | null> {
+): Promise<{ transcript?: string; captionStatus?: 'no-captions' | 'no-video'; tweet?: TweetMeta } | null> {
   const rt = (globalThis as unknown as { chrome: typeof chrome }).chrome.runtime;
   return new Promise((resolve) => {
     try {
@@ -458,8 +487,8 @@ function fetchTwitterCaptionsViaBackground(
         { type: 'FETCH_TWITTER_CAPTIONS', tweetId, langPrefs, summaryLang },
         (resp: unknown) => {
           if (rt.lastError) { resolve(null); return; }
-          const r = resp as { success?: boolean; transcript?: string; captionStatus?: 'no-captions' | 'no-video' } | undefined;
-          resolve(r?.success ? { transcript: r.transcript, captionStatus: r.captionStatus } : null);
+          const r = resp as { success?: boolean; transcript?: string; captionStatus?: 'no-captions' | 'no-video'; tweet?: TweetMeta } | undefined;
+          resolve(r?.success ? { transcript: r.transcript, captionStatus: r.captionStatus, tweet: r.tweet } : null);
         },
       );
     } catch { resolve(null); }

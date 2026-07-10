@@ -2,6 +2,7 @@ import type { ExtractedContent, ExtractedComment } from '../extractors/types';
 import type { SummaryDocument } from '../summarizer/types';
 import type { ChatMessage, ModelInfo, VisionSupport } from '../llm/types';
 import type { Settings } from '../storage/types';
+import type { TweetMeta } from '../twitter-video';
 
 export type MessageType =
   | 'EXTRACT_CONTENT'
@@ -240,6 +241,8 @@ export interface FetchTwitterCaptionsResultMessage {
   transcript?: string;
   /** Present when there is no transcript: 'no-captions' -> note; 'no-video' -> nothing. */
   captionStatus?: 'no-captions' | 'no-video';
+  /** Tweet body from syndication — used to summarize when the DOM <article> is absent. */
+  tweet?: TweetMeta;
   error?: string;
 }
 

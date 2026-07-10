@@ -1423,9 +1423,9 @@ async function handleFetchTwitterCaptions(
   try {
     const r = await fetchTwitterVideoTranscript(tweetId, langPrefs, summaryLang);
     if ('transcript' in r) {
-      return { type: 'FETCH_TWITTER_CAPTIONS_RESULT', success: true, transcript: r.transcript };
+      return { type: 'FETCH_TWITTER_CAPTIONS_RESULT', success: true, transcript: r.transcript, tweet: r.tweet ?? undefined };
     }
-    return { type: 'FETCH_TWITTER_CAPTIONS_RESULT', success: true, captionStatus: r.status };
+    return { type: 'FETCH_TWITTER_CAPTIONS_RESULT', success: true, captionStatus: r.status, tweet: r.tweet ?? undefined };
   } catch (err) {
     return {
       type: 'FETCH_TWITTER_CAPTIONS_RESULT',

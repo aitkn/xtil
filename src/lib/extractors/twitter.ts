@@ -44,6 +44,12 @@ export const twitterExtractor: ContentExtractor = {
  * GIF never produces a note.
  */
 export function detectTweetVideo(doc: Document, url: string): string | null {
+  // Fullscreen immersive viewer (/status/<id>/video/<n>) removes the tweet <article>
+  // from the DOM, so DOM-based detection can't fire. The URL itself is a reliable
+  // signal that this tweet has a video — the background confirms via syndication.
+  const videoRoute = url.match(/\/status\/(\d+)\/video\/\d+/);
+  if (videoRoute) return videoRoute[1];
+
   const articles = doc.querySelectorAll('article');
   if (articles.length === 0) return null;
 
