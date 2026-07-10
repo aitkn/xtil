@@ -64,7 +64,7 @@ export function detectTweetVideo(doc: Document, url: string): string | null {
 function articleHasOwnVideo(article: Element): boolean {
   for (const video of article.querySelectorAll('video')) {
     if (isInsideQuotedTweet(video, article)) continue;
-    if (((video as HTMLVideoElement).poster || '').includes('pbs.twimg.com')) return true;
+    if ((video.poster || '').includes('pbs.twimg.com')) return true;
   }
   return false;
 }

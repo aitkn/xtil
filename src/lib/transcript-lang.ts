@@ -136,12 +136,14 @@ const NAMED_ENTITIES: Record<string, string> = {
 
 /** Decode the HTML entities commonly seen in caption text (single pass — no double-decode). */
 function decodeEntities(s: string): string {
-  return s.replace(/&(#\d+|#x[0-9a-fA-F]+|[a-zA-Z]+);/g, (m, body) => {
+  return s.replace(/&(#\d+|#[xX][0-9a-fA-F]+|[a-zA-Z]+);/g, (m, body) => {
     if (body[0] === '#') {
       const code = body[1] === 'x' || body[1] === 'X'
         ? parseInt(body.slice(2), 16)
         : parseInt(body.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff
+        ? String.fromCodePoint(code)
+        : m;
     }
     const named = NAMED_ENTITIES[body.toLowerCase()];
     return named !== undefined ? named : m;
