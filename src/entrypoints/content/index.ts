@@ -9,6 +9,7 @@ import { detectVimeoVideo, fetchVimeoTranscript } from '@/lib/vimeo';
 import { detectDailymotionVideo, fetchDailymotionTranscript } from '@/lib/dailymotion';
 import { detectHTML5VideoWithTracks, fetchHTML5VideoTranscript } from '@/lib/html5-video';
 import { detectJwPlayer, fetchJwPlayerTranscript } from '@/lib/jwplayer';
+import { detectTweetVideo } from '@/lib/extractors/twitter';
 import { parseTTML } from '@/lib/netflix';
 
 export default defineContentScript({
@@ -389,6 +390,15 @@ async function fetchEmbeddedVideoTranscript(
     } catch { /* fall through */ }
   }
 
+  // X / Twitter native video (HLS captions via the syndication CDN, resolved in the background)
+  const twitterId = detectTweetVideo(doc, url);
+  if (twitterId) {
+    const r = await fetchTwitterCaptionsViaBackground(twitterId, langPrefs, summaryLang);
+    if (r?.transcript) return { transcript: r.transcript };
+    if (r?.captionStatus === 'no-captions') return { status: 'no-captions' };
+    // no-video / null -> fall through (no note)
+  }
+
   // Generic HTML5 <video> with <track> elements (last — catches everything else)
   // On X/Twitter, scope to the focal tweet's article to avoid picking up other videos
   const videoRoot = findVideoRoot(doc, url);
@@ -432,6 +442,27 @@ function bridgeRequest<T>(
 
     window.addEventListener('message', handler);
     window.postMessage({ type: requestType, requestId, ...payload }, window.location.origin);
+  });
+}
+
+/** Ask the background worker to resolve a tweet's video captions (all fetches are CORS-blocked from content). */
+function fetchTwitterCaptionsViaBackground(
+  tweetId: string,
+  langPrefs?: string[],
+  summaryLang?: string,
+): Promise<{ transcript?: string; captionStatus?: 'no-captions' | 'no-video' } | null> {
+  const rt = (globalThis as unknown as { chrome: { runtime: typeof chrome.runtime } }).chrome.runtime;
+  return new Promise((resolve) => {
+    try {
+      rt.sendMessage(
+        { type: 'FETCH_TWITTER_CAPTIONS', tweetId, langPrefs, summaryLang },
+        (resp: unknown) => {
+          if (rt.lastError) { resolve(null); return; }
+          const r = resp as { success?: boolean; transcript?: string; captionStatus?: 'no-captions' | 'no-video' } | undefined;
+          resolve(r?.success ? { transcript: r.transcript, captionStatus: r.captionStatus } : null);
+        },
+      );
+    } catch { resolve(null); }
   });
 }
 
