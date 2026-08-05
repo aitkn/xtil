@@ -3,6 +3,7 @@ node_modules/
 .wxt/
 .claude/*
 !.claude/skills/
+!.claude/commands/
 *.log
 .env
 .playwright-user-data/
