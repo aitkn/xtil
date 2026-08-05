@@ -31,8 +31,10 @@ export class AnthropicProvider implements LLMProvider {
       model: this.config.model,
       messages: userMessages,
       max_tokens: options?.maxTokens ?? 4096,
-      temperature: options?.temperature ?? 0.3,
     };
+    // Current Claude models reject `temperature` outright (HTTP 400), so only
+    // send it when a caller explicitly asks for one — never as a default.
+    if (options?.temperature !== undefined) body.temperature = options.temperature;
     if (system) body.system = system;
 
     // Use tool_use to enforce JSON schema when provided
@@ -95,16 +97,14 @@ export class AnthropicProvider implements LLMProvider {
         }
       }
 
-      // Web search responses have multiple text blocks (reasoning + answer);
-      // concatenate all of them instead of taking only the first.
-      if (options?.webSearch) {
-        return (data.content || [])
-          .filter((b: Record<string, unknown>) => b.type === 'text')
-          .map((b: Record<string, unknown>) => b.text)
-          .join('') || '';
-      }
-
-      return data.content?.[0]?.text || '';
+      // Never index content[0] — it isn't reliably the text block. Web search
+      // splits the answer across several text blocks, and on models that think
+      // by default (Sonnet 5, Opus 5) content leads with a `thinking` block,
+      // which is present even when its text is omitted. Filter and concatenate.
+      return (data.content || [])
+        .filter((b: Record<string, unknown>) => b.type === 'text')
+        .map((b: Record<string, unknown>) => b.text)
+        .join('') || '';
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         if (options?.signal?.aborted) throw new Error('Summarization cancelled');
@@ -127,9 +127,10 @@ export class AnthropicProvider implements LLMProvider {
       model: this.config.model,
       messages: userMessages,
       max_tokens: options?.maxTokens ?? 4096,
-      temperature: options?.temperature ?? 0.3,
       stream: true,
     };
+    // See sendChat: `temperature` is opt-in only — current models 400 on it.
+    if (options?.temperature !== undefined) body.temperature = options.temperature;
     if (system) body.system = system;
 
     // Server-side web search — Claude decides when to search; results stream
