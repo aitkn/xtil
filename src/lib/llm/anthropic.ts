@@ -31,8 +31,10 @@ export class AnthropicProvider implements LLMProvider {
       model: this.config.model,
       messages: userMessages,
       max_tokens: options?.maxTokens ?? 4096,
-      temperature: options?.temperature ?? 0.3,
     };
+    // Current Claude models reject `temperature` outright (HTTP 400), so only
+    // send it when a caller explicitly asks for one — never as a default.
+    if (options?.temperature !== undefined) body.temperature = options.temperature;
     if (system) body.system = system;
 
     // Use tool_use to enforce JSON schema when provided
@@ -127,9 +129,10 @@ export class AnthropicProvider implements LLMProvider {
       model: this.config.model,
       messages: userMessages,
       max_tokens: options?.maxTokens ?? 4096,
-      temperature: options?.temperature ?? 0.3,
       stream: true,
     };
+    // See sendChat: `temperature` is opt-in only — current models 400 on it.
+    if (options?.temperature !== undefined) body.temperature = options.temperature;
     if (system) body.system = system;
 
     // Server-side web search — Claude decides when to search; results stream
