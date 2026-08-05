@@ -4,6 +4,14 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.14
+
+**Newer Claude models work again, and Claude Opus 5 joins the lineup**
+
+- Fixed Claude models — including Claude Sonnet 5, the default — failing with an API error instead of summarizing. xTil was sending a setting the newest Claude models no longer accept, which broke every summary on those models.
+- Made xTil more robust at reading answers from Claude models that reason before replying, so a summary or page-type detection can't come back empty.
+- Added **Claude Opus 5**, replacing Opus 4.8 at the same price, with a 1M-token context window.
+
 ## 1.2.13
 
 **Summarize what's said in X (Twitter) videos + newer models**

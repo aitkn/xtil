@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-07-10T07:01:09.082Z",
+  "_generated": "2026-08-05T19:31:52.160Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -42,7 +42,8 @@
           "inputPrice": 10,
           "outputPrice": 50,
           "vision": true,
-          "reasoning": true
+          "reasoning": false,
+          "webSearch": false
         },
         "claude-haiku-4-5-20251001": {
           "name": "Claude Haiku 4.5",
@@ -51,8 +52,8 @@
           "inputPrice": 1,
           "outputPrice": 5,
           "vision": true,
-          "reasoning": true,
-          "webSearch": true
+          "reasoning": false,
+          "webSearch": false
         },
         "claude-mythos-5": {
           "name": "Claude Mythos 5",
@@ -61,16 +62,14 @@
           "inputPrice": 10,
           "outputPrice": 50,
           "vision": true,
-          "reasoning": true
+          "reasoning": false,
+          "webSearch": false
         },
         "claude-mythos-preview": {
           "name": "Claude Mythos Preview",
-          "contextWindow": 1000000,
-          "maxOutput": 128000,
-          "inputPrice": 10,
-          "outputPrice": 50,
           "vision": true,
-          "reasoning": true
+          "reasoning": false,
+          "webSearch": false
         },
         "claude-opus-4-1-20250805": {
           "name": "Claude Opus 4.1",
@@ -109,12 +108,17 @@
         },
         "claude-opus-4-8": {
           "name": "Claude Opus 4.8",
+          "reasoning": true,
+          "webSearch": false
+        },
+        "claude-opus-5": {
+          "name": "Claude Opus 5",
           "contextWindow": 1000000,
           "maxOutput": 128000,
           "inputPrice": 5,
           "outputPrice": 25,
           "vision": true,
-          "reasoning": true,
+          "reasoning": false,
           "webSearch": false
         },
         "claude-sonnet-4-20250514": {
@@ -139,9 +143,7 @@
           "maxOutput": 64000,
           "inputPrice": 3,
           "outputPrice": 15,
-          "vision": true,
-          "reasoning": true,
-          "webSearch": true
+          "vision": true
         },
         "claude-sonnet-5": {
           "name": "Claude Sonnet 5",
@@ -150,7 +152,8 @@
           "inputPrice": 3,
           "outputPrice": 15,
           "vision": true,
-          "reasoning": true
+          "reasoning": false,
+          "webSearch": false
         }
       }
     },
@@ -174,20 +177,24 @@
           "reasoning": true
         },
         "deepseek-v4-flash": {
-          "name": "DeepSeek-V4-Flash",
+          "name": "DeepSeek V4 Flash",
           "contextWindow": 1000000,
           "maxOutput": 384000,
           "inputPrice": 0.14,
           "outputPrice": 0.28,
-          "reasoning": true
+          "vision": false,
+          "reasoning": true,
+          "webSearch": false
         },
         "deepseek-v4-pro": {
-          "name": "DeepSeek-V4-Pro",
+          "name": "DeepSeek V4 Pro",
           "contextWindow": 1000000,
           "maxOutput": 384000,
           "inputPrice": 0.435,
           "outputPrice": 0.87,
-          "reasoning": true
+          "vision": false,
+          "reasoning": true,
+          "webSearch": false
         }
       }
     },
@@ -405,6 +412,16 @@
           "contextWindow": 1048576,
           "maxOutput": 65536
         },
+        "gemini-3.5-flash-lite": {
+          "name": "Gemini 3.5 Flash Lite",
+          "contextWindow": 1048576,
+          "maxOutput": 65536
+        },
+        "gemini-3.6-flash": {
+          "name": "Gemini 3.6 Flash",
+          "contextWindow": 1048576,
+          "maxOutput": 65536
+        },
         "gemini-flash-latest": {
           "name": "Gemini Flash Latest",
           "contextWindow": 1048576,
@@ -432,6 +449,11 @@
         },
         "gemini-robotics-er-1.6-preview": {
           "name": "Gemini Robotics-ER 1.6 Preview",
+          "contextWindow": 131072,
+          "maxOutput": 65536
+        },
+        "gemini-robotics-er-2-preview": {
+          "name": "Gemini Robotics-ER 2 Preview",
           "contextWindow": 131072,
           "maxOutput": 65536
         },
@@ -464,6 +486,9 @@
     },
     "openai": {
       "models": {
+        "chat-latest": {
+          "name": "ChatGPT chat-latest"
+        },
         "chatgpt-4o-latest": {
           "name": "ChatGPT-4o Latest",
           "contextWindow": 128000,
@@ -475,11 +500,6 @@
         },
         "chatgpt-image-latest": {
           "name": "chatgpt-image-latest"
-        },
-        "computer-use-preview": {
-          "name": "Computer Use Preview",
-          "inputPrice": 1.5,
-          "outputPrice": 6
         },
         "gpt-3.5-turbo": {
           "name": "gpt-3.5-turbo"
@@ -589,9 +609,7 @@
           "name": "gpt-4o-mini-search-preview-2025-03-11"
         },
         "gpt-4o-mini-transcribe": {
-          "name": "GPT-4o Mini Transcribe",
-          "inputPrice": 1.25,
-          "outputPrice": 5
+          "name": "GPT-4o Mini Transcribe"
         },
         "gpt-4o-mini-transcribe-2025-03-20": {
           "name": "gpt-4o-mini-transcribe-2025-03-20"
@@ -615,9 +633,7 @@
           "name": "gpt-4o-search-preview-2025-03-11"
         },
         "gpt-4o-transcribe": {
-          "name": "GPT-4o Transcribe",
-          "inputPrice": 2.5,
-          "outputPrice": 10
+          "name": "GPT-4o Transcribe"
         },
         "gpt-4o-transcribe-diarize": {
           "name": "gpt-4o-transcribe-diarize"
@@ -747,19 +763,18 @@
           "name": "gpt-5.3-chat-latest"
         },
         "gpt-5.3-codex": {
-          "name": "GPT-5.3 Codex",
-          "inputPrice": 1.75,
-          "outputPrice": 14
+          "name": "GPT-5.3 Codex"
         },
         "gpt-5.4": {
           "name": "GPT-5.4",
           "inputPrice": 2.5,
-          "outputPrice": 15,
-          "reasoning": true,
-          "webSearch": true
+          "outputPrice": 15
         },
         "gpt-5.4-2026-03-05": {
           "name": "gpt-5.4-2026-03-05"
+        },
+        "gpt-5.4-cyber": {
+          "name": "GPT-5.4 Cyber"
         },
         "gpt-5.4-mini": {
           "name": "GPT-5.4 Mini",
@@ -792,9 +807,7 @@
         "gpt-5.5": {
           "name": "GPT-5.5",
           "inputPrice": 5,
-          "outputPrice": 30,
-          "reasoning": true,
-          "webSearch": true
+          "outputPrice": 30
         },
         "gpt-5.5-2026-04-23": {
           "name": "gpt-5.5-2026-04-23"
@@ -809,18 +822,24 @@
         },
         "gpt-5.6-luna": {
           "name": "GPT-5.6 Luna",
-          "inputPrice": 1,
-          "outputPrice": 6
+          "inputPrice": 0.2,
+          "outputPrice": 1.2,
+          "reasoning": true,
+          "webSearch": true
         },
         "gpt-5.6-sol": {
           "name": "GPT-5.6 Sol",
           "inputPrice": 5,
-          "outputPrice": 30
+          "outputPrice": 30,
+          "reasoning": true,
+          "webSearch": true
         },
         "gpt-5.6-terra": {
           "name": "GPT-5.6 Terra",
-          "inputPrice": 2.5,
-          "outputPrice": 15
+          "inputPrice": 2,
+          "outputPrice": 12,
+          "reasoning": true,
+          "webSearch": true
         },
         "gpt-audio": {
           "name": "gpt-audio"
@@ -844,22 +863,19 @@
           "name": "gpt-image-1"
         },
         "gpt-image-1-mini": {
-          "name": "GPT Image 1 Mini",
-          "inputPrice": 2,
-          "outputPrice": 0
+          "name": "GPT Image 1 Mini"
         },
         "gpt-image-1.5": {
-          "name": "GPT Image 1.5",
-          "inputPrice": 5,
-          "outputPrice": 10
+          "name": "GPT Image 1.5"
         },
         "gpt-image-2": {
-          "name": "GPT Image 2",
-          "inputPrice": 5,
-          "outputPrice": 30
+          "name": "GPT Image 2"
         },
         "gpt-image-2-2026-04-21": {
           "name": "gpt-image-2-2026-04-21"
+        },
+        "gpt-live-transcribe": {
+          "name": "GPT Live Transcribe"
         },
         "gpt-realtime": {
           "name": "gpt-realtime"
@@ -871,14 +887,10 @@
           "name": "gpt-realtime-2"
         },
         "gpt-realtime-2.1": {
-          "name": "GPT Realtime 2.1",
-          "inputPrice": 4,
-          "outputPrice": 24
+          "name": "GPT Realtime 2.1"
         },
         "gpt-realtime-2.1-mini": {
-          "name": "GPT Realtime 2.1 Mini",
-          "inputPrice": 0.6,
-          "outputPrice": 2.4
+          "name": "GPT Realtime 2.1 Mini"
         },
         "gpt-realtime-2025-08-28": {
           "name": "gpt-realtime-2025-08-28"
@@ -886,17 +898,17 @@
         "gpt-realtime-mini": {
           "name": "gpt-realtime-mini"
         },
-        "gpt-realtime-mini-2025-10-06": {
-          "name": "gpt-realtime-mini-2025-10-06"
-        },
         "gpt-realtime-mini-2025-12-15": {
           "name": "gpt-realtime-mini-2025-12-15"
         },
         "gpt-realtime-translate": {
-          "name": "gpt-realtime-translate"
+          "name": "GPT Realtime Translate"
         },
         "gpt-realtime-whisper": {
-          "name": "gpt-realtime-whisper"
+          "name": "GPT Realtime Whisper"
+        },
+        "gpt-transcribe": {
+          "name": "GPT Transcribe"
         },
         "o1": {
           "name": "o1",
@@ -947,9 +959,7 @@
           "name": "o3-2025-04-16"
         },
         "o3-deep-research": {
-          "name": "o3 Deep Research",
-          "inputPrice": 5,
-          "outputPrice": 20
+          "name": "o3-deep-research"
         },
         "o3-deep-research-2025-06-26": {
           "name": "o3-deep-research-2025-06-26"
@@ -990,15 +1000,20 @@
           "webSearch": true
         },
         "o4-mini-2025-04-16": {
-          "name": "o4-mini-2025-04-16"
+          "name": "o4-mini-2025-04-16",
+          "reasoning": true
         },
         "o4-mini-deep-research": {
-          "name": "o4 Mini Deep Research",
-          "inputPrice": 1,
-          "outputPrice": 4
+          "name": "o4-mini-deep-research"
         },
         "o4-mini-deep-research-2025-06-26": {
           "name": "o4-mini-deep-research-2025-06-26"
+        },
+        "sora-2": {
+          "name": "Sora 2"
+        },
+        "sora-2-pro": {
+          "name": "Sora 2 Pro"
         }
       }
     },

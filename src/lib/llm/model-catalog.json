@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-07-10T07:09:40.000Z",
+  "_generated": "2026-08-05T19:37:44.000Z",
   "providers": {
     "anthropic": {
       "models": {
@@ -12,8 +12,8 @@
           "vision": true,
           "reasoning": true
         },
-        "claude-opus-4-8": {
-          "name": "Claude Opus 4.8",
+        "claude-opus-5": {
+          "name": "Claude Opus 5",
           "contextWindow": 1000000,
           "maxOutput": 128000,
           "inputPrice": 5,
@@ -53,6 +53,7 @@
         "claude-opus-4-5-20251101",
         "claude-opus-4-6",
         "claude-opus-4-7",
+        "claude-opus-4-8",
         "claude-sonnet-4-20250514",
         "claude-sonnet-4-5-20250929",
         "claude-sonnet-4-6"
@@ -66,7 +67,9 @@
           "maxOutput": 384000,
           "inputPrice": 0.14,
           "outputPrice": 0.28,
-          "reasoning": false
+          "vision": false,
+          "reasoning": false,
+          "webSearch": false
         },
         "deepseek-v4-pro": {
           "name": "DeepSeek-V4 Pro",
@@ -74,7 +77,9 @@
           "maxOutput": 384000,
           "inputPrice": 0.435,
           "outputPrice": 0.87,
-          "reasoning": true
+          "vision": false,
+          "reasoning": true,
+          "webSearch": false
         }
       },
       "excluded": [
@@ -145,6 +150,8 @@
         "gemini-3.1-flash-lite",
         "gemini-3.1-pro-preview-customtools",
         "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.6-flash",
         "gemini-flash-latest",
         "gemini-flash-lite-latest",
         "gemini-omni-flash-preview",
@@ -155,6 +162,7 @@
         "gemini-2.5-pro-preview-05-06",
         "gemini-robotics-er-1.5-preview",
         "gemini-robotics-er-1.6-preview",
+        "gemini-robotics-er-2-preview",
         "gemma-4-26b-a4b-it",
         "gemma-4-31b-it",
         "nano-banana-pro-preview"
@@ -174,8 +182,8 @@
         "gpt-5.6-terra": {
           "name": "GPT-5.6 Terra",
           "maxOutput": 128000,
-          "inputPrice": 2.5,
-          "outputPrice": 15,
+          "inputPrice": 2,
+          "outputPrice": 12,
           "reasoning": true,
           "webSearch": true
         },
@@ -183,8 +191,8 @@
           "name": "GPT-5.6 Luna",
           "contextWindow": 200000,
           "maxOutput": 100000,
-          "inputPrice": 1,
-          "outputPrice": 6,
+          "inputPrice": 0.2,
+          "outputPrice": 1.2,
           "vision": true,
           "reasoning": true,
           "webSearch": true
@@ -249,8 +257,8 @@
         }
       },
       "excluded": [
+        "chat-latest",
         "chatgpt-4o-latest",
-        "computer-use-preview",
         "gpt-3.5-turbo",
         "gpt-3.5-turbo-16k",
         "gpt-4",
@@ -274,6 +282,7 @@
         "gpt-5.2-chat-latest",
         "gpt-5.2-pro",
         "gpt-5.4",
+        "gpt-5.4-cyber",
         "gpt-5.4-pro",
         "gpt-5.5",
         "gpt-5.5-pro",
@@ -285,7 +294,9 @@
         "o3-deep-research",
         "o3-mini",
         "o3-pro",
-        "o4-mini-deep-research"
+        "o4-mini-deep-research",
+        "sora-2",
+        "sora-2-pro"
       ]
     },
     "xai": {
