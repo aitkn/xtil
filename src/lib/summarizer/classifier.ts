@@ -88,7 +88,11 @@ export async function classifyGenre(
         { role: 'system', content: 'Respond with ONLY a JSON object. No explanation, no markdown, no code fences.' },
         { role: 'user', content: userMsg },
       ],
-      { maxTokens: 300, jsonMode: true, signal },
+      // maxTokens covers reasoning tokens too on models that think by default
+      // (Sonnet 5, Opus 5, OpenAI reasoning models), so leave headroom for
+      // thinking plus the small JSON object — 300 can be spent entirely on
+      // thinking, yielding no parseable text.
+      { maxTokens: 1024, jsonMode: true, signal },
     );
 
     const raw = response.trim();

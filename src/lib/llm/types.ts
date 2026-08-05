@@ -24,6 +24,12 @@ export interface JsonSchema {
 }
 
 export interface ChatOptions {
+  /**
+   * Sampling temperature. Left unset by every current caller. Anthropic removed
+   * this parameter on the current Claude generation (Opus 4.7+, Opus 5, Sonnet 5),
+   * which returns HTTP 400 if it is sent — so setting it here will break those
+   * models even though the other providers honour it.
+   */
   temperature?: number;
   maxTokens?: number;
   /** When true, ask the provider to enforce valid JSON output. */
