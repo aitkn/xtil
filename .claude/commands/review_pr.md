@@ -12,6 +12,30 @@ You are an expert code reviewer for this codebase. Review a pull request and pos
 
 Automated reviews already start you in a **throwaway detached worktree at the PR head**. The review wrapper creates it before you start and removes it after you exit, one per reviewer — so you never create or remove a worktree yourself, and `git worktree add`/`remove` is blocked along with the commands above. The guard (a `git` shim first on your `PATH`) lives outside this repo, so a PR cannot weaken the guard that reviews it.
 
+**Two directories in that worktree are NOT this PR's.** Before you start, the wrapper deletes
+`.claude/` and `.wolf/` at the PR head and copies the main checkout's versions in their place
+(`_seed_trusted_config`). That is deliberate and not negotiable: agent configuration is executable
+— `.claude/settings.json` registers the hooks that run during your own review — so a PR left to
+supply its own would be able to weaken the guard reviewing it.
+
+Two consequences, both of which have already cost review time:
+
+- **A fresh review worktree is usually dirty, and under those two paths that is expected, not a
+  fault.** Under `.claude/` and `.wolf/`, expect modifications where the PR edits those paths,
+  deletions wherever the PR head has a file the main checkout's WORKING TREE does not — not
+  only files the PR adds, but any file the main checkout is behind on or has deleted locally —
+  and untracked files wherever
+  the main checkout is ahead or holds uncommitted work of its own; it is clean only when the two
+  copies happen to match. sked_ai#2349 saw 22 such entries and both arms reported the checkout as
+  suspect. **Anything dirty OUTSIDE those two directories is not explained by this and still
+  deserves your scrutiny.**
+- **For a PR that touches `.claude/` or `.wolf/`, the file on disk is master's, not the one you
+  are reviewing.** Read those paths with `git show <headRefOid>:<path>` or from `gh pr diff` —
+  never from disk, **even when `git rev-parse HEAD` equals `headRefOid`**, and key the lookup on
+  `headRefOid` rather than `HEAD` so it still works from a checkout that is not the PR. Any
+  later step telling you to read files directly once HEAD matches does not apply to these two
+  directories. Everything outside them is genuinely the PR's code.
+
 A review needs no checkout at all: `gh pr diff` gives the diff, and `gh api -H "Accept: application/vnd.github.raw" repos/{owner}/{repo}/contents/<path>?ref=<head_sha>` gives any file at the PR head. Without that header the API returns JSON metadata with the file in a base64 `content` field, not the text (and it omits `content` entirely above 1 MB).
 
 ---
@@ -25,7 +49,7 @@ A review needs no checkout at all: `gh pr diff` gives the diff, and `gh api -H "
    gh pr diff <number>
    gh pr view <number> --json headRefOid --jq '.headRefOid'
    ```
-3. Read the key source files touched in the diff to understand the changes in context. Don't just rely on the diff — read surrounding code to catch issues the diff alone won't reveal. **Confirm the files on disk are actually at the PR head before trusting them:** `git rev-parse HEAD` must equal the `headRefOid` from step 2. If it matches (the normal case in a review worktree, see Phase 0), read the files directly. If it does not, you are in a shared checkout on some other ref — do not read files from disk; fetch them with `gh api` at `<head_sha>` instead. Either way, do not check anything out.
+3. Read the key source files touched in the diff to understand the changes in context. Don't just rely on the diff — read surrounding code to catch issues the diff alone won't reveal. **Confirm the files on disk are actually at the PR head before trusting them:** `git rev-parse HEAD` must equal the `headRefOid` from step 2. If it matches (the normal case in a review worktree, see Phase 0), read the files directly — **except under `.claude/` and `.wolf/`, which the wrapper has replaced with the main checkout's copies (Phase 0); read those with `git show <headRefOid>:<path>` however HEAD compares.** If it does not, you are in a shared checkout on some other ref — do not read files from disk; fetch them with `gh api` at `<head_sha>` instead. Either way, do not check anything out.
 
 ---
 
@@ -78,28 +102,79 @@ Post your findings as a single PR review with inline comments using the GitHub A
 
 **Use the bot account token** from `~/.env.claude` (`GITHUB_REVIEW_TOKEN`) so comments appear under the bot name, not the user's account. If the token is not set, fall back to default `gh` auth and warn the user.
 
+**Write the payload to a file whose path is unique to THIS review, assert it, and POST that same
+file.** `/tmp` is shared by every review session on this host — three arms per PR, six repos, rounds
+hours apart — so a fixed name like `/tmp/review_payload.json` is a cross-review channel, not scratch
+space. sked_ai#2349 was reviewed with the payload sked_ai#2337 had left at exactly that path
+12 h 43 m earlier: a stale body, a stale `commit_id`, and an inline comment on a file #2349 does not
+even touch, all posted under this arm's name — while the arm's own log reported the clean LGTM it
+believed it had sent.
+
+**The assert and the POST must read the same bytes.** Writing one file, checking it, and then
+sending a body from somewhere else rebuilds the same "what I believe I sent" gap by another route,
+so `$PAYLOAD` is both the thing you assert and the thing you send — never a heredoc on the POST:
+
 ```bash
+# Run this as ONE shell invocation: shell variables do not survive between tool
+# calls, so a $PAYLOAD assigned in an earlier call reads back EMPTY in a later one.
+#
+# HEAD_SHA is the headRefOid you PINNED IN PHASE 1 -- the commit your findings were
+# actually computed against. Paste that value; do NOT re-read the live head here.
+# Re-reading breaks the guard in both directions when a push lands mid-review:
+# the payload and the live head would both be the NEW sha, so the assert passes and
+# a review of code you never examined is accepted -- or it fails, and "rewrite"
+# becomes stamping the new sha onto findings derived from the old diff.
+HEAD_SHA=<the headRefOid from Phase 1>
+[ -n "$HEAD_SHA" ] || { echo "no analyzed head sha -- refusing to post"; exit 1; }
+PAYLOAD=$(mktemp -t review-pr{pr_number}-XXXXXX.json)
+echo "payload: $PAYLOAD"   # printed so a file-write tool can be given the literal path
+
+# Write the JSON payload (structure below) into $PAYLOAD -- heredoc here, or your
+# file-write tool using the path just printed.
+cat > "$PAYLOAD" <<'JSONEOF'
+  <json payload>
+JSONEOF
+
+# Refuse to post a payload that is not the one you just wrote for this review.
+# The -s test is not belt-and-braces: with both sides empty -- which is exactly what
+# a run split across two tool calls produces -- `test "" = ""` PASSES.
+[ -s "$PAYLOAD" ] || { echo "payload file is empty or unset -- refusing to post"; exit 1; }
+test "$(jq -r .commit_id "$PAYLOAD")" = "$HEAD_SHA" \
+  || { echo "payload commit_id is not the analyzed head -- refusing to post"; exit 1; }
+
+# Then check the PR has not moved under you since Phase 1. This is a re-review
+# trigger, NOT something to fix by editing the payload.
+LIVE=$(gh api repos/{owner}/{repo}/pulls/{pr_number} --jq .head.sha)
+[ "$LIVE" = "$HEAD_SHA" ] \
+  || { echo "head moved $HEAD_SHA -> $LIVE mid-review; re-read the diff at $LIVE and rebuild"; exit 1; }
+
 # Load the bot token
 REVIEW_TOKEN=$(grep GITHUB_REVIEW_TOKEN ~/.env.claude 2>/dev/null | cut -d= -f2)
 
-# Post review — use bot token if available, otherwise fall back to gh default
+# Post review -- use bot token if available, otherwise fall back to gh default
 if [ -n "$REVIEW_TOKEN" ]; then
   curl -s -X POST \
     -H "Authorization: token $REVIEW_TOKEN" \
     -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/reviews" \
-    -d @/dev/stdin <<'JSONEOF'
-  <json payload>
-JSONEOF
+    --data-binary @"$PAYLOAD"   # NOT -d: `-d @file` strips newlines, so it would not
+                                # send the bytes the assert above just checked
 else
   echo "WARNING: GITHUB_REVIEW_TOKEN not found in ~/.env.claude — posting under your account"
-  gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews -X POST \
-    --input <(cat <<'JSONEOF'
-  <json payload>
-JSONEOF
-  )
+  gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews -X POST --input "$PAYLOAD"
 fi
 ```
+
+If the assert fails, **rebuild the payload — never re-stamp `commit_id`, and never edit the
+assert.** Re-stamping is the cheapest repair and it is precisely the incident: setting
+`.commit_id` to the current head would have made #2349's stale payload pass and posted #2337's
+body and inline comment under #2349's head. Work out which case you are in first:
+
+- **The payload is not yours** (a leftover from another PR or round) — discard it and write your
+  own findings into a fresh `$PAYLOAD`.
+- **The head moved under you mid-review** — the diff you reviewed is stale. Re-read it at the new
+  head, re-validate every inline `line` number against it, and rebuild the payload from that. Your
+  findings may still hold; their line numbers usually do not.
 
 JSON payload structure:
 ```json
