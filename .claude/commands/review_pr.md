@@ -22,7 +22,9 @@ Two consequences, both of which have already cost review time:
 
 - **A fresh review worktree is usually dirty, and under those two paths that is expected, not a
   fault.** Under `.claude/` and `.wolf/`, expect modifications where the PR edits those paths,
-  deletions where the PR ADDS a file the main checkout does not have, and untracked files wherever
+  deletions wherever the PR head has a file the main checkout's WORKING TREE does not — not
+  only files the PR adds, but any file the main checkout is behind on or has deleted locally —
+  and untracked files wherever
   the main checkout is ahead or holds uncommitted work of its own; it is clean only when the two
   copies happen to match. sked_ai#2349 saw 22 such entries and both arms reported the checkout as
   suspect. **Anything dirty OUTSIDE those two directories is not explained by this and still
@@ -113,11 +115,16 @@ sending a body from somewhere else rebuilds the same "what I believe I sent" gap
 so `$PAYLOAD` is both the thing you assert and the thing you send — never a heredoc on the POST:
 
 ```bash
-# Bind both up front; everything below uses them.
-HEAD_SHA=$(gh api repos/{owner}/{repo}/pulls/{pr_number} --jq .head.sha)
+# Run this as ONE shell invocation: shell variables do not survive between tool
+# calls, so a $PAYLOAD assigned in an earlier call reads back EMPTY in a later one.
+HEAD_SHA=$(gh api repos/{owner}/{repo}/pulls/{pr_number} --jq .head.sha) \
+  || { echo "could not read this PR's head -- fix that, the payload is not the problem"; exit 1; }
+[ -n "$HEAD_SHA" ] || { echo "empty head sha -- refusing to post"; exit 1; }
 PAYLOAD=$(mktemp -t review-pr{pr_number}-XXXXXX.json)
+echo "payload: $PAYLOAD"   # printed so a file-write tool can be given the literal path
 
-# Write the JSON payload (structure below) into $PAYLOAD -- heredoc, jq, or your file-write tool.
+# Write the JSON payload (structure below) into $PAYLOAD -- heredoc here, or your
+# file-write tool using the path just printed.
 cat > "$PAYLOAD" <<'JSONEOF'
   <json payload>
 JSONEOF
@@ -142,7 +149,16 @@ else
 fi
 ```
 
-If the assert fails, REWRITE the payload; never satisfy it by editing the assert.
+If the assert fails, **rebuild the payload — never re-stamp `commit_id`, and never edit the
+assert.** Re-stamping is the cheapest repair and it is precisely the incident: setting
+`.commit_id` to the current head would have made #2349's stale payload pass and posted #2337's
+body and inline comment under #2349's head. Work out which case you are in first:
+
+- **The payload is not yours** (a leftover from another PR or round) — discard it and write your
+  own findings into a fresh `$PAYLOAD`.
+- **The head moved under you mid-review** — the diff you reviewed is stale. Re-read it at the new
+  head, re-validate every inline `line` number against it, and rebuild the payload from that. Your
+  findings may still hold; their line numbers usually do not.
 
 JSON payload structure:
 ```json
