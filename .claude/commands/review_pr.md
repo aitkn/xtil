@@ -117,9 +117,15 @@ so `$PAYLOAD` is both the thing you assert and the thing you send — never a he
 ```bash
 # Run this as ONE shell invocation: shell variables do not survive between tool
 # calls, so a $PAYLOAD assigned in an earlier call reads back EMPTY in a later one.
-HEAD_SHA=$(gh api repos/{owner}/{repo}/pulls/{pr_number} --jq .head.sha) \
-  || { echo "could not read this PR's head -- fix that, the payload is not the problem"; exit 1; }
-[ -n "$HEAD_SHA" ] || { echo "empty head sha -- refusing to post"; exit 1; }
+#
+# HEAD_SHA is the headRefOid you PINNED IN PHASE 1 -- the commit your findings were
+# actually computed against. Paste that value; do NOT re-read the live head here.
+# Re-reading breaks the guard in both directions when a push lands mid-review:
+# the payload and the live head would both be the NEW sha, so the assert passes and
+# a review of code you never examined is accepted -- or it fails, and "rewrite"
+# becomes stamping the new sha onto findings derived from the old diff.
+HEAD_SHA=<the headRefOid from Phase 1>
+[ -n "$HEAD_SHA" ] || { echo "no analyzed head sha -- refusing to post"; exit 1; }
 PAYLOAD=$(mktemp -t review-pr{pr_number}-XXXXXX.json)
 echo "payload: $PAYLOAD"   # printed so a file-write tool can be given the literal path
 
@@ -129,9 +135,18 @@ cat > "$PAYLOAD" <<'JSONEOF'
   <json payload>
 JSONEOF
 
-# Refuse to post a payload that is not for this PR's head.
+# Refuse to post a payload that is not the one you just wrote for this review.
+# The -s test is not belt-and-braces: with both sides empty -- which is exactly what
+# a run split across two tool calls produces -- `test "" = ""` PASSES.
+[ -s "$PAYLOAD" ] || { echo "payload file is empty or unset -- refusing to post"; exit 1; }
 test "$(jq -r .commit_id "$PAYLOAD")" = "$HEAD_SHA" \
-  || { echo "payload commit_id is not this PR's head -- refusing to post"; exit 1; }
+  || { echo "payload commit_id is not the analyzed head -- refusing to post"; exit 1; }
+
+# Then check the PR has not moved under you since Phase 1. This is a re-review
+# trigger, NOT something to fix by editing the payload.
+LIVE=$(gh api repos/{owner}/{repo}/pulls/{pr_number} --jq .head.sha)
+[ "$LIVE" = "$HEAD_SHA" ] \
+  || { echo "head moved $HEAD_SHA -> $LIVE mid-review; re-read the diff at $LIVE and rebuild"; exit 1; }
 
 # Load the bot token
 REVIEW_TOKEN=$(grep GITHUB_REVIEW_TOKEN ~/.env.claude 2>/dev/null | cut -d= -f2)
@@ -142,7 +157,8 @@ if [ -n "$REVIEW_TOKEN" ]; then
     -H "Authorization: token $REVIEW_TOKEN" \
     -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/reviews" \
-    -d @"$PAYLOAD"
+    --data-binary @"$PAYLOAD"   # NOT -d: `-d @file` strips newlines, so it would not
+                                # send the bytes the assert above just checked
 else
   echo "WARNING: GITHUB_REVIEW_TOKEN not found in ~/.env.claude — posting under your account"
   gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews -X POST --input "$PAYLOAD"
