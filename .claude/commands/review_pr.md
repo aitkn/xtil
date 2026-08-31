@@ -20,14 +20,19 @@ supply its own would be able to weaken the guard reviewing it.
 
 Two consequences, both of which have already cost review time:
 
-- **`git status` is never clean in a fresh review worktree, and that is not a fault.** Expect
-  modifications where the PR edits those paths, deletions where the PR ADDS a file the main
-  checkout does not have, and untracked files wherever the main checkout is ahead or has
-  uncommitted work of its own. sked_ai#2349 saw 22 such entries and both arms reported the
-  checkout as suspect. Do not.
+- **A fresh review worktree is usually dirty, and under those two paths that is expected, not a
+  fault.** Under `.claude/` and `.wolf/`, expect modifications where the PR edits those paths,
+  deletions where the PR ADDS a file the main checkout does not have, and untracked files wherever
+  the main checkout is ahead or holds uncommitted work of its own; it is clean only when the two
+  copies happen to match. sked_ai#2349 saw 22 such entries and both arms reported the checkout as
+  suspect. **Anything dirty OUTSIDE those two directories is not explained by this and still
+  deserves your scrutiny.**
 - **For a PR that touches `.claude/` or `.wolf/`, the file on disk is master's, not the one you
-  are reviewing.** Read those paths with `git show HEAD:<path>` or from `gh pr diff` — never from
-  disk. Everything outside those two directories is genuinely the PR's code.
+  are reviewing.** Read those paths with `git show <headRefOid>:<path>` or from `gh pr diff` —
+  never from disk, **even when `git rev-parse HEAD` equals `headRefOid`**, and key the lookup on
+  `headRefOid` rather than `HEAD` so it still works from a checkout that is not the PR. Any
+  later step telling you to read files directly once HEAD matches does not apply to these two
+  directories. Everything outside them is genuinely the PR's code.
 
 A review needs no checkout at all: `gh pr diff` gives the diff, and `gh api -H "Accept: application/vnd.github.raw" repos/{owner}/{repo}/contents/<path>?ref=<head_sha>` gives any file at the PR head. Without that header the API returns JSON metadata with the file in a base64 `content` field, not the text (and it omits `content` entirely above 1 MB).
 
@@ -42,7 +47,7 @@ A review needs no checkout at all: `gh pr diff` gives the diff, and `gh api -H "
    gh pr diff <number>
    gh pr view <number> --json headRefOid --jq '.headRefOid'
    ```
-3. Read the key source files touched in the diff to understand the changes in context. Don't just rely on the diff — read surrounding code to catch issues the diff alone won't reveal. **Confirm the files on disk are actually at the PR head before trusting them:** `git rev-parse HEAD` must equal the `headRefOid` from step 2. If it matches (the normal case in a review worktree, see Phase 0), read the files directly. If it does not, you are in a shared checkout on some other ref — do not read files from disk; fetch them with `gh api` at `<head_sha>` instead. Either way, do not check anything out.
+3. Read the key source files touched in the diff to understand the changes in context. Don't just rely on the diff — read surrounding code to catch issues the diff alone won't reveal. **Confirm the files on disk are actually at the PR head before trusting them:** `git rev-parse HEAD` must equal the `headRefOid` from step 2. If it matches (the normal case in a review worktree, see Phase 0), read the files directly — **except under `.claude/` and `.wolf/`, which the wrapper has replaced with the main checkout's copies (Phase 0); read those with `git show <headRefOid>:<path>` however HEAD compares.** If it does not, you are in a shared checkout on some other ref — do not read files from disk; fetch them with `gh api` at `<head_sha>` instead. Either way, do not check anything out.
 
 ---
 
@@ -95,7 +100,6 @@ Post your findings as a single PR review with inline comments using the GitHub A
 
 **Use the bot account token** from `~/.env.claude` (`GITHUB_REVIEW_TOKEN`) so comments appear under the bot name, not the user's account. If the token is not set, fall back to default `gh` auth and warn the user.
 
-```bash
 **Write the payload to a file whose path is unique to THIS review, assert it, and POST that same
 file.** `/tmp` is shared by every review session on this host — three arms per PR, six repos, rounds
 hours apart — so a fixed name like `/tmp/review_payload.json` is a cross-review channel, not scratch
