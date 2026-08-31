@@ -12,6 +12,23 @@ You are an expert code reviewer for this codebase. Review a pull request and pos
 
 Automated reviews already start you in a **throwaway detached worktree at the PR head**. The review wrapper creates it before you start and removes it after you exit, one per reviewer — so you never create or remove a worktree yourself, and `git worktree add`/`remove` is blocked along with the commands above. The guard (a `git` shim first on your `PATH`) lives outside this repo, so a PR cannot weaken the guard that reviews it.
 
+**Two directories in that worktree are NOT this PR's.** Before you start, the wrapper deletes
+`.claude/` and `.wolf/` at the PR head and copies the main checkout's versions in their place
+(`_seed_trusted_config`). That is deliberate and not negotiable: agent configuration is executable
+— `.claude/settings.json` registers the hooks that run during your own review — so a PR left to
+supply its own would be able to weaken the guard reviewing it.
+
+Two consequences, both of which have already cost review time:
+
+- **`git status` is never clean in a fresh review worktree, and that is not a fault.** Expect
+  modifications where the PR edits those paths, deletions where the PR ADDS a file the main
+  checkout does not have, and untracked files wherever the main checkout is ahead or has
+  uncommitted work of its own. sked_ai#2349 saw 22 such entries and both arms reported the
+  checkout as suspect. Do not.
+- **For a PR that touches `.claude/` or `.wolf/`, the file on disk is master's, not the one you
+  are reviewing.** Read those paths with `git show HEAD:<path>` or from `gh pr diff` — never from
+  disk. Everything outside those two directories is genuinely the PR's code.
+
 A review needs no checkout at all: `gh pr diff` gives the diff, and `gh api -H "Accept: application/vnd.github.raw" repos/{owner}/{repo}/contents/<path>?ref=<head_sha>` gives any file at the PR head. Without that header the API returns JSON metadata with the file in a base64 `content` field, not the text (and it omits `content` entirely above 1 MB).
 
 ---
@@ -79,27 +96,49 @@ Post your findings as a single PR review with inline comments using the GitHub A
 **Use the bot account token** from `~/.env.claude` (`GITHUB_REVIEW_TOKEN`) so comments appear under the bot name, not the user's account. If the token is not set, fall back to default `gh` auth and warn the user.
 
 ```bash
+**Write the payload to a file whose path is unique to THIS review, assert it, and POST that same
+file.** `/tmp` is shared by every review session on this host — three arms per PR, six repos, rounds
+hours apart — so a fixed name like `/tmp/review_payload.json` is a cross-review channel, not scratch
+space. sked_ai#2349 was reviewed with the payload sked_ai#2337 had left at exactly that path
+12 h 43 m earlier: a stale body, a stale `commit_id`, and an inline comment on a file #2349 does not
+even touch, all posted under this arm's name — while the arm's own log reported the clean LGTM it
+believed it had sent.
+
+**The assert and the POST must read the same bytes.** Writing one file, checking it, and then
+sending a body from somewhere else rebuilds the same "what I believe I sent" gap by another route,
+so `$PAYLOAD` is both the thing you assert and the thing you send — never a heredoc on the POST:
+
+```bash
+# Bind both up front; everything below uses them.
+HEAD_SHA=$(gh api repos/{owner}/{repo}/pulls/{pr_number} --jq .head.sha)
+PAYLOAD=$(mktemp -t review-pr{pr_number}-XXXXXX.json)
+
+# Write the JSON payload (structure below) into $PAYLOAD -- heredoc, jq, or your file-write tool.
+cat > "$PAYLOAD" <<'JSONEOF'
+  <json payload>
+JSONEOF
+
+# Refuse to post a payload that is not for this PR's head.
+test "$(jq -r .commit_id "$PAYLOAD")" = "$HEAD_SHA" \
+  || { echo "payload commit_id is not this PR's head -- refusing to post"; exit 1; }
+
 # Load the bot token
 REVIEW_TOKEN=$(grep GITHUB_REVIEW_TOKEN ~/.env.claude 2>/dev/null | cut -d= -f2)
 
-# Post review — use bot token if available, otherwise fall back to gh default
+# Post review -- use bot token if available, otherwise fall back to gh default
 if [ -n "$REVIEW_TOKEN" ]; then
   curl -s -X POST \
     -H "Authorization: token $REVIEW_TOKEN" \
     -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/reviews" \
-    -d @/dev/stdin <<'JSONEOF'
-  <json payload>
-JSONEOF
+    -d @"$PAYLOAD"
 else
   echo "WARNING: GITHUB_REVIEW_TOKEN not found in ~/.env.claude — posting under your account"
-  gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews -X POST \
-    --input <(cat <<'JSONEOF'
-  <json payload>
-JSONEOF
-  )
+  gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews -X POST --input "$PAYLOAD"
 fi
 ```
+
+If the assert fails, REWRITE the payload; never satisfy it by editing the assert.
 
 JSON payload structure:
 ```json
