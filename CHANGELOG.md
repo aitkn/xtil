@@ -4,6 +4,15 @@ All notable user-facing changes to xTil are documented here.
 
 ---
 
+## 1.2.15
+
+**Newer models across the board: Claude Opus 5.5, GPT-6, Gemini 3.8 Flash, Grok 4.7**
+
+- Added **Claude Opus 5.5**, replacing Opus 5 at a lower price. Claude Sonnet 5 is now cheaper too.
+- Added OpenAI's **GPT-6 Sol** and **GPT-6 Luna**, replacing the GPT-5.6 models. Both are cheaper, and GPT-6 Luna handles much longer pages.
+- Added **Gemini 3.8 Flash** and **Grok 4.7**, the newest fast Gemini and flagship Grok models.
+- DeepSeek's fast model now appears under its new name, **DeepSeek Flash**. DeepSeek V4 Pro costs more to run than before.
+
 ## 1.2.14
 
 **Newer Claude models work again, and Claude Opus 5 joins the lineup**
